@@ -115,7 +115,7 @@ input[type=search] { font: inherit; font-size: 13px; padding: 5px 10px; border: 
 .who { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .who img { width: 26px; height: 26px; border-radius: 50%; background: var(--grid); flex: none; }
 .who .name { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.who .sub { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.who .sub { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lv { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; white-space: nowrap; }
 .bar { display: flex; align-items: center; height: 16px; }
 .bar .seg { height: 14px; flex: none; }
@@ -179,6 +179,8 @@ input[type=search] { font: inherit; font-size: 13px; padding: 5px 10px; border: 
 .dot:hover { stroke: var(--ink); }
 .zone { fill: var(--warning); fill-opacity: 0.16; }
 .zone-line { fill: none; stroke: var(--warning); stroke-width: 1.5; }
+.zone-t { fill: var(--ink-2); font-size: 10.5px; font-weight: 600; }
+.chart-note { margin: 8px 0 0; font-size: 12px; color: var(--ink-2); line-height: 1.6; }
 .hbars { display: grid; gap: 2px; }
 .hb { display: grid; grid-template-columns: 220px 1fr 80px; gap: 8px; align-items: center; padding: 4px 2px; font-size: 13px; }
 .hb:hover { background: var(--hover); }
@@ -217,10 +219,19 @@ th { color: var(--ink-2); font-weight: 600; cursor: pointer; user-select: none; 
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 ul.blind { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink-2); }
 ul.blind li { margin: 4px 0; }
+dl.terms { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 12px; margin: 0; font-size: 13px; align-items: baseline; }
+dl.terms dt { font-weight: 600; }
+dl.terms dd { margin: 0; color: var(--ink-2); }
 
 #tip { position: fixed; z-index: 10; pointer-events: none; display: none; max-width: 360px; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.6; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); }
 #tip .k { color: var(--muted); }
 #tip svg { vertical-align: -4px; }
+#tip .tt-h { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 13px; }
+#tip .tt-h svg { vertical-align: 0; }
+#tip dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 10px; margin: 0; }
+#tip dt { color: var(--muted); }
+#tip dd { margin: 0; font-variant-numeric: tabular-nums; }
+#tip .tt-flag { margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -261,6 +272,10 @@ ul.blind li { margin: 4px 0; }
         <h2>奶蛙进化路径 <span class="meta">点击分段或台阶筛选排行</span></h2>
         <div id="path"></div>
       </section>
+      <section class="card">
+        <h2>名词解释</h2>
+        <dl class="terms" id="terms"></dl>
+      </section>
     </div>
   </div>
 
@@ -290,6 +305,7 @@ ul.blind li { margin: 4px 0; }
     <section class="card chart">
       <h2>合入率与警告线 <span class="meta">每个点是一个人；横轴为对数刻度</span></h2>
       <div id="chart-rate"><div class="empty">等待数据</div></div>
+      <p class="chart-note" id="rate-note"></p>
     </section>
     <section class="card">
       <h2>M-Team 规则对照 <span class="meta">悬停查看映射理由</span></h2>
@@ -337,6 +353,21 @@ const STAGES = {
   pending: { name: '蛙卵', icon: 'egg' },
   failed: { name: '未孵化', icon: 'unhatched' },
 };
+
+// 名词解释：「名词解释」卡片、筛选按钮与标签的悬停提示共用。tag 是排行里对应标签的样式
+const TERMS = (() => {
+  const [first, ...rest] = RULES.warnLines;
+  const a = RULES.newbie.anomaly;
+  return {
+    collab: { name: '协作', text: `参与别人的 PR 或 issue：review、评论、帮人合入。同一个 PR 或 issue 只算一次；自己提的有效 issue 也算。每次 +${RULES.score.collab} 魔力。` },
+    rate: { name: '合入率', text: `合入 PR ÷ 已收尾 PR。已收尾指已合入、关闭未合入，或打开超过 ${RULES.staleOpenDays} 天还没合入。` },
+    warn: { name: '合入率警告', tag: 'tag st warning', text: `已收尾 PR 超过 ${first.resolved} 个后，合入率低于 ${pct(first.rate)} 就会被标记；超过 ${rest.map((l) => l.resolved).join(' / ')} 个时，要求依次提高到 ${rest.map((l) => pct(l.rate)).join(' / ')}。只是提醒，不扣魔力；形态降级另看降级线。` },
+    outsider: { name: '组织外', tag: 'tag', text: '数据更新时不在 nwverse 组织成员名单里的账号，例如从 fork 提 PR 的外部贡献者、已退出的人。贡献照常计分。' },
+    anomaly: { name: '新手异常', tag: 'tag st serious', text: `孵化期内开了 ${a.opened} 个以上 PR，合入的不到 ${pct(a.rate)}。最近 ${a.graceHours} 小时内开的 PR 不计。` },
+    dormant: { name: '冬眠', tag: 'tag st', text: `超过 ${RULES.dormantDays} 天没有任何动作。只做标记；${RULES.levels[RULES.dormantExemptLevel].name}及以上不标记。` },
+  };
+})();
+const termTag = (t) => `<span class="${t.tag}" data-tip="${esc(esc(t.text))}">${esc(t.name)}</span>`;
 
 function niceStep(max) {
   for (const step of [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]) if (max / step <= 5) return step;
@@ -459,14 +490,14 @@ const TOP_N = 20;
 
 const FILTERS = {
   all: { label: '全部', chip: true, fn: () => true },
-  member: { label: '成员', chip: true, fn: (p) => p.member },
-  outsider: { label: '非成员', chip: true, fn: (p) => !p.member },
+  member: { label: '组织成员', chip: true, fn: (p) => p.member },
+  outsider: { label: '组织外', chip: true, tip: TERMS.outsider.text, fn: (p) => !p.member },
   passed: { label: '考核通过', fn: (p) => p.newbie.status === 'passed' },
   pending: { label: '蛙卵（考核中）', fn: (p) => p.newbie.status === 'pending' },
-  failed: { label: '未孵化', chip: true, fn: (p) => p.newbie.status === 'failed' },
-  warn: { label: '合入率警告', chip: true, fn: (p) => p.warn },
-  anomaly: { label: '新手异常', chip: true, fn: (p) => p.newbie.anomaly },
-  dormant: { label: '冬眠', chip: true, fn: (p) => p.dormant },
+  failed: { label: '未孵化', chip: true, tip: `首次贡献起 ${RULES.newbie.days} 天内没有通过新手考核`, fn: (p) => p.newbie.status === 'failed' },
+  warn: { label: '合入率警告', chip: true, tip: TERMS.warn.text, fn: (p) => p.warn },
+  anomaly: { label: '新手异常', chip: true, tip: TERMS.anomaly.text, fn: (p) => p.newbie.anomaly },
+  dormant: { label: '冬眠', chip: true, tip: TERMS.dormant.text, fn: (p) => p.dormant },
 };
 RULES.levels.forEach((L, i) => { FILTERS[`lv${i}`] = { label: L.name, fn: (p) => p.level === i }; });
 
@@ -616,7 +647,6 @@ function renderBlind(limits) {
     '模型系数的跨厂商对齐按「当代旗舰 / 中端 / 轻量」划分，没有基准测试依据；新型号发布后需要更新识别规则。',
     '直接推送到默认分支的 commit 不计入；仓库要求「所有改动走 PR」之前的贡献会被低估。',
     'AI 生成的 PR 记在开 PR 的账号名下，账号持有人对内容负责。',
-    '非成员可能是外部协作者、已离开的成员，或还没接受邀请的人。',
     `每个 PR 和 issue 只读取前 ${limits.nested} 条 review 和前 ${limits.nested} 条评论。`,
     '「首次贡献」代替入组时间；第一次贡献很早、之后长期不活跃的人，新手考核会按那次贡献起算。',
   ].map((t) => `<li>${esc(t)}</li>`).join('');
@@ -633,7 +663,7 @@ function renderKpis(b) {
   const inflight = b.people.reduce((n, p) => n + p.inflight, 0);
   const backlog = [...b.people].sort((x, y) => y.inflight - x.inflight)[0];
   const kpis = [
-    { label: '贡献者', value: s.contributors, note: `成员 ${s.memberContributors} · 非成员 ${s.outsiders}` },
+    { label: '贡献者', value: s.contributors, note: `组织成员 ${s.memberContributors} · 组织外 ${s.outsiders}` },
     { label: '合入 PR', value: fmtNum(s.merged), note: `共开 ${fmtNum(s.prs)} 个 PR` },
     { label: '有人工 review 的合入', value: pct(ratio(s.mergedReviewed, s.merged)), meter: ratio(s.mergedReviewed, s.merged), note: `${s.mergedReviewed} / ${fmtNum(s.merged)}` },
     { label: '作者自己合入', value: pct(ratio(s.mergedSelf, s.merged)), meter: ratio(s.mergedSelf, s.merged), note: `${fmtNum(s.mergedSelf)} / ${fmtNum(s.merged)}` },
@@ -662,34 +692,53 @@ function levelChip(p) {
 }
 
 function flagTags(p) {
-  const tags = [];
-  if (!p.member) tags.push('<span class="tag">非成员</span>');
-  if (p.newbie.anomaly) tags.push('<span class="tag st serious">新手异常</span>');
-  if (p.warn) tags.push('<span class="tag st warning">合入率警告</span>');
-  if (p.dormant) tags.push('<span class="tag st">冬眠</span>');
-  return tags.join('');
+  return [!p.member && TERMS.outsider, p.newbie.anomaly && TERMS.anomaly, p.warn && TERMS.warn, p.dormant && TERMS.dormant]
+    .filter(Boolean).map(termTag).join('');
 }
 
+function renderTerms() {
+  $('terms').innerHTML = Object.values(TERMS)
+    .map((t) => `<dt>${t.tag ? `<span class="${t.tag}">${esc(t.name)}</span>` : esc(t.name)}</dt><dd>${esc(t.text)}</dd>`).join('');
+}
+
+// 排行行里已有形态、合入数、协作数和魔力总数；悬停卡片只补充构成、进度和需要注意的事
 function personTip(p, now) {
   const nb = RULES.newbie;
   const n = p.newbie;
-  const newbieText = n.status === 'passed'
-    ? `通过（第 ${n.passDay} 天）`
-    : `${n.status === 'failed' ? '未孵化' : `蛙卵，剩 ${n.daysLeft} 天`}（PR ${n.merged}/${nb.merged}，活跃周 ${n.activeWeeks}/${nb.activeWeeks}）`;
-  const stage = p.level === null ? STAGES[p.newbie.status] : RULES.levels[p.level];
-  const models = [...p.modelMix.values()].sort((a, b) => b.count - a.count).slice(0, 3).map((m) => `${esc(m.label)} ${m.count}`).join('，');
-  const lines = [
-    `<b>${esc(p.login)}</b>　${frogIcon(stage.icon, 18)} ${esc(stage.name)}${stage.tagline ? `<span class="k">　${esc(stage.tagline)}</span>` : ''}`,
-    `<span class="k">魔力</span> <b>${fmtBonus(p.bonus)}</b> = PR ${fmt1(p.bonusPr)} + 模型加成 ${fmt1(p.bonusModel)} + 协作 ${fmt1(p.bonusCollab)}`,
-    `<span class="k">合入 PR</span> ${p.merged} / 开 ${p.opened}　<span class="k">协作</span> ${p.collab}　<span class="k">合入率</span> ${pct(p.rate)}`,
-    `<span class="k">改动行</span> ${fmtNum(p.lines)}　<span class="k">commit</span> ${fmtNum(p.commits)}`,
-  ];
-  if (models) lines.push(`<span class="k">模型</span> ${models}`);
-  lines.push(`<span class="k">新手考核</span> ${newbieText}`);
-  if (p.next) lines.push(`<span class="k">距${esc(RULES.levels[p.next.level].name)}</span> ${esc(p.next.gaps.join('，') || '下周回放后升级')}`);
-  if (p.inflight) lines.push(`<span class="k">进行中 PR</span> ${p.inflight}`);
-  lines.push(`<span class="k">首次贡献</span> ${fmtDate(p.firstAt)}　<span class="k">最近</span> ${daysAgo(p.lastAt, now)}`);
-  return lines.join('<br>');
+  const stage = p.level === null ? STAGES[n.status] : RULES.levels[p.level];
+  const rows = [];
+  const add = (k, v) => rows.push(`<dt>${k}</dt><dd>${v}</dd>`);
+
+  const parts = [['PR', p.bonusPr], ['模型', p.bonusModel], ['协作', p.bonusCollab]].filter(([, v]) => Math.abs(v) >= 0.05);
+  const sum = parts.map(([k, v], i) => `${i ? (v < 0 ? ' − ' : ' + ') : ''}${k} ${fmt1(i ? Math.abs(v) : v)}`).join('');
+  add('魔力', `<b>${fmtBonus(p.bonus)}</b>${sum ? ` = ${sum}` : ''}`);
+
+  if (p.opened) {
+    const pr = [`合入 ${p.merged}`];
+    if (p.closedUnmerged) pr.push(`关闭未合 ${p.closedUnmerged}`);
+    if (p.stale) pr.push(`超 ${RULES.staleOpenDays} 天未合 ${p.stale}`);
+    if (p.inflight) pr.push(`进行中 ${p.inflight}`);
+    add('PR', pr.join(' · '));
+    if (p.rate != null) add('合入率', `${pct(p.rate)} <span class="k">= ${p.merged} ÷ ${p.resolved} 个已收尾</span>`);
+  }
+
+  if (p.level === null) {
+    const goal = `合入 PR ${n.merged}/${nb.merged} · 活跃周 ${n.activeWeeks}/${nb.activeWeeks}`;
+    add('孵化', n.status === 'pending' ? `${goal} <span class="k">剩 ${n.daysLeft} 天</span>` : `${goal} <span class="k">${nb.days} 天内未达标</span>`);
+  } else if (p.next) {
+    add(`距${esc(RULES.levels[p.next.level].name)}`, esc(p.next.gaps.join(' · ') || '已达标'));
+  }
+
+  const models = [...p.modelMix.values()].sort((a, b) => b.count - a.count).slice(0, 3);
+  if (models.length) add('模型', models.map((m) => `${esc(m.label)} ${m.count}`).join(' · '));
+  add('活动', `${fmtDate(p.firstAt)} 起 · 最近 ${daysAgo(p.lastAt, now)}`);
+
+  const flags = [];
+  if (p.warn) flags.push(`${termTag(TERMS.warn)} 已收尾超过 ${p.warnLine.resolved} 个，合入率需 ≥ ${pct(p.warnLine.rate)}`);
+  if (n.anomaly) flags.push(`${termTag(TERMS.anomaly)} 孵化期开 ${n.anomalyOpened} 个 PR，合入 ${n.anomalyMerged} 个`);
+  return `<div class="tt-h">${frogIcon(stage.icon, 22)}<b>${esc(p.login)}</b><span class="k">${esc(stage.name)}</span></div>`
+    + `<dl>${rows.join('')}</dl>`
+    + flags.map((f) => `<div class="tt-flag">${f}</div>`).join('');
 }
 
 function sparkline(p, weeks, max) {
@@ -710,7 +759,8 @@ function renderChips() {
   $('chips').innerHTML = keys.map((k) => {
     const n = b ? b.people.filter(FILTERS[k].fn).length : 0;
     const extra = !FILTERS[k].chip ? ' ×' : '';
-    return `<button class="chip${state.filter === k ? ' on' : ''}" data-filter="${k}">${esc(FILTERS[k].label)}<b>${b ? n : ''}</b>${extra}</button>`;
+    const tip = FILTERS[k].tip ? ` data-tip="${esc(esc(FILTERS[k].tip))}"` : '';
+    return `<button class="chip${state.filter === k ? ' on' : ''}" data-filter="${k}"${tip}>${esc(FILTERS[k].label)}<b>${b ? n : ''}</b>${extra}</button>`;
   }).join('');
 }
 
@@ -732,7 +782,7 @@ function renderLeaderboard() {
         <img src="https://github.com/${encodeURIComponent(p.login)}.png?size=52" alt="" loading="lazy">
         <div>
           <div class="name"><a href="https://github.com/${encodeURIComponent(p.login)}" target="_blank" rel="noopener">${esc(p.login)}</a>${flagTags(p)}</div>
-          <div class="sub">${p.merged} PR · ${p.collab} 协作 · ${pct(p.rate)}</div>
+          <div class="sub">合入 ${p.merged} · 协作 ${p.collab} · 合入率 ${pct(p.rate)}</div>
         </div>
       </div>
       <span>${levelChip(p)}</span>
@@ -871,6 +921,10 @@ function rateChart(b) {
     });
     d += `V${y(0)}Z`;
     s += `<path class="zone" d="${d}"/><path class="zone-line" d="${edge}"/>`;
+    // 每一级的起点标出该级的合入率要求；标在线下方的警告区内，避开线上方的大多数点
+    lines.forEach((l) => {
+      s += `<text class="zone-t" x="${x(l.resolved) + 4}" y="${y(l.rate) + 13}" data-tip="${esc(`已收尾超过 ${l.resolved} 个：合入率需 ≥ ${pct(l.rate)}`)}">${pct(l.rate)}</text>`;
+    });
     s += `<text class="ax-l" x="${W - pad.r - 4}" y="${y(0) - 8}" text-anchor="end">警告区</text>`;
   }
   [...pts].sort((a, b2) => a.resolved - b2.resolved).forEach((p) => {
@@ -1004,6 +1058,8 @@ $('search').addEventListener('input', (e) => {
 });
 
 $('logo').innerHTML = frogIcon('face', 30);
+$('rate-note').innerHTML = `<b>合入率</b>：${esc(TERMS.rate.text)}<br><b>黄色区域</b>：点落在这里会被标「合入率警告」。${esc(TERMS.warn.text)}`;
+renderTerms();
 renderFormula();
 renderFactors();
 renderMapping();
