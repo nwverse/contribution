@@ -53,13 +53,13 @@ const RULES = {
     { resolved: 100, rate: 0.8 },
     { resolved: 200, rate: 0.9 },
   ],
-  // 等级：同时满足在组周数、魔力、协作、合入率四项才升级；合入率低于 demote 自动降一级
+  // 等级只看当前魔力，不设降级线。通过新手考核即为蝌蚪；没通过的人魔力达到第二级门槛也直接孵化
   levels: [
-    { name: '蝌蚪', icon: 'tadpole', tagline: '通过新手考核，游进奶蛙宇宙', weeks: 0, bonus: 0, collab: 0, rate: 0, demote: null },
-    { name: '小奶蛙', icon: 'froglet', tagline: '长出脚蹼，能自己蹦了', weeks: 4, bonus: 60, collab: 3, rate: 0.7, demote: 0.6 },
-    { name: '奶蛙', icon: 'frog', tagline: '睁开洞悉一切的绿色大眼睛', weeks: 8, bonus: 120, collab: 10, rate: 0.8, demote: 0.7 },
-    { name: '大笑奶蛙', icon: 'laugh', tagline: '哟齁齁齁，秒开战斗脸', weeks: 12, bonus: 200, collab: 25, rate: 0.85, demote: 0.75 },
-    { name: '宇宙奶蛙', icon: 'cosmic', tagline: '技能超模，什么场合都能笑着收尾', weeks: 16, bonus: 300, collab: 50, rate: 0.9, demote: 0.8 },
+    { name: '蝌蚪', icon: 'tadpole', tagline: '通过新手考核，游进奶蛙宇宙', bonus: 0 },
+    { name: '小奶蛙', icon: 'froglet', tagline: '长出脚蹼，能自己蹦了', bonus: 50 },
+    { name: '奶蛙', icon: 'frog', tagline: '睁开洞悉一切的绿色大眼睛', bonus: 150 },
+    { name: '大笑奶蛙', icon: 'laugh', tagline: '哟齁齁齁，秒开战斗脸', bonus: 400 },
+    { name: '宇宙奶蛙', icon: 'cosmic', tagline: '技能超模，什么场合都能笑着收尾', bonus: 1000 },
   ],
   dormantDays: 40,
   // 达到该等级下标及以上免于冬眠标记
@@ -96,10 +96,6 @@ function countUpTo(sorted, t) {
     n++;
   }
   return n;
-}
-
-function qualifies(level, m) {
-  return m.weeks >= level.weeks && m.bonus >= level.bonus && m.collab >= level.collab && m.rate >= level.rate;
 }
 
 function prRawScore(lines, commits, rules) {
@@ -316,36 +312,17 @@ function computeBoard(data, rules, now) {
       anomalyMerged: openedMerged,
     };
 
-    // 等级：从通过考核那周起逐周回放，状态完全由历史推导
-    let level = null;
-    if (passAt) {
-      level = 0;
-      for (let w = weekStart(passAt, tz); w <= now; w += WEEK) {
-        const t = Math.max(passAt, Math.min(w + WEEK - 1, now));
-        const ps = prStatsAt(t);
-        const m = { weeks: (t - firstAt) / WEEK, bonus: scoreAt(t).bonus, collab: countUpTo(threadTimes, t), rate: ps.rate ?? 0 };
-        while (level > 0 && m.rate < levels[level].demote) level--;
-        while (level + 1 < levels.length && qualifies(levels[level + 1], m)) level++;
-      }
-    }
-
     const cur = prStatsAt(now);
     const score = scoreAt(now);
     const collab = threadTimes.length;
     const weeksIn = (now - firstAt) / WEEK;
-    let next = null;
-    if (level !== null && level + 1 < levels.length) {
-      const L = levels[level + 1];
-      next = {
-        level: level + 1,
-        gaps: [
-          weeksIn < L.weeks ? `在组 ${Math.floor(weeksIn)}/${L.weeks} 周` : null,
-          score.bonus < L.bonus ? `魔力 ${Math.floor(score.bonus)}/${L.bonus}` : null,
-          collab < L.collab ? `协作 ${collab}/${L.collab}` : null,
-          (cur.rate ?? 0) < L.rate ? `合入率 ${Math.round((cur.rate ?? 0) * 100)}%/${Math.round(L.rate * 100)}%` : null,
-        ].filter(Boolean),
-      };
+    // 形态只看当前魔力：通过新手考核，或魔力达到第二级门槛，即孵化；孵化后取魔力达到的最高一级
+    let level = null;
+    if (passAt !== null || score.bonus >= levels[1].bonus) {
+      level = 0;
+      while (level + 1 < levels.length && score.bonus >= levels[level + 1].bonus) level++;
     }
+    const next = level !== null && level + 1 < levels.length ? { level: level + 1, bonus: levels[level + 1].bonus } : null;
     let warnLine = null;
     for (const line of rules.warnLines) if (cur.resolved > line.resolved) warnLine = line;
     const warn = warnLine !== null && cur.rate < warnLine.rate;
@@ -419,9 +396,10 @@ function computeBoard(data, rules, now) {
       members: members.size,
       memberContributors: count((p) => p.member),
       outsiders: count((p) => !p.member),
-      passed: count((p) => p.newbie.status === 'passed'),
-      failed: count((p) => p.newbie.status === 'failed'),
-      pending: count((p) => p.newbie.status === 'pending'),
+      // 孵化阶段：已孵化（含魔力补孵化）、蛙卵（考核中未孵化）、未孵化（考核未通过且魔力不够）
+      hatched: count((p) => p.level !== null),
+      pending: count((p) => p.level === null && p.newbie.status === 'pending'),
+      failed: count((p) => p.level === null && p.newbie.status === 'failed'),
       anomaly: count((p) => p.newbie.anomaly),
       warn: count((p) => p.warn),
       dormant: count((p) => p.dormant),

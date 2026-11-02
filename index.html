@@ -357,7 +357,7 @@ const TERMS = (() => {
   return {
     collab: { name: '协作', text: `参与别人的 PR 或 issue：review、评论、帮人合入。同一个 PR 或 issue 只算一次；自己提的有效 issue 也算。每次 +${RULES.score.collab} 魔力。` },
     rate: { name: '合入率', text: `合入 PR ÷ 已收尾 PR。已收尾指已合入、被别人关闭，或打开超过 ${RULES.staleOpenDays} 天还没合入。自己关闭的 PR 视为撤回，不计入。` },
-    warn: { name: '合入率警告', tag: 'tag st warning', text: `已收尾 PR 超过 ${first.resolved} 个后，合入率低于 ${pct(first.rate)} 就会被标记；超过 ${rest.map((l) => l.resolved).join(' / ')} 个时，要求依次提高到 ${rest.map((l) => pct(l.rate)).join(' / ')}。只是提醒，不扣魔力；形态降级另看降级线。` },
+    warn: { name: '合入率警告', tag: 'tag st warning', text: `已收尾 PR 超过 ${first.resolved} 个后，合入率低于 ${pct(first.rate)} 就会被标记；超过 ${rest.map((l) => l.resolved).join(' / ')} 个时，要求依次提高到 ${rest.map((l) => pct(l.rate)).join(' / ')}。只是提醒，不扣魔力，也不影响形态。` },
     outsider: { name: '组织外', tag: 'tag', text: '数据更新时不在 nwverse 组织成员名单里的账号，例如从 fork 提 PR 的外部贡献者、已退出的人。贡献照常计分。' },
     anomaly: { name: '新手异常', tag: 'tag st serious', text: `孵化期内开了 ${a.opened} 个以上 PR，合入的不到 ${pct(a.rate)}。最近 ${a.graceHours} 小时内开的 PR 不计。` },
     dormant: { name: '冬眠', tag: 'tag st', text: `超过 ${RULES.dormantDays} 天没有任何动作。只做标记；${RULES.levels[RULES.dormantExemptLevel].name}及以上不标记。` },
@@ -488,9 +488,9 @@ const FILTERS = {
   all: { label: '全部', chip: true, fn: () => true },
   member: { label: '组织成员', chip: true, fn: (p) => p.member },
   outsider: { label: '组织外', chip: true, tip: TERMS.outsider.text, fn: (p) => !p.member },
-  passed: { label: '考核通过', fn: (p) => p.newbie.status === 'passed' },
-  pending: { label: '蛙卵（考核中）', fn: (p) => p.newbie.status === 'pending' },
-  failed: { label: '未孵化', chip: true, tip: `首次贡献起 ${RULES.newbie.days} 天内没有通过新手考核`, fn: (p) => p.newbie.status === 'failed' },
+  hatched: { label: '已孵化', fn: (p) => p.level !== null },
+  pending: { label: '蛙卵（考核中）', fn: (p) => p.level === null && p.newbie.status === 'pending' },
+  failed: { label: '未孵化', chip: true, tip: `首次贡献起 ${RULES.newbie.days} 天内没有通过新手考核，魔力也还没到 ${RULES.levels[1].bonus}`, fn: (p) => p.level === null && p.newbie.status === 'failed' },
   warn: { label: '合入率警告', chip: true, tip: TERMS.warn.text, fn: (p) => p.warn },
   anomaly: { label: '新手异常', chip: true, tip: TERMS.anomaly.text, fn: (p) => p.newbie.anomaly },
   dormant: { label: '冬眠', chip: true, tip: TERMS.dormant.text, fn: (p) => p.dormant },
@@ -603,11 +603,11 @@ function renderMapping() {
   const rows = [
     ['注册时间', '首次贡献', '首次开 PR、review、评论或提 issue 的时间。GitHub 不向普通成员开放入组时间。'],
     ['上传量', 'PR 分', '合入 PR 按改动行、commit 数（对数压缩）和模型系数计分。'],
-    ['下载量', '不考核', 'GitHub 上 review 和评论极少，考核协作会误伤大多数人；协作改在升级时要求。', true],
+    ['下载量', '不考核', 'GitHub 上 review 和评论极少，考核协作会误伤大多数人；协作只计入魔力。', true],
     ['分享率', '合入率', '「给出 ÷ 收到 review」对所有人都是 0/0。合入率看 PR 是否收尾，作用接近 H&R。'],
     ['做种魔力', `魔力（每周最多计 ${RULES.weeklyActionCap} 个动作）`, '只能靠持续活跃累积，单周集中刷 PR 收益有限。'],
-    ['新手考核', `${RULES.newbie.days} 天孵化期`, `合入 PR ≥ ${RULES.newbie.merged}，活跃周 ≥ ${RULES.newbie.activeWeeks}。只考一次，没有月考、季考。`],
-    ['等级与降级线', '奶蛙进化与降级线', '多加一项协作门槛：越高形态越需要为他人付出。降级线比升级线低 0.1。'],
+    ['新手考核', `${RULES.newbie.days} 天孵化期`, `合入 PR ≥ ${RULES.newbie.merged}，活跃周 ≥ ${RULES.newbie.activeWeeks}。只考一次，没有月考、季考；没通过的人魔力达到 ${RULES.levels[1].bonus} 也直接孵化。`],
+    ['等级与降级线', '奶蛙进化（只看魔力）', 'M-Team 升级同时看注册时间、上传量和分享率；这里只看魔力，不设降级线，合入率只用于警告。'],
     ['分享率警告期', '合入率警告线', '已收尾 PR 越多，合入率要求越高。'],
     ['40 天不登录删号', `${RULES.dormantDays} 天无动作 → 冬眠`, `只标记不处理；${RULES.levels[RULES.dormantExemptLevel].name}及以上豁免。`],
     ['魔力兑换、连坐', '不映射', '兑换需要保存余额，违背无状态；组织没有邀请树。', true],
@@ -629,7 +629,7 @@ function renderBlind(limits) {
     '直接推送到默认分支的 commit 不计入；仓库要求「所有改动走 PR」之前的贡献会被低估。',
     'AI 生成的 PR 记在开 PR 的账号名下，账号持有人对内容负责。',
     `每个 PR 和 issue 只读取前 ${limits.nested} 条 review 和前 ${limits.nested} 条评论。`,
-    '「首次贡献」代替入组时间；第一次贡献很早、之后长期不活跃的人，新手考核会按那次贡献起算。',
+    `「首次贡献」代替入组时间；第一次贡献很早、之后长期不活跃的人，新手考核会按那次贡献起算，之后要靠魔力达到 ${RULES.levels[1].bonus} 孵化。`,
   ].map((t) => `<li>${esc(t)}</li>`).join('');
 }
 
@@ -705,10 +705,12 @@ function personTip(p, now) {
   }
 
   if (p.level === null) {
-    const goal = `合入 PR ${n.merged}/${nb.merged} · 活跃周 ${n.activeWeeks}/${nb.activeWeeks}`;
-    add('孵化', n.status === 'pending' ? `${goal} <span class="k">剩 ${n.daysLeft} 天</span>` : `${goal} <span class="k">${nb.days} 天内未达标</span>`);
+    const byBonus = `魔力 ${fmtBonus(p.bonus)}/${RULES.levels[1].bonus}`;
+    add('孵化', n.status === 'pending'
+      ? `合入 PR ${n.merged}/${nb.merged} · 活跃周 ${n.activeWeeks}/${nb.activeWeeks} <span class="k">剩 ${n.daysLeft} 天，或${byBonus}</span>`
+      : `${byBonus} <span class="k">考核未通过，魔力达标后孵化</span>`);
   } else if (p.next) {
-    add(`距${esc(RULES.levels[p.next.level].name)}`, esc(p.next.gaps.join(' · ') || '已达标'));
+    add(`距${esc(RULES.levels[p.next.level].name)}`, `魔力 ${fmtBonus(p.bonus)}/${fmtNum(p.next.bonus)}`);
   }
 
   const models = [...p.modelMix.values()].sort((a, b) => b.count - a.count).slice(0, 3);
@@ -785,29 +787,29 @@ function renderPath(b) {
     <span class="tag">${frogIcon('egg', 14)} 蛙卵：首次贡献起 ${nb.days} 天</span>
     <span class="tag">合入 PR ≥ ${nb.merged}</span>
     <span class="tag">活跃周 ≥ ${nb.activeWeeks}</span>
+    <span class="tag" data-tip="${esc(`没通过新手考核的人，魔力达到 ${L[1].bonus} 也直接孵化`)}">或魔力 ≥ ${L[1].bonus}</span>
     <span class="tag st serious" data-tip="${esc(`考核期内开 PR ≥ ${nb.anomaly.opened} 个且合入比 &lt; ${pct(nb.anomaly.rate)}，标记「新手异常」。最近 ${nb.anomaly.graceHours} 小时内开的 PR 不计。`)}">异常线</span>
   </div>`;
   if (b) {
     const s = b.summary;
     const parts = [
-      ['passed', '孵化成蝌蚪', 'good', s.passed, L[0].icon],
+      ['hatched', '已孵化', 'good', s.hatched, L[0].icon],
       ['pending', '蛙卵（考核中）', 'neutral', s.pending, STAGES.pending.icon],
       ['failed', '未孵化', 'critical', s.failed, STAGES.failed.icon],
     ];
-    const total = s.passed + s.pending + s.failed || 1;
+    const total = s.hatched + s.pending + s.failed || 1;
     html += `<div class="segbar">${parts.filter((x) => x[3]).map(([k, label, cls, n, icon]) => `<div class="${cls}" style="flex:${n}" data-filter="${k}" data-tip="${esc(`${label} ${n} 人（${pct(n / total)}），点击筛选`)}">${n / total >= 0.1 ? `${frogIcon(icon, 18)}${n}` : ''}</div>`).join('')}</div>
       <div class="legend">${parts.map(([, label, cls, n]) => `<span><i style="background:var(--${cls})"></i>${label} ${n}</span>`).join('')}</div>`;
   }
-  html += '<div class="flow">孵化成蝌蚪后，四项同时达标逐级进化；合入率跌破降级线退回上一形态</div>';
+  html += '<div class="flow">孵化后形态只看魔力：魔力达到门槛即进化，不会降级</div>';
 
   const W = 470;
   const labelW = 46;
   const base = 214;
   const stepW = (W - labelW - 4) / L.length;
-  const rows = ['在组', '魔力', '协作', '合入率', '降级线'];
-  let svg = `<svg viewBox="0 0 ${W} ${base + 92}" role="img" aria-label="奶蛙进化阶梯与门槛">`;
+  let svg = `<svg viewBox="0 0 ${W} ${base + 30}" role="img" aria-label="奶蛙进化阶梯与魔力门槛">`;
   svg += `<line class="bl" x1="${labelW}" x2="${W - 4}" y1="${base}" y2="${base}"/>`;
-  rows.forEach((r, k) => { svg += `<text class="ax-l" x="${labelW - 6}" y="${base + 20 + k * 16}" text-anchor="end">${r}</text>`; });
+  svg += `<text class="ax-l" x="${labelW - 6}" y="${base + 20}" text-anchor="end">魔力</text>`;
   L.forEach((lv, i) => {
     const x = labelW + stepW * i + 3;
     const w = stepW - 6;
@@ -815,15 +817,14 @@ function renderPath(b) {
     const cx = x + w / 2;
     const people = b ? b.people.filter((p) => p.level === i) : [];
     const names = people.slice(0, 15).map((p) => esc(p.login)).join('、') + (people.length > 15 ? ` 等 ${people.length} 人` : '');
-    const rule = i === 0 ? '通过新手考核' : `升级：在组 ≥ ${lv.weeks} 周、魔力 ≥ ${lv.bonus}、协作 ≥ ${lv.collab}、合入率 ≥ ${pct(lv.rate)}<br>降级：合入率 &lt; ${pct(lv.demote)}`;
+    const rule = i === 0 ? `通过新手考核即孵化；没通过的人魔力达到 ${L[1].bonus} 也孵化` : `魔力 ≥ ${lv.bonus}`;
     const tip = `${frogIcon(lv.icon, 22)} <b>${esc(lv.name)}</b>　<span class="k">${esc(lv.tagline)}</span><br>${rule}${b ? `<br><br>${people.length} 人${names ? `：${names}` : ''}` : ''}`;
     svg += `<g class="step" data-filter="lv${i}" data-tip="${esc(tip)}">`;
     svg += `<path d="${roundedTop(x, base - h, w, h, 4)}" style="fill:var(--lv${i})"/>`;
     svg += `<text x="${cx}" y="${base - 10}" text-anchor="middle" style="fill:${LEVEL_INK[i]};font-size:12.5px;font-weight:600">${esc(lv.name)}</text>`;
     svg += frogIcon(lv.icon, 32, { x: cx - 16, y: base - h - 34 });
     if (b) svg += `<text class="cnt" x="${cx}" y="${base - h - 40}" text-anchor="middle">${people.length}</text>`;
-    const cells = i === 0 ? ['通过考核', '—', '—', '—', '—'] : [`≥ ${lv.weeks} 周`, `≥ ${lv.bonus}`, `≥ ${lv.collab}`, `≥ ${pct(lv.rate)}`, `< ${pct(lv.demote)}`];
-    cells.forEach((c, k) => { svg += `<text class="ax" x="${cx}" y="${base + 20 + k * 16}" text-anchor="middle">${esc(c)}</text>`; });
+    svg += `<text class="ax" x="${cx}" y="${base + 20}" text-anchor="middle">${i === 0 ? '孵化即可' : `≥ ${fmtNum(lv.bonus)}`}</text>`;
     svg += '</g>';
   });
   svg += '</svg>';
