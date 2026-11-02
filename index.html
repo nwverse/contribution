@@ -58,58 +58,15 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1
 .meta { font-size: 12px; color: var(--muted); }
 
 /* 顶栏 */
-.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
-.top h1 { font-size: 20px; margin: 0 6px 0 0; display: flex; align-items: center; gap: 8px; }
-.top form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-left: auto; }
-.subbar { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 16px; margin-top: 10px; }
-.subbar #status { margin-left: auto; padding-top: 2px; }
-.link-btn { font: inherit; font-size: 12px; padding: 2px 0 0; background: none; border: none; color: var(--s1); cursor: pointer; }
-.link-btn:disabled { color: var(--muted); cursor: progress; }
-input[type=text], input[type=password], input[type=search] {
-  font: inherit; font-size: 13px; padding: 5px 10px; border: 1px solid var(--axis); border-radius: 6px; background: var(--surface); color: var(--ink);
-}
-#org-input { width: 110px; }
-#token-input { width: 220px; }
-button.primary { font: inherit; font-size: 13px; padding: 5px 16px; border-radius: 6px; border: 1px solid var(--s1); background: var(--s1); color: #fff; cursor: pointer; }
-button.primary:disabled { opacity: 0.5; cursor: progress; }
+.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.top h1 { font-size: 20px; margin: 0; display: flex; align-items: center; gap: 8px; }
+.top #status { margin-left: auto; }
 #status.error { color: var(--critical); }
-
-/* 获取 token 说明 */
-.howto { font-size: 13px; flex: 1 1 auto; min-width: 0; }
-.howto > summary { cursor: pointer; color: var(--s1); font-size: 13px; list-style: none; }
-.howto > summary::-webkit-details-marker { display: none; }
-.howto > summary::before { content: "▸ "; color: var(--muted); }
-.howto[open] > summary::before { content: "▾ "; }
-.howto .box { margin-top: 8px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; display: grid; gap: 10px; }
-.steps { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 10px 40px; }
-.steps li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.steps .num { width: 20px; height: 20px; border-radius: 50%; background: var(--s1); color: #fff; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; flex: none; }
-.steps code { padding: 3px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--page); color: var(--ink); font-size: 13px; }
-button.copy { font: inherit; font-size: 12px; padding: 2px 12px; border: 1px solid var(--axis); border-radius: 6px; background: transparent; color: var(--ink); cursor: pointer; }
-.howto .note { font-size: 12px; color: var(--muted); margin: 0; padding-top: 8px; border-top: 1px solid var(--grid); }
-
-/* 加载进度 */
-.loading { margin-top: 14px; }
-.ld-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
-.ld-head strong { font-size: 15px; }
-.ld-head .pct { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; margin-left: auto; }
-.ld-bar { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; margin: 10px 0 12px; }
-.ld-bar i { display: block; height: 100%; width: 0; background: var(--s1); border-radius: 4px; transition: width 0.4s ease; }
-.ld-steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 13px; }
-.ld-steps li { display: flex; align-items: baseline; gap: 8px; color: var(--muted); }
-.ld-steps li.done, .ld-steps li.active { color: var(--ink); }
-.ld-steps .mark { width: 16px; text-align: center; flex: none; }
-.ld-steps li.done .mark { color: var(--good); }
-.ld-steps li.active .mark { color: var(--s1); }
-.ld-steps .detail { color: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; }
-.spin { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--track); border-top-color: var(--s1); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -1px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.preview-note { display: none; margin-bottom: 8px; padding: 6px 10px; border-radius: 6px; background: var(--hover); font-size: 12px; color: var(--ink-2); }
-.preview-note.on { display: block; }
+input[type=search] { font: inherit; font-size: 13px; padding: 5px 10px; border: 1px solid var(--axis); border-radius: 6px; background: var(--surface); color: var(--ink); }
 .sk { display: grid; grid-template-columns: 30px minmax(170px, 230px) 104px minmax(140px, 1fr) 92px; gap: 10px; align-items: center; padding: 12px 4px; border-bottom: 1px solid var(--grid); }
 .sk i { display: block; height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--grid) 25%, var(--hover) 50%, var(--grid) 75%); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) { .sk i, .spin { animation: none; } .ld-bar i { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .sk i { animation: none; } }
 
 /* 布局 */
 .grid { display: grid; gap: 14px; margin-top: 14px; }
@@ -261,40 +218,14 @@ ul.blind li { margin: 4px 0; }
 <div class="wrap">
   <header class="top">
     <h1><span id="logo"></span>奶蛙宇宙贡献度看板</h1>
-    <form id="auth-form">
-      <input type="text" id="org-input" value="nwverse" aria-label="组织" autocomplete="off" spellcheck="false">
-      <input type="password" id="token-input" placeholder="GitHub token" aria-label="GitHub token" autocomplete="off">
-      <button type="submit" class="primary" id="run-btn">拉取</button>
-      <label class="meta"><input type="checkbox" id="auto-refresh"> 每 10 分钟自动刷新</label>
-    </form>
+    <span class="meta" id="status">正在读取数据…</span>
   </header>
-  <div class="subbar">
-    <details class="howto" id="howto">
-      <summary>如何获取 token</summary>
-      <div class="box">
-        <ol class="steps">
-          <li><span class="num">1</span><span>在终端执行</span><code id="gh-cmd">gh auth token | pbcopy</code><button type="button" class="copy" id="copy-cmd">复制命令</button></li>
-          <li><span class="num">2</span><span>token 已在剪贴板，粘贴到右上角输入框，点「拉取」</span></li>
-        </ol>
-        <p class="note">需要 classic token 的 repo、read:org 权限（本机 gh 登录后默认具备）。token 只留在页面内存，只发往 api.github.com，刷新页面即丢弃。</p>
-      </div>
-    </details>
-    <span class="meta" id="status"></span>
-    <button type="button" class="link-btn" id="full-reload" hidden data-tip="刷新默认只拉有更新的条目。删除或转出的 PR、issue 需要完整重拉才会移除。">完整重拉</button>
-  </div>
-
-  <section class="card loading" id="loading" hidden>
-    <div class="ld-head"><strong id="ld-title"></strong><span class="meta" id="ld-time"></span><span class="pct" id="ld-pct">0%</span></div>
-    <div class="ld-bar"><i id="ld-fill"></i></div>
-    <ol class="ld-steps" id="ld-steps"></ol>
-  </section>
 
   <section class="kpis" id="kpis" hidden></section>
 
   <div class="grid main">
     <section class="card">
       <h2>贡献度排行 <span class="meta" id="lb-meta">按魔力排序，悬停查看明细</span></h2>
-      <div class="preview-note" id="preview-note"></div>
       <div class="chips" id="chips"></div>
       <div class="legend" style="margin-bottom:8px">
         <span><i style="background:var(--s1)"></i>合入 PR（含规模）</span>
@@ -303,7 +234,7 @@ ul.blind li { margin: 4px 0; }
         <input type="search" id="search" placeholder="搜索账号" style="margin-left:auto;width:150px">
       </div>
       <div class="lb-head"><span>#</span><span>贡献者</span><span>形态</span><span>魔力</span><span>每周魔力</span></div>
-      <div id="leaderboard"><div class="empty">填入 token 后点「拉取」，实时生成排行</div></div>
+      <div id="leaderboard"><div class="empty">正在读取数据…</div></div>
       <div class="more" id="more"></div>
     </section>
 
@@ -360,755 +291,10 @@ ul.blind li { margin: 4px 0; }
 </div>
 <div id="tip" role="tooltip"></div>
 
-<script id="engine">
-'use strict';
-
-// 规则常量：所有阈值与系数集中在这里，页面上的规则说明也由它生成。
-const RULES = {
-  // 周的切分时区（UTC+8，周一 00:00 开始）
-  tzOffsetHours: 8,
-  // 每周最多按这么多个动作计分，超出按比例折算，对应 M-Team「做种数最多计 N 个」
-  weeklyActionCap: 10,
-  score: {
-    // 单个合入 PR：1 + lines × log10(1 + 改动行) + commits × log2(1 + commit 数)，再乘模型系数
-    lines: 0.25,
-    commits: 0.15,
-    // 每参与一个他人的 PR 或 issue
-    collab: 1,
-  },
-  // 模型系数 = 1 + 档位加成 × 版本系数。各家同档按「当代旗舰 / 中端 / 轻量」对齐，没有基准测试依据，可按团队体验调整。
-  modelTiers: [
-    { key: 'top', label: '顶配', bonus: 0.5 },
-    { key: 'flagship', label: '旗舰', bonus: 0.3 },
-    { key: 'second', label: '次旗舰', bonus: 0.2 },
-    { key: 'mid', label: '中端', bonus: 0.1 },
-    { key: 'light', label: '轻量', bonus: 0 },
-    { key: 'unknown', label: '未注明型号', bonus: 0.1, versioned: false },
-    { key: 'other', label: '其他工具 / 无 AI 标注', bonus: 0, versioned: false },
-  ],
-  // 版本系数 = max(0, 1 − versionDecay × (系列最新版本 − 署名版本))：落后 0.4 版加成减半，落后 0.8 版不再加成。
-  // 版本号在同一系列内比较（各家产品线共用版本号），新版本发布后更新 latest。
-  // latest 依据 2026-11 的公开发布：Claude Opus 5.5、GPT-6.1（Sol / Terra）、Gemini 4（Argon / Carbon）、DeepSeek V4.1 Flash。
-  versionDecay: 1.25,
-  // 署名有型号但没有版本号时的版本系数
-  unknownVersionFactor: 0.5,
-  families: {
-    Claude: { latest: 5.5, version: /\b(?:fable|opus|sonnet|haiku)[ -]?(\d+)(?:[.-](\d{1,2})(?!\d))?|\bclaude[ -](\d)[.-](\d)[ -](?:fable|opus|sonnet|haiku)\b/i },
-    GPT: { latest: 6.1, version: /\bgpt[- ]?(\d+)(?:\.(\d{1,2}))?/i },
-    Gemini: { latest: 4, version: /\bgemini[ -]?(\d+)(?:\.(\d{1,2}))?/i },
-    DeepSeek: { latest: 4.1, version: /\bdeepseek[ -]?v(\d+)(?:\.(\d{1,2}))?/i },
-  },
-  // 按 commit 作者与共同作者（Co-Authored-By）的名字识别模型。
-  // 同一个署名按列表顺序取第一个匹配，所以更具体的型号（mini、nano、Flash-Lite）排在前面；
-  // 一个 PR 出现多个模型时取系数最高的。
-  models: [
-    { key: 'fable', family: 'Claude', short: 'Fable', label: 'Claude Fable', tier: 'top', pattern: /\bfable\b/i },
-    { key: 'opus', family: 'Claude', short: 'Opus', label: 'Claude Opus', tier: 'flagship', pattern: /\bopus\b/i },
-    { key: 'sonnet', family: 'Claude', short: 'Sonnet', label: 'Claude Sonnet', tier: 'mid', pattern: /\bsonnet\b/i },
-    { key: 'haiku', family: 'Claude', short: 'Haiku', label: 'Claude Haiku', tier: 'light', pattern: /\bhaiku\b/i },
-    { key: 'claude', family: 'Claude', short: 'Claude、Claude Code', label: 'Claude 未注明型号', tier: 'unknown', pattern: /\bclaude\b/i },
-    // GPT-6 起用代号分档：Astra 旗舰 > Sol 高端 > Terra 中端 > Luna 快速；mini、nano、Instant 沿用旧档位
-    { key: 'gptLight', family: 'GPT', short: 'Luna、nano、Instant', label: 'GPT Luna / nano', tier: 'light', pattern: /\b(gpt|codex)\b[\w. -]*?\b(luna|nano|instant)\b/i },
-    { key: 'gptMid', family: 'GPT', short: 'Terra、mini', label: 'GPT Terra / mini', tier: 'mid', pattern: /\b(gpt|codex)\b[\w. -]*?\b(terra|mini)\b/i },
-    { key: 'gptSol', family: 'GPT', short: 'Sol', label: 'GPT Sol', tier: 'flagship', pattern: /\bgpt\b[\w. -]*?\bsol\b/i },
-    { key: 'gptTop', family: 'GPT', short: 'Astra、Pro', label: 'GPT Astra / Pro', tier: 'top', pattern: /\bgpt\b[\w. -]*?\b(astra|pro)\b/i },
-    { key: 'gptVer', family: 'GPT', short: 'GPT-5、5.x 等无代号版本', label: 'GPT', tier: 'flagship', pattern: /\bgpt[- ]?([5-9]|\d{2,})(\.\d+)?\b/i },
-    { key: 'gpt', family: 'GPT', short: 'Codex 默认署名', label: 'GPT / Codex 未注明型号', tier: 'unknown', pattern: /\b(gpt|codex|openai|chatgpt)\b/i },
-    // Gemini 4 起用代号分档：Carbon 最强 > Argon 旗舰；Flash、Flash-Lite 沿用旧档位
-    { key: 'geminiLite', family: 'Gemini', short: 'Flash-Lite', label: 'Gemini Flash-Lite', tier: 'light', pattern: /\bgemini\b[\w. -]*?\bflash[- ]?lite\b/i },
-    { key: 'geminiFlash', family: 'Gemini', short: 'Flash', label: 'Gemini Flash', tier: 'mid', pattern: /\bgemini\b[\w. -]*?\bflash\b/i },
-    { key: 'geminiTop', family: 'Gemini', short: 'Carbon、Ultra', label: 'Gemini Carbon', tier: 'top', pattern: /\bgemini\b[\w. -]*?\b(carbon|ultra)\b/i },
-    { key: 'geminiPro', family: 'Gemini', short: 'Argon、Pro', label: 'Gemini Argon / Pro', tier: 'flagship', pattern: /\bgemini\b[\w. -]*?\b(argon|pro)\b/i },
-    { key: 'gemini', family: 'Gemini', short: 'Gemini', label: 'Gemini 未注明型号', tier: 'unknown', pattern: /\bgemini\b/i },
-    { key: 'deepseekPro', family: 'DeepSeek', short: 'Pro、Reasoner', label: 'DeepSeek Pro / Reasoner', tier: 'second', pattern: /\bdeepseek\b[\w. -]*?\b(pro|reasoner|r\d)\b/i },
-    { key: 'deepseekFlash', family: 'DeepSeek', short: 'Flash、Chat', label: 'DeepSeek Flash / Chat', tier: 'mid', pattern: /\bdeepseek\b[\w. -]*?\b(flash|chat|v\d[\w.]*)\b/i },
-    { key: 'deepseek', family: 'DeepSeek', short: 'DeepSeek', label: 'DeepSeek 未注明型号', tier: 'unknown', pattern: /\bdeepseek\b/i },
-    { key: 'cursor', family: '其他', short: 'Cursor', label: 'Cursor', tier: 'other', pattern: /\bcursor\b/i },
-    { key: 'copilot', family: '其他', short: 'Copilot', label: 'Copilot', tier: 'other', pattern: /\bcopilot\b/i },
-  ],
-  modelNone: { key: 'none', family: '其他', short: '无 AI 标注', label: '无 AI 标注', tier: 'other' },
-  // PR 打开超过这么多天仍未合入也未关闭，算作「未收尾」
-  staleOpenDays: 14,
-  newbie: {
-    days: 30,
-    merged: 3,
-    activeWeeks: 2,
-    // 考核期内开 PR 数达到 opened、合入比低于 rate，标记为「新手异常」；最近 graceHours 内开的 PR 不计
-    anomaly: { opened: 10, rate: 0.3, graceHours: 48 },
-  },
-  // 合入率警告线：已收尾 PR 数超过 resolved 时，合入率需不低于 rate
-  warnLines: [
-    { resolved: 10, rate: 0.6 },
-    { resolved: 50, rate: 0.7 },
-    { resolved: 100, rate: 0.8 },
-    { resolved: 200, rate: 0.9 },
-  ],
-  // 等级：同时满足在组周数、魔力、协作、合入率四项才升级；合入率低于 demote 自动降一级
-  levels: [
-    { name: '蝌蚪', icon: 'tadpole', tagline: '通过新手考核，游进奶蛙宇宙', weeks: 0, bonus: 0, collab: 0, rate: 0, demote: null },
-    { name: '小奶蛙', icon: 'froglet', tagline: '长出脚蹼，能自己蹦了', weeks: 4, bonus: 60, collab: 3, rate: 0.7, demote: 0.6 },
-    { name: '奶蛙', icon: 'frog', tagline: '睁开洞悉一切的绿色大眼睛', weeks: 8, bonus: 120, collab: 10, rate: 0.8, demote: 0.7 },
-    { name: '大笑奶蛙', icon: 'laugh', tagline: '哟齁齁齁，秒开战斗脸', weeks: 12, bonus: 200, collab: 25, rate: 0.85, demote: 0.75 },
-    { name: '宇宙奶蛙', icon: 'cosmic', tagline: '技能超模，什么场合都能笑着收尾', weeks: 16, bonus: 300, collab: 50, rate: 0.9, demote: 0.8 },
-  ],
-  dormantDays: 40,
-  // 达到该等级下标及以上免于冬眠标记
-  dormantExemptLevel: 2,
-  // 不计为有效 issue 的关闭原因
-  invalidIssueReasons: ['NOT_PLANNED', 'DUPLICATE'],
-  // GitHub 类型为 User、但实际是自动化的账号
-  ignoreLogins: [],
-  includeArchived: false,
-  includeForks: false,
-};
-
-const DAY = 86400000;
-const WEEK = 7 * DAY;
-
-function weekStart(t, tzHours) {
-  const offset = tzHours * 3600000;
-  const days = Math.floor((t + offset) / DAY);
-  // 1970-01-01 是周四，按周一为 0 计算
-  const dow = (days + 3) % 7;
-  return (days - dow) * DAY - offset;
-}
-
-function toTime(s) {
-  return s ? Date.parse(s) : null;
-}
-
-function countUpTo(sorted, t) {
-  let n = 0;
-  for (const x of sorted) {
-    if (x > t) break;
-    n++;
-  }
-  return n;
-}
-
-function qualifies(level, m) {
-  return m.weeks >= level.weeks && m.bonus >= level.bonus && m.collab >= level.collab && m.rate >= level.rate;
-}
-
-function prRawScore(lines, commits, rules) {
-  return 1 + rules.score.lines * Math.log10(1 + lines) + rules.score.commits * Math.log2(1 + commits);
-}
-
-// 从署名中解析版本号：正则的捕获组两两一组（主版本、次版本），取第一组匹配到的
-function parseVersion(text, re) {
-  const m = text.match(re);
-  if (!m) return null;
-  const groups = m.slice(1);
-  const i = groups.findIndex((g) => g !== undefined);
-  if (i < 0) return null;
-  return Number(groups[i + 1] !== undefined ? `${groups[i]}.${groups[i + 1]}` : groups[i]);
-}
-
-// 单个署名的模型、版本与系数：系数 = 1 + 档位加成 × 版本系数
-function modelOf(text, rules) {
-  const model = rules.models.find((x) => x.pattern.test(text)) || rules.modelNone;
-  const tier = rules.modelTiers.find((t) => t.key === model.tier);
-  const family = rules.families[model.family];
-  let version = null;
-  let factor = 1;
-  if (family && tier.versioned !== false) {
-    version = parseVersion(text, family.version);
-    factor = version === null
-      ? rules.unknownVersionFactor
-      : Math.min(1, Math.max(0, 1 - rules.versionDecay * (family.latest - version)));
-  }
-  const weight = Math.round((1 + tier.bonus * factor) * 100) / 100;
-  const label = version === null ? model.label : `${model.label} ${version}`;
-  return { key: version === null ? model.key : `${model.key}@${version}`, label, model, version, weight };
-}
-
-// PR 内所有 commit 作者与共同作者中系数最高的模型，系数相同取先出现的
-function detectModel(pr, rules) {
-  let best = null;
-  for (const c of pr.commits?.nodes || []) {
-    for (const a of c.commit?.authors?.nodes || []) {
-      const m = modelOf(`${a.name || ''} ${a.email || ''}`, rules);
-      if (m.model !== rules.modelNone && (!best || m.weight > best.weight)) best = m;
-    }
-  }
-  return best || modelOf('', rules);
-}
-
-// data: { org, members: [login], repos: [{ name, prs: [PR node], issues: [Issue node] }] }
-// 节点字段与页面 GraphQL 查询一致。返回值只依赖 data、rules、now。
-function computeBoard(data, rules, now) {
-  const tz = rules.tzOffsetHours;
-  const cap = rules.weeklyActionCap;
-  const ignore = new Set(rules.ignoreLogins);
-  const members = new Set(data.members);
-  const people = new Map();
-  const weekActive = new Map();
-  const weekMerged = new Map();
-  // 合入 PR 按「型号@版本」计数：key → { label, weight, count }
-  const modelCounts = new Map();
-
-  const human = (actor) => {
-    if (!actor) return null;
-    if (actor.__typename === 'Bot' || /\[bot\]$/i.test(actor.login) || ignore.has(actor.login)) return null;
-    return actor.login;
-  };
-  const get = (login) => {
-    let p = people.get(login);
-    if (!p) {
-      p = { login, member: members.has(login), prs: [], threads: new Map(), issuesFiled: 0 };
-      people.set(login, p);
-    }
-    return p;
-  };
-  // 记录一次「参与他人工作」：同一个 PR 或 issue 只算一次，取最早时间
-  const touch = (actor, t, key, owner) => {
-    const login = human(actor);
-    if (!login || login === owner || t == null) return;
-    const p = get(login);
-    const prev = p.threads.get(key);
-    if (prev === undefined || t < prev) p.threads.set(key, t);
-  };
-
-  const stats = { prs: 0, merged: 0, mergedReviewed: 0, mergedSelf: 0, mergedAi: 0, truncated: 0, issues: 0 };
-
-  for (const repo of data.repos) {
-    for (const pr of repo.prs) {
-      stats.prs++;
-      if (pr.reviews.totalCount > pr.reviews.nodes.length || pr.comments.totalCount > pr.comments.nodes.length) {
-        stats.truncated++;
-      }
-      const owner = human(pr.author);
-      const key = `${repo.name}#${pr.number}`;
-      const merged = toTime(pr.mergedAt);
-      const lines = pr.additions + pr.deletions;
-      const commits = pr.commits?.totalCount ?? 1;
-      const model = detectModel(pr, rules);
-      if (owner) {
-        get(owner).prs.push({
-          created: toTime(pr.createdAt),
-          merged,
-          closed: merged ? null : toTime(pr.closedAt),
-          lines,
-          commits,
-          model,
-          raw: prRawScore(lines, commits, rules),
-        });
-      }
-      let reviewed = false;
-      for (const r of pr.reviews.nodes) {
-        const login = human(r.author);
-        if (login && login !== owner) reviewed = true;
-        touch(r.author, toTime(r.submittedAt), key, owner);
-      }
-      for (const c of pr.comments.nodes) touch(c.author, toTime(c.createdAt), key, owner);
-      if (merged) {
-        stats.merged++;
-        if (reviewed) stats.mergedReviewed++;
-        if (owner && human(pr.mergedBy) === owner) stats.mergedSelf++;
-        if (model.model !== rules.modelNone) stats.mergedAi++;
-        const mc = modelCounts.get(model.key) || { label: model.label, weight: model.weight, count: 0 };
-        mc.count++;
-        modelCounts.set(model.key, mc);
-        touch(pr.mergedBy, merged, key, owner);
-        const w = weekStart(merged, tz);
-        weekMerged.set(w, (weekMerged.get(w) || 0) + 1);
-      }
-    }
-    for (const issue of repo.issues) {
-      stats.issues++;
-      const owner = human(issue.author);
-      const key = `${repo.name}!${issue.number}`;
-      if (owner && !rules.invalidIssueReasons.includes(issue.stateReason)) {
-        const p = get(owner);
-        p.threads.set(key, toTime(issue.createdAt));
-        p.issuesFiled++;
-      }
-      for (const c of issue.comments.nodes) touch(c.author, toTime(c.createdAt), key, owner);
-    }
-  }
-
-  const levels = rules.levels;
-  const nb = rules.newbie;
-  const result = [];
-
-  for (const p of people.values()) {
-    const mergedPrs = p.prs.filter((x) => x.merged);
-    const mergedTimes = mergedPrs.map((x) => x.merged).sort((a, b) => a - b);
-    const threadTimes = [...p.threads.values()].sort((a, b) => a - b);
-    // 动作：合入 PR 得分拆成规模部分 pr 与模型加成 model；协作得分 collab
-    const acts = [
-      ...mergedPrs.map((x) => ({ t: x.merged, pr: x.raw, model: x.raw * (x.model.weight - 1), collab: 0 })),
-      ...threadTimes.map((t) => ({ t, pr: 0, model: 0, collab: rules.score.collab })),
-    ].sort((a, b) => a.t - b.t);
-    const allTimes = [...p.prs.map((x) => x.created), ...acts.map((a) => a.t)];
-    const firstAt = Math.min(...allTimes);
-    const lastAt = Math.max(...allTimes);
-    for (const t of allTimes) {
-      const w = weekStart(t, tz);
-      if (!weekActive.has(w)) weekActive.set(w, new Set());
-      weekActive.get(w).add(p.login);
-    }
-
-    // 截至 t 的魔力：逐周汇总，动作数超过 cap 的周按 cap / 动作数 折算
-    const scoreAt = (t) => {
-      const weeks = new Map();
-      for (const a of acts) {
-        if (a.t > t) break;
-        const w = weekStart(a.t, tz);
-        let s = weeks.get(w);
-        if (!s) weeks.set(w, (s = { n: 0, pr: 0, model: 0, collab: 0 }));
-        s.n++;
-        s.pr += a.pr;
-        s.model += a.model;
-        s.collab += a.collab;
-      }
-      const total = { pr: 0, model: 0, collab: 0, bonus: 0, weekly: new Map() };
-      for (const [w, s] of weeks) {
-        const k = Math.min(1, cap / s.n);
-        total.pr += k * s.pr;
-        total.model += k * s.model;
-        total.collab += k * s.collab;
-        total.weekly.set(w, k * (s.pr + s.model + s.collab));
-      }
-      total.bonus = total.pr + total.model + total.collab;
-      return total;
-    };
-    const prStatsAt = (t) => {
-      let merged = 0;
-      let closed = 0;
-      let stale = 0;
-      let inflight = 0;
-      for (const pr of p.prs) {
-        if (pr.created > t) continue;
-        if (pr.merged && pr.merged <= t) merged++;
-        else if (pr.closed && pr.closed <= t) closed++;
-        else if (t - pr.created > rules.staleOpenDays * DAY) stale++;
-        else inflight++;
-      }
-      const resolved = merged + closed + stale;
-      return { merged, closed, stale, inflight, resolved, rate: resolved ? merged / resolved : null };
-    };
-
-    // 新手考核：首次贡献起 nb.days 天内，各项全部达标即通过
-    const end = firstAt + nb.days * DAY;
-    const evalAt = Math.min(now, end);
-    let passAt = null;
-    const windowWeeks = new Set();
-    let windowMerged = 0;
-    const events = [...mergedTimes.map((t) => [t, true]), ...threadTimes.map((t) => [t, false])].sort((x, y) => x[0] - y[0]);
-    for (const [t, isMerge] of events) {
-      if (t > evalAt) break;
-      windowWeeks.add(weekStart(t, tz));
-      if (isMerge) windowMerged++;
-      if (passAt === null && windowMerged >= nb.merged && windowWeeks.size >= nb.activeWeeks) passAt = t;
-    }
-    const openedCutoff = Math.min(evalAt - nb.anomaly.graceHours * 3600000, end);
-    const opened = p.prs.filter((x) => x.created <= openedCutoff);
-    const openedMerged = opened.filter((x) => x.merged && x.merged <= evalAt).length;
-    const anomaly = opened.length >= nb.anomaly.opened && openedMerged / opened.length < nb.anomaly.rate;
-    const newbie = {
-      status: passAt ? 'passed' : now < end ? 'pending' : 'failed',
-      end,
-      passAt,
-      passDay: passAt ? Math.floor((passAt - firstAt) / DAY) + 1 : null,
-      merged: countUpTo(mergedTimes, evalAt),
-      activeWeeks: windowWeeks.size,
-      daysLeft: Math.max(0, Math.ceil((end - now) / DAY)),
-      anomaly,
-      anomalyOpened: opened.length,
-      anomalyMerged: openedMerged,
-    };
-
-    // 等级：从通过考核那周起逐周回放，状态完全由历史推导
-    let level = null;
-    if (passAt) {
-      level = 0;
-      for (let w = weekStart(passAt, tz); w <= now; w += WEEK) {
-        const t = Math.max(passAt, Math.min(w + WEEK - 1, now));
-        const ps = prStatsAt(t);
-        const m = { weeks: (t - firstAt) / WEEK, bonus: scoreAt(t).bonus, collab: countUpTo(threadTimes, t), rate: ps.rate ?? 0 };
-        while (level > 0 && m.rate < levels[level].demote) level--;
-        while (level + 1 < levels.length && qualifies(levels[level + 1], m)) level++;
-      }
-    }
-
-    const cur = prStatsAt(now);
-    const score = scoreAt(now);
-    const collab = threadTimes.length;
-    const weeksIn = (now - firstAt) / WEEK;
-    let next = null;
-    if (level !== null && level + 1 < levels.length) {
-      const L = levels[level + 1];
-      next = {
-        level: level + 1,
-        gaps: [
-          weeksIn < L.weeks ? `在组 ${Math.floor(weeksIn)}/${L.weeks} 周` : null,
-          score.bonus < L.bonus ? `魔力 ${Math.floor(score.bonus)}/${L.bonus}` : null,
-          collab < L.collab ? `协作 ${collab}/${L.collab}` : null,
-          (cur.rate ?? 0) < L.rate ? `合入率 ${Math.round((cur.rate ?? 0) * 100)}%/${Math.round(L.rate * 100)}%` : null,
-        ].filter(Boolean),
-      };
-    }
-    let warnLine = null;
-    for (const line of rules.warnLines) if (cur.resolved > line.resolved) warnLine = line;
-    const warn = warnLine !== null && cur.rate < warnLine.rate;
-    const dormant = now - lastAt > rules.dormantDays * DAY && !(level !== null && level >= rules.dormantExemptLevel);
-
-    // key → { label, count }
-    const modelMix = new Map();
-    for (const x of mergedPrs) {
-      const mm = modelMix.get(x.model.key) || { label: x.model.label, count: 0 };
-      mm.count++;
-      modelMix.set(x.model.key, mm);
-    }
-
-    result.push({
-      login: p.login,
-      member: p.member,
-      firstAt,
-      lastAt,
-      weeksIn,
-      merged: mergedTimes.length,
-      opened: p.prs.length,
-      closedUnmerged: cur.closed,
-      stale: cur.stale,
-      inflight: cur.inflight,
-      resolved: cur.resolved,
-      rate: cur.rate,
-      collab,
-      issuesFiled: p.issuesFiled,
-      bonus: score.bonus,
-      bonusPr: score.pr,
-      bonusModel: score.model,
-      bonusCollab: score.collab,
-      weekly: score.weekly,
-      activeWeeks: score.weekly.size,
-      lines: mergedPrs.reduce((n, x) => n + x.lines, 0),
-      commits: mergedPrs.reduce((n, x) => n + x.commits, 0),
-      modelMix,
-      newbie,
-      level,
-      next,
-      warn,
-      warnLine,
-      dormant,
-    });
-  }
-
-  result.sort((a, b) => b.bonus - a.bonus || b.merged - a.merged || a.login.localeCompare(b.login));
-  result.forEach((p, i) => { p.rank = i + 1; });
-
-  const allWeeks = [...weekActive.keys()];
-  const weeks = [];
-  if (allWeeks.length) {
-    for (let w = Math.min(...allWeeks); w <= weekStart(now, tz); w += WEEK) {
-      weeks.push({ start: w, active: weekActive.get(w)?.size || 0, merged: weekMerged.get(w) || 0 });
-    }
-  }
-
-  const count = (f) => result.filter(f).length;
-  return {
-    org: data.org,
-    repos: data.repos.map((r) => r.name),
-    now,
-    people: result,
-    weeks,
-    inactiveMembers: [...members].filter((m) => !people.has(m)).sort((a, b) => a.localeCompare(b)),
-    summary: {
-      ...stats,
-      models: [...modelCounts.values()].sort((a, b) => b.count - a.count),
-      contributors: result.length,
-      members: members.size,
-      memberContributors: count((p) => p.member),
-      outsiders: count((p) => !p.member),
-      passed: count((p) => p.newbie.status === 'passed'),
-      failed: count((p) => p.newbie.status === 'failed'),
-      pending: count((p) => p.newbie.status === 'pending'),
-      anomaly: count((p) => p.newbie.anomaly),
-      warn: count((p) => p.warn),
-      dormant: count((p) => p.dormant),
-      levelCounts: levels.map((_, i) => count((p) => p.level === i)),
-    },
-  };
-}
-</script>
+<script src="engine.js"></script>
 
 <script>
 'use strict';
-
-// ---------- 拉取 ----------
-
-const API = 'https://api.github.com/graphql';
-
-// GitHub 按查询中的嵌套连接计点：连接总数 ÷ 100 后四舍五入，最少 1 点。
-// PR 有 review、评论、commit 3 个嵌套连接，每批 48 个编号约 145 个连接，只计 1 点。
-// commit 读提交说明再解析 Co-Authored-By：若用 authors 连接，每个 commit 多 1 个连接，点数约为 4 倍。
-const NESTED_LIMIT = 20;
-const COMMIT_LIMIT = 5;
-const BATCH_SIZE = 48;
-const CONCURRENCY = 16;
-// 首次加载时，边拉边用已到的数据刷新预览的最小间隔
-const PREVIEW_INTERVAL_MS = 2500;
-const AUTO_REFRESH_MS = 10 * 60 * 1000;
-// 增量刷新从上次拉取开始时间再往前多查这么久，覆盖搜索索引的延迟
-const INCREMENTAL_OVERLAP_MS = 5 * 60 * 1000;
-// 增量刷新时有更新的条目超过这个数就改为完整拉取：搜索只能顺序翻页，条目多时不如按编号并发拉
-const INCREMENTAL_MAX_ITEMS = 300;
-
-const PR_FIELDS = `
-  number state createdAt mergedAt closedAt additions deletions
-  author { login __typename }
-  mergedBy { login __typename }
-  reviews(first: ${NESTED_LIMIT}) { totalCount nodes { author { login __typename } submittedAt } }
-  comments(first: ${NESTED_LIMIT}) { totalCount nodes { author { login __typename } createdAt } }
-  commits(last: ${COMMIT_LIMIT}) { totalCount nodes { commit { author { name } message } } }`;
-const ISSUE_FIELDS = `
-  number state stateReason createdAt closedAt
-  author { login __typename }
-  comments(first: ${NESTED_LIMIT}) { totalCount nodes { author { login __typename } createdAt } }`;
-
-// 成员、仓库与各仓库的 PR / issue 数量一次取回；增量刷新不需要数量
-const META_QUERY = `query($org: String!, $memberCursor: String, $repoCursor: String, $needMembers: Boolean!, $needRepos: Boolean!, $withCounts: Boolean!) {
-  organization(login: $org) {
-    membersWithRole(first: 100, after: $memberCursor) @include(if: $needMembers) {
-      pageInfo { hasNextPage endCursor }
-      nodes { login }
-    }
-    repositories(first: 100, after: $repoCursor, orderBy: {field: NAME, direction: ASC}) @include(if: $needRepos) {
-      pageInfo { hasNextPage endCursor }
-      nodes {
-        name isArchived isFork isPrivate
-        pullRequests(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) @include(if: $withCounts) { totalCount nodes { number } }
-        issues(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) @include(if: $withCounts) { totalCount nodes { number } }
-      }
-    }
-  }
-}`;
-
-const SEARCH_QUERY = `query($q: String!, $cursor: String) {
-  search(query: $q, type: ISSUE, first: ${BATCH_SIZE}, after: $cursor) {
-    issueCount
-    pageInfo { hasNextPage endCursor }
-    nodes {
-      __typename
-      ... on PullRequest { repository { name } ${PR_FIELDS} }
-      ... on Issue { repository { name } ${ISSUE_FIELDS} }
-    }
-  }
-}`;
-
-function batchQuery(numbers) {
-  const items = numbers.map((n) => `n${n}: issueOrPullRequest(number: ${n}) { __typename ... on PullRequest { ${PR_FIELDS} } ... on Issue { ${ISSUE_FIELDS} } }`).join('\n');
-  return `query($org: String!, $repo: String!) { repository(owner: $org, name: $repo) { ${items} } }`;
-}
-
-// 把提交说明里的 Co-Authored-By 转成引擎使用的 commit.authors 结构，并丢弃说明正文以节省内存
-const CO_AUTHOR = /^co-authored-by:\s*(.+?)\s*(?:<[^>]*>)?\s*$/gim;
-function normalizeItem(item) {
-  if (item.__typename !== 'PullRequest' || !item.commits) return item;
-  const nodes = item.commits.nodes.map(({ commit }) => {
-    const names = commit.author?.name ? [commit.author.name] : [];
-    for (const m of (commit.message || '').matchAll(CO_AUTHOR)) names.push(m[1]);
-    return { commit: { authors: { nodes: names.map((name) => ({ name })) } } };
-  });
-  return { ...item, commits: { totalCount: item.commits.totalCount, nodes } };
-}
-
-const MAX_ATTEMPTS = 4;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-// allowMissing：编号空缺（已删除、转移或属于 discussion）时 GitHub 返回 NOT_FOUND，保留其余数据。
-// 网络中断、5xx、二级限流（403/429）、GraphQL 超时或 RATE_LIMITED 会等待后重试，最多 MAX_ATTEMPTS 次。
-async function gql(token, query, variables, { allowMissing = false, onWait } = {}) {
-  for (let attempt = 1; ; attempt++) {
-    const retry = async (seconds) => {
-      onWait?.(seconds);
-      await sleep(seconds * 1000);
-    };
-    let res;
-    try {
-      res = await fetch(API, {
-        method: 'POST',
-        headers: { Authorization: `bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, variables }),
-      });
-    } catch (err) {
-      if (attempt >= MAX_ATTEMPTS) throw new Error(`网络请求失败：${err.message}`);
-      await retry(3 * attempt);
-      continue;
-    }
-    if (res.status === 401) throw new Error('token 无效或已过期（HTTP 401）');
-    const text = await res.text();
-    const limited = (res.status === 403 || res.status === 429) && /rate limit/i.test(text);
-    if ((limited || res.status >= 500 || res.status === 499) && attempt < MAX_ATTEMPTS) {
-      await retry(limited ? Number(res.headers.get('Retry-After') || 60) : 3 * attempt);
-      continue;
-    }
-    if (!res.ok) throw new Error(`GitHub API 返回 HTTP ${res.status}：${text.slice(0, 200)}`);
-    const body = JSON.parse(text);
-    const errors = body.errors || [];
-    const transient = errors.some((e) => e.type === 'RATE_LIMITED' || /timeout|timed out|something went wrong/i.test(e.message));
-    if (transient && attempt < MAX_ATTEMPTS) {
-      await retry(5 * attempt);
-      continue;
-    }
-    const fatal = errors.filter((e) => !(allowMissing && e.type === 'NOT_FOUND'));
-    if (fatal.length || !body.data) throw new Error((fatal.length ? fatal : errors).map((e) => e.message).join('；'));
-    return body.data;
-  }
-}
-
-// 任一任务失败后不再领取新任务；等进行中的任务结束再抛出第一个错误，避免失败后仍有进度回调
-async function runPool(tasks, limit) {
-  let next = 0;
-  let failure = null;
-  const worker = async () => {
-    while (next < tasks.length && !failure) {
-      const i = next++;
-      try {
-        await tasks[i]();
-      } catch (err) {
-        failure ??= err;
-      }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
-  if (failure) throw failure;
-}
-
-// 成员与仓库列表；超过 100 时只对还没取完的那一项继续翻页
-async function fetchMeta(token, org, withCounts) {
-  const members = [];
-  const repos = [];
-  const vars = { org, memberCursor: null, repoCursor: null, needMembers: true, needRepos: true, withCounts };
-  while (vars.needMembers || vars.needRepos) {
-    const d = (await gql(token, META_QUERY, vars)).organization;
-    if (!d) throw new Error('找不到组织，或 token 没有访问权限');
-    if (vars.needMembers) {
-      members.push(...d.membersWithRole.nodes.map((m) => m.login));
-      vars.needMembers = d.membersWithRole.pageInfo.hasNextPage;
-      vars.memberCursor = d.membersWithRole.pageInfo.endCursor;
-    }
-    if (vars.needRepos) {
-      repos.push(...d.repositories.nodes);
-      vars.needRepos = d.repositories.pageInfo.hasNextPage;
-      vars.repoCursor = d.repositories.pageInfo.endCursor;
-    }
-  }
-  return { members, repos: repos.filter((r) => (RULES.includeArchived || !r.isArchived) && (RULES.includeForks || !r.isFork)) };
-}
-
-// 完整拉取：按编号分批并发取回所有 PR 与 issue
-// hooks.onMeta({ repos, members, items, batches })：仓库与成员读完、总量已知
-// hooks.onBatch({ done, total, prs, issues, latest, snapshot })：每批完成；snapshot() 返回目前已拉到的数据
-// hooks.onWait(seconds)：触发限流或临时错误，等待后重试
-async function fetchAll(token, org, hooks) {
-  const meta = await fetchMeta(token, org, true);
-  const counts = meta.repos.map((r) => ({
-    prTotal: r.pullRequests.totalCount,
-    issueTotal: r.issues.totalCount,
-    maxNumber: Math.max(0, r.pullRequests.nodes[0]?.number || 0, r.issues.nodes[0]?.number || 0),
-  }));
-  const loaded = meta.repos.map((r) => ({ name: r.name, isPrivate: r.isPrivate, prs: [], issues: [] }));
-  const snapshot = () => ({ org, members: meta.members, repos: loaded });
-  let done = 0;
-  let total = 0;
-  let prs = 0;
-  let issues = 0;
-  let latest = 0;
-  const fetchBatch = (i, from) => async () => {
-    const numbers = Array.from({ length: BATCH_SIZE }, (_, k) => from + k);
-    const repo = (await gql(token, batchQuery(numbers), { org, repo: loaded[i].name }, { allowMissing: true, onWait: hooks.onWait })).repository;
-    let found = 0;
-    for (const raw of Object.values(repo)) {
-      if (!raw) continue;
-      const item = normalizeItem(raw);
-      found++;
-      if (item.__typename === 'PullRequest') {
-        loaded[i].prs.push(item);
-        prs++;
-      } else {
-        loaded[i].issues.push(item);
-        issues++;
-      }
-      latest = Math.max(latest, Date.parse(item.createdAt));
-    }
-    done++;
-    hooks.onBatch({ done, total, prs, issues, latest, snapshot });
-    return found;
-  };
-
-  const tasks = [];
-  counts.forEach((c, i) => {
-    for (let from = 1; from <= c.maxNumber; from += BATCH_SIZE) tasks.push(fetchBatch(i, from));
-  });
-  total = tasks.length;
-  hooks.onMeta({
-    repos: meta.repos.length,
-    members: meta.members.length,
-    items: counts.reduce((n, c) => n + c.prTotal + c.issueTotal, 0),
-    batches: total,
-  });
-  await runPool(tasks, CONCURRENCY);
-
-  // 转移进来的 issue 可能编号更大但创建时间更早：数量不够时继续向后探测，直到整批为空
-  for (const [i, c] of counts.entries()) {
-    let from = Math.ceil(c.maxNumber / BATCH_SIZE) * BATCH_SIZE + 1;
-    while (loaded[i].prs.length < c.prTotal || loaded[i].issues.length < c.issueTotal) {
-      total++;
-      if (!(await fetchBatch(i, from)())) break;
-      from += BATCH_SIZE;
-    }
-  }
-  return snapshot();
-}
-
-// 增量刷新：用组织级搜索取 since 之后有更新的 PR 与 issue，按编号合并进上一份数据。
-// 出现新仓库或更新条目过多时返回 null，由调用方改为完整拉取。
-// hooks.onMeta({ repos, members })；hooks.onPage({ done, total, prs, issues })；hooks.onWait(seconds)
-async function fetchUpdates(token, org, prev, since, hooks) {
-  const meta = await fetchMeta(token, org, false);
-  const known = new Set(prev.repos.map((r) => r.name));
-  if (meta.repos.some((r) => !known.has(r.name))) return null;
-  hooks.onMeta({ repos: meta.repos.length, members: meta.members.length });
-  const current = new Set(meta.repos.map((r) => r.name));
-  const repos = new Map(prev.repos.filter((r) => current.has(r.name)).map((r) => [r.name, {
-    ...r,
-    prs: new Map(r.prs.map((x) => [x.number, x])),
-    issues: new Map(r.issues.map((x) => [x.number, x])),
-  }]));
-  const q = `org:${org} updated:>=${new Date(since).toISOString()}`;
-  let cursor = null;
-  let done = 0;
-  let prs = 0;
-  let issues = 0;
-  do {
-    const s = (await gql(token, SEARCH_QUERY, { q, cursor }, { onWait: hooks.onWait })).search;
-    if (s.issueCount > INCREMENTAL_MAX_ITEMS) return null;
-    for (const node of s.nodes) {
-      const repo = repos.get(node.repository?.name);
-      // 已归档、fork 或被规则排除的仓库
-      if (!repo) continue;
-      const { repository, ...item } = normalizeItem(node);
-      if (item.__typename === 'PullRequest') {
-        repo.prs.set(item.number, item);
-        prs++;
-      } else {
-        repo.issues.set(item.number, item);
-        issues++;
-      }
-    }
-    done++;
-    hooks.onPage({ done, total: Math.max(done, Math.ceil(s.issueCount / BATCH_SIZE)), prs, issues });
-    cursor = s.pageInfo.hasNextPage ? s.pageInfo.endCursor : null;
-  } while (cursor);
-  return {
-    org,
-    members: meta.members,
-    repos: [...repos.values()].map((r) => ({ ...r, prs: [...r.prs.values()], issues: [...r.issues.values()] })),
-    updated: prs + issues,
-  };
-}
 
 // ---------- 工具 ----------
 
@@ -1192,8 +378,7 @@ document.addEventListener('mousemove', (e) => { if (tipEl.style.display === 'blo
 
 // ---------- 状态 ----------
 
-// data 与 fetchedAt 只存在页面内存里，用于增量刷新；刷新页面即丢弃
-const state = { data: null, fetchedAt: 0, board: null, preview: null, filter: 'all', search: '', showAll: false, sort: { key: 'rank', dir: 1 }, running: false, timer: null };
+const state = { board: null, filter: 'all', search: '', showAll: false, sort: { key: 'rank', dir: 1 } };
 const TOP_N = 20;
 
 const FILTERS = {
@@ -1356,16 +541,18 @@ function renderMapping() {
     <p class="meta" style="margin:10px 0 0">来源：<a href="https://wiki.m-team.cc/zh-tw/account-rules" target="_blank" rel="noopener">M-Team 帐号规则</a>（2026-08-23 版）</p>`;
 }
 
-function renderBlind() {
+// limits：上传脚本拉取时的截断参数，随数据一起发布
+function renderBlind(limits) {
   $('blind').innerHTML = [
-    `模型来自 commit 的 Co-Authored-By 标记，是提交者自行声明的文本，可以手工伪造；只看每个 PR 最后 ${COMMIT_LIMIT} 个 commit。`,
+    '数据是上传脚本生成的快照，页面不实时拉取；更新频率取决于上传任务的执行间隔。',
+    '只展示人维度的贡献度，不展示任何仓库维度的信息；看板仓库本身的 PR 与 issue 不计入。',
+    `模型来自 commit 的 Co-Authored-By 标记，是提交者自行声明的文本，可以手工伪造；只看每个 PR 最后 ${limits.commits} 个 commit。`,
     'Codex CLI 默认署名「Codex」、Cursor 默认署名「Cursor」，都不含型号，分别按「未注明型号」和「其他」计。需要按型号计分时，在工具里把署名配置成带型号的名字（如 Codex 的 commit_attribution）。',
     '模型系数的跨厂商对齐按「当代旗舰 / 中端 / 轻量」划分，没有基准测试依据；新型号发布后需要更新识别规则。',
-    '「刷新」与自动刷新只拉上次之后有更新的条目（组织级搜索，有几分钟索引延迟，已往前多查 5 分钟）；删除或转出的 PR、issue 要「完整重拉」才会移除。',
-    '直接推送到默认分支的 commit 不计入；仓库要求「所有改动走 PR」之前的贡献会被低估。逐个 commit 判断是否关联 PR 每 100 个约 4 秒，不适合每次打开都拉。',
+    '直接推送到默认分支的 commit 不计入；仓库要求「所有改动走 PR」之前的贡献会被低估。',
     'AI 生成的 PR 记在开 PR 的账号名下，账号持有人对内容负责。',
-    '非成员可能是外部协作者、已离开的成员，或还没接受邀请的人（普通成员看不到待接受的邀请）。',
-    `每个 PR 和 issue 只读取前 ${NESTED_LIMIT} 条 review 和前 ${NESTED_LIMIT} 条评论。`,
+    '非成员可能是外部协作者、已离开的成员，或还没接受邀请的人。',
+    `每个 PR 和 issue 只读取前 ${limits.nested} 条 review 和前 ${limits.nested} 条评论。`,
     '「首次贡献」代替入组时间；第一次贡献很早、之后长期不活跃的人，新手考核会按那次贡献起算。',
   ].map((t) => `<li>${esc(t)}</li>`).join('');
 }
@@ -1382,7 +569,7 @@ function renderKpis(b) {
   const backlog = [...b.people].sort((x, y) => y.inflight - x.inflight)[0];
   const kpis = [
     { label: '贡献者', value: s.contributors, note: `成员 ${s.memberContributors} · 非成员 ${s.outsiders}` },
-    { label: '合入 PR', value: fmtNum(s.merged), note: `${b.repos.length} 个仓库 · 共开 ${fmtNum(s.prs)}` },
+    { label: '合入 PR', value: fmtNum(s.merged), note: `共开 ${fmtNum(s.prs)} 个 PR` },
     { label: '有人工 review 的合入', value: pct(ratio(s.mergedReviewed, s.merged)), meter: ratio(s.mergedReviewed, s.merged), note: `${s.mergedReviewed} / ${fmtNum(s.merged)}` },
     { label: '作者自己合入', value: pct(ratio(s.mergedSelf, s.merged)), meter: ratio(s.mergedSelf, s.merged), note: `${fmtNum(s.mergedSelf)} / ${fmtNum(s.merged)}` },
     { label: '带 AI 共同作者的合入', value: pct(ratio(s.mergedAi, s.merged)), meter: ratio(s.mergedAi, s.merged), note: `${fmtNum(s.mergedAi)} / ${fmtNum(s.merged)}` },
@@ -1465,14 +652,6 @@ function renderChips() {
 function renderLeaderboard() {
   const b = state.board;
   renderChips();
-  const pv = state.preview;
-  const note = $('preview-note');
-  note.className = `preview-note${pv ? ' on' : ''}`;
-  if (pv) {
-    note.textContent = pv.failed
-      ? `拉取中断：下面是不完整的数据（回放到 ${fmtDate(pv.latest)}），请重新拉取`
-      : `预览中：已按时间顺序回放到 ${fmtDate(pv.latest)}（${fmtNum(pv.prs)} 个 PR、${fmtNum(pv.issues)} 个 issue），排名还会随新数据变化`;
-  }
   if (!b) return;
   const list = visiblePeople();
   const shown = state.showAll ? list : list.slice(0, TOP_N);
@@ -1689,203 +868,54 @@ function renderAll() {
   renderTable();
 }
 
-// ---------- 交互 ----------
+// ---------- 加载数据 ----------
+
+// 上传脚本发布的数据快照，与页面同目录
+const DATA_URL = 'data/board.json';
 
 function setStatus(text, isError = false) {
   $('status').textContent = text;
   $('status').className = `meta${isError ? ' error' : ''}`;
 }
 
-// 加载进度面板：三个阶段；整体进度按「读取 5% / 拉取 90% / 计算 3%」分配，剩余时间按当前阶段已完成部分的平均速度估算
-function createLoader(title, labels) {
-  const steps = labels.map((label) => ({ label, detail: '' }));
-  const started = Date.now();
-  let current = 0;
-  let ratio = 0.02;
-  let stepStart = started;
-  let etaAt = null;
-  let note = '';
-  const draw = () => {
-    const elapsed = Math.round((Date.now() - started) / 1000);
-    const left = etaAt === null ? null : Math.max(1, Math.round((etaAt - Date.now()) / 1000));
-    $('ld-time').textContent = `已用 ${elapsed} 秒${left === null ? '' : ` · 预计还需约 ${left} 秒`}`;
-    $('ld-pct').textContent = `${Math.round(ratio * 100)}%`;
-    $('ld-fill').style.width = `${(ratio * 100).toFixed(1)}%`;
-    $('ld-steps').innerHTML = steps.map((s, i) => {
-      const cls = i < current ? 'done' : i === current ? 'active' : '';
-      const mark = i < current ? '✓' : i === current ? '<span class="spin"></span>' : '○';
-      const detail = i === current && note ? note : s.detail;
-      return `<li class="${cls}"><span class="mark">${mark}</span><span>${esc(s.label)}</span><span class="detail">${esc(detail)}</span></li>`;
-    }).join('');
-  };
-  $('ld-title').textContent = title;
-  $('loading').hidden = false;
-  draw();
-  const timer = setInterval(draw, 500);
-  return {
-    detail(i, text) {
-      steps[i].detail = text;
-      draw();
-    },
-    enter(i, text) {
-      current = i;
-      if (text !== undefined) steps[i].detail = text;
-      ratio = Math.max(ratio, [0.02, 0.05, 0.97][i]);
-      stepStart = Date.now();
-      etaAt = null;
-      note = '';
-      draw();
-    },
-    progress(done, total, text) {
-      note = '';
-      ratio = 0.05 + (0.9 * done) / total;
-      steps[current].detail = text;
-      etaAt = done >= 3 && done < total ? Date.now() + ((Date.now() - stepStart) / done) * (total - done) : null;
-      draw();
-    },
-    wait(seconds) {
-      note = `GitHub 暂时限流，${seconds} 秒后自动重试`;
-      draw();
-    },
-    close() {
-      clearInterval(timer);
-      $('loading').hidden = true;
-    },
-  };
-}
-
 function renderSkeleton() {
   const row = '<div class="sk"><i style="width:60%"></i><i style="width:70%"></i><i style="width:60%"></i><i></i><i></i></div>';
   $('leaderboard').innerHTML = row.repeat(8);
-  $('more').innerHTML = '';
 }
 
-const fmtTime = (t) => new Date(t).toLocaleTimeString('zh-CN', { hour12: false });
-
-// 增量刷新：只拉上次之后有更新的条目；需要完整拉取时返回 null
-async function refreshIncremental(token, org, loader) {
-  const since = state.fetchedAt - INCREMENTAL_OVERLAP_MS;
-  return fetchUpdates(token, org, state.data, since, {
-    onMeta: (info) => {
-      loader.detail(0, `${info.repos} 个仓库、${info.members} 名成员`);
-      loader.enter(1, `查询 ${fmtTime(since)} 之后的更新`);
-    },
-    onPage: (info) => loader.progress(info.done, info.total, `第 ${info.done}/${info.total} 页 · ${info.prs} 个 PR、${info.issues} 个 issue 有更新`),
-    onWait: (seconds) => loader.wait(seconds),
-  });
+const fmtDateTime = (t) => new Date(t + RULES.tzOffsetHours * 3600000).toISOString().slice(0, 16).replace('T', ' ');
+function ago(t) {
+  const m = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (m < 60) return `${m} 分钟前`;
+  if (m < 48 * 60) return `${Math.round(m / 60)} 小时前`;
+  return `${Math.round(m / 1440)} 天前`;
 }
 
-// 完整拉取；首次加载时边拉边算，已到的数据按时间顺序回放出预览排行
-async function refreshFull(token, org, loader, preview) {
-  let lastPreview = 0;
-  return fetchAll(token, org, {
-    onMeta: (info) => {
-      loader.detail(0, `${info.repos} 个仓库、${info.members} 名成员`);
-      loader.enter(1, `共 ${fmtNum(info.items)} 个 PR 与 issue，分 ${info.batches} 批并发拉取`);
-    },
-    onWait: (seconds) => loader.wait(seconds),
-    onBatch: (info) => {
-      loader.progress(info.done, info.total, `${info.done}/${info.total} 批 · 已读取 ${fmtNum(info.prs)} 个 PR、${fmtNum(info.issues)} 个 issue${info.latest ? ` · 已回放到 ${fmtDate(info.latest)}` : ''}`);
-      // 以回放到的日期作为「当前时间」计算，否则后面还没拉到的活动会让冬眠、考核期等状态失真
-      if (preview && info.latest && info.done < info.total && Date.now() - lastPreview > PREVIEW_INTERVAL_MS) {
-        lastPreview = Date.now();
-        state.board = computeBoard(info.snapshot(), RULES, info.latest);
-        state.preview = { latest: info.latest, prs: info.prs, issues: info.issues };
-        renderAll();
-      }
-    },
-  });
-}
-
-// 同一组织已有数据时先做增量刷新，否则（或增量判定需要时）完整拉取
-async function run({ full = false } = {}) {
-  if (state.running) return;
-  const org = $('org-input').value.trim();
-  const token = $('token-input').value.trim();
-  if (!org || !token) {
-    setStatus('请填写组织和 token', true);
-    return;
+// 上传脚本把 Map 展开成数组，这里还原成渲染层使用的结构
+function hydrate(d) {
+  for (const p of d.people) {
+    p.weekly = new Map(p.weekly);
+    p.modelMix = new Map(p.modelMix.map((m, i) => [i, m]));
   }
-  const url = new URL(location.href);
-  url.searchParams.set('org', org);
-  history.replaceState(null, '', url);
-  state.running = true;
-  $('run-btn').disabled = true;
-  $('full-reload').disabled = true;
-  setStatus('');
-  const started = Date.now();
-  const firstLoad = !state.board;
-  let loader = null;
+  return d;
+}
+
+async function loadBoard() {
+  renderSkeleton();
   try {
-    let data = null;
-    let mode = 'full';
-    if (!full && state.data?.org === org && state.fetchedAt) {
-      loader = createLoader(`正在刷新 ${org}`, ['读取仓库与成员', '拉取有更新的 PR 与 issue', '计算排行']);
-      data = await refreshIncremental(token, org, loader);
-      mode = 'incremental';
-      if (!data) loader.close();
-    }
-    if (!data) {
-      mode = 'full';
-      loader = createLoader(`${firstLoad ? '正在拉取' : '正在完整拉取'} ${org}`, ['读取仓库与成员', '拉取 PR 与 issue', '计算排行']);
-      if (firstLoad) renderSkeleton();
-      data = await refreshFull(token, org, loader, firstLoad);
-    }
-    loader.enter(2);
-    state.data = data;
-    state.fetchedAt = started;
-    state.board = computeBoard(data, RULES, Date.now());
-    state.preview = null;
+    const res = await fetch(DATA_URL, { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    state.board = hydrate(await res.json());
     renderAll();
-    const how = mode === 'incremental' ? `增量刷新 ${data.updated} 条` : '完整拉取';
-    setStatus(`${org} · ${data.repos.map((r) => r.name).join('、')} · 更新于 ${fmtTime(Date.now())}（${how}，${((Date.now() - started) / 1000).toFixed(0)} 秒）`);
-    $('run-btn').textContent = '刷新';
-    $('full-reload').hidden = false;
-    $('howto').open = false;
+    renderBlind(state.board.limits);
+    setStatus(`${state.board.org} · 数据更新于 ${fmtDateTime(state.board.now)}（UTC+8，${ago(state.board.now)}）`);
   } catch (err) {
     console.error(err);
-    setStatus(`失败：${err.message}`, true);
-    if (state.preview) {
-      state.preview.failed = true;
-      renderLeaderboard();
-    }
-  } finally {
-    loader?.close();
-    state.running = false;
-    $('run-btn').disabled = false;
-    $('full-reload').disabled = false;
+    $('leaderboard').innerHTML = '<div class="empty">还没有可展示的数据</div>';
+    setStatus(`读取数据失败：${err.message}`, true);
   }
 }
 
-async function copyCommand() {
-  const btn = $('copy-cmd');
-  const text = $('gh-cmd').textContent;
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    // 剪贴板 API 不可用时（部分浏览器的 file:// 页面）退回选区复制
-    const range = document.createRange();
-    range.selectNodeContents($('gh-cmd'));
-    const sel = getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-    document.execCommand('copy');
-    sel.removeAllRanges();
-  }
-  btn.textContent = '已复制';
-  setTimeout(() => { btn.textContent = '复制命令'; }, 1500);
-}
-
-$('auth-form').addEventListener('submit', (e) => {
-  e.preventDefault();
-  run();
-});
-$('copy-cmd').addEventListener('click', copyCommand);
-$('full-reload').addEventListener('click', () => run({ full: true }));
-$('auto-refresh').addEventListener('change', (e) => {
-  clearInterval(state.timer);
-  state.timer = e.target.checked ? setInterval(run, AUTO_REFRESH_MS) : null;
-});
 document.addEventListener('click', (e) => {
   const f = e.target.closest('[data-filter]');
   if (f && state.board) setFilter(f.dataset.filter);
@@ -1908,28 +938,13 @@ $('search').addEventListener('input', (e) => {
   }
 });
 
-// 「如何获取 token」：没有 token 时展开，有 token 时收起；只在有无 token 切换时改动，不覆盖用户手动展开
-let hadToken = null;
-function syncHowto() {
-  const hasToken = $('token-input').value.trim() !== '';
-  if (hasToken !== hadToken) $('howto').open = !hasToken;
-  hadToken = hasToken;
-}
-$('token-input').addEventListener('input', syncHowto);
-$('token-input').addEventListener('change', syncHowto);
-syncHowto();
-
-{
-  const org = new URLSearchParams(location.search).get('org');
-  if (org) $('org-input').value = org;
-}
 $('logo').innerHTML = frogIcon('cosmic', 28);
 renderFormula();
 renderFactors();
 renderMapping();
-renderBlind();
 renderPath(null);
 renderChips();
+loadBoard();
 </script>
 </body>
 </html>
