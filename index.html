@@ -187,18 +187,14 @@ input[type=search] { font: inherit; font-size: 13px; padding: 5px 10px; border: 
 .hb-b { height: 14px; }
 .hb-b i { display: block; height: 100%; background: var(--s1); border-radius: 0 4px 4px 0; min-width: 2px; }
 .hb-v { font-variant-numeric: tabular-nums; text-align: right; }
-.factors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.factors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .sub-h { font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin: 14px 0 6px; }
+.sub-h .meta { font-weight: 400; }
+.mrows { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 10px; align-items: center; }
+.mrows .fam { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
 .ex-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ex-chips span { padding: 2px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; color: var(--ink-2); }
 .ex-chips b { color: var(--ink); font-variant-numeric: tabular-nums; }
-table.mx { table-layout: fixed; font-size: 12px; }
-table.mx th, table.mx td { white-space: normal; text-align: center; padding: 6px 4px; border: 1px solid var(--grid); position: static; cursor: default; }
-table.mx th { background: transparent; }
-table.mx th .k { font-weight: 600; color: var(--ink); }
-table.mx tr > th:first-child { text-align: left; width: 72px; }
-table.mx td.na { color: var(--muted); }
-table.mx td.other { text-align: left; color: var(--ink-2); }
 .factors h3 { font-size: 12.5px; font-weight: 600; margin: 0 0 4px; color: var(--ink-2); }
 @media (max-width: 700px) { .factors { grid-template-columns: 1fr; } }
 
@@ -516,9 +512,6 @@ function setFilter(key) {
 
 // ---------- 渲染：公式与规则（不依赖数据） ----------
 
-// 用于演示系数的示例署名，与引擎共用 modelOf
-const MODEL_EXAMPLES = ['Claude Opus 5.5', 'Claude Fable 5.1', 'Claude Opus 5', 'Claude Sonnet 5.5', 'GPT-6 Astra', 'GPT-6.1 Sol', 'gpt-6.1-terra', 'GPT-5.4', 'Gemini 4 Carbon', 'Gemini 4 Argon', 'Gemini 3.8 Flash', 'deepseek-v4-pro', 'DeepSeek-V4.1-Flash', 'Codex', 'Cursor'];
-
 function renderFormula() {
   const S = RULES.score;
   const cap = RULES.weeklyActionCap;
@@ -526,7 +519,8 @@ function renderFormula() {
   const exLines = S.lines * Math.log10(1 + ex.lines);
   const exCommits = S.commits * Math.log2(1 + ex.commits);
   const exScore = (1 + exLines + exCommits) * ex.model.weight;
-  const decay = RULES.versionDecay;
+  const top = RULES.models.reduce((m, x) => (x.weight > m.weight ? x : m));
+  const penalties = RULES.models.filter((m) => m.weight < 1).map((m) => `${esc(m.label)} ×${m.weight}`).join('、');
   $('formula-card').innerHTML = `
     <h2>贡献度公式 <span class="meta">贡献度 = 魔力，按魔力降序排名</span></h2>
     <div class="formula">
@@ -543,9 +537,7 @@ function renderFormula() {
         <dt><i class="sw s3"></i>协作分</dt>
         <dd><span class="k">${S.collab}</span><span class="note">每参与一个他人的 PR 或 issue（review、评论、代合入），或提一个有效 issue</span></dd>
         <dt><i class="sw s2"></i>模型系数</dt>
-        <dd>1 + 档位加成 × 版本系数<span class="note">一个 PR 用了多个模型时取最高</span></dd>
-        <dt><i class="sw none"></i>版本系数</dt>
-        <dd>max(0, 1 − <span class="k">${decay}</span> × 落后版本数)<span class="note">落后 ${(0.5 / decay).toFixed(1)} 个版本加成减半，${(1 / decay).toFixed(1)} 个版本归零；没写版本号按 ×${RULES.unknownVersionFactor}</span></dd>
+        <dd>按署名的模型查表，最高 ${esc(top.label)} <span class="k">×${top.weight}</span><span class="note">一个 PR 用了多个模型时取最高；带扣分工具署名时按扣分计（${penalties}）</span></dd>
       </dl>
     </div>
     <dl class="examples">
@@ -554,68 +546,57 @@ function renderFormula() {
       <dt>例 2</dt>
       <dd>一周合入 12 个 PR、协作 3 次，共 15 个动作：当周得分 × ${cap}/15</dd>
     </dl>
-    <p class="formula-ref">档位加成与各系列最新版本见「计分因子」。</p>`;
+    <p class="formula-ref">各模型的系数见「计分因子」。</p>`;
 }
 
-function curveChart({ fn, xMin, xMax, ticks, xLabel, logX = false, yMax = null, yFmt = (v) => `+${v}`, tickFmt = (t) => (t >= 1000 ? `${t / 1000}k` : t), tipFmt = (x, y) => `${xLabel} ${fmtNum(x)} → +${y.toFixed(2)}` }) {
+// 横轴从 0 开始的加分曲线
+function curveChart({ fn, xMax, ticks, xLabel }) {
   const W = 240;
   const H = 140;
   const pad = { l: 40, r: 18, t: 10, b: 36 };
-  const top = yMax ?? Math.ceil(fn(xMax) * 4) / 4;
-  const sx = (v) => pad.l + (W - pad.l - pad.r) * (logX ? Math.log10(v / xMin) / Math.log10(xMax / xMin) : (v - xMin) / (xMax - xMin));
+  const top = Math.ceil(fn(xMax) * 4) / 4;
+  const sx = (v) => pad.l + ((W - pad.l - pad.r) * v) / xMax;
   const sy = (v) => pad.t + (H - pad.t - pad.b) * (1 - v / top);
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
   for (const v of [0, top]) {
-    s += `<line class="${v ? 'gl' : 'bl'}" x1="${pad.l}" x2="${W - pad.r}" y1="${sy(v)}" y2="${sy(v)}"/><text class="ax" x="${pad.l - 4}" y="${sy(v) + 4}" text-anchor="end">${yFmt(v)}</text>`;
+    s += `<line class="${v ? 'gl' : 'bl'}" x1="${pad.l}" x2="${W - pad.r}" y1="${sy(v)}" y2="${sy(v)}"/><text class="ax" x="${pad.l - 4}" y="${sy(v) + 4}" text-anchor="end">+${v}</text>`;
   }
   // 按几何间隔取样，线性横轴上对数曲线开头的陡峭段也能画平滑
-  const lo = Math.max(xMin, 1e-3);
-  const samples = xMin < lo ? [xMin] : [];
+  const lo = 1e-3;
+  const samples = [0];
   for (let i = 0; i <= 80; i++) samples.push(lo * (xMax / lo) ** (i / 80));
   const pts = samples.map((v) => `${sx(v).toFixed(1)},${sy(fn(v)).toFixed(1)}`);
   s += `<polyline class="ln" points="${pts.join(' ')}"/>`;
   ticks.forEach((t) => {
-    s += `<circle class="dot" cx="${sx(t)}" cy="${sy(fn(t))}" r="4" data-tip="${esc(tipFmt(t, fn(t)))}"/>`;
-    s += `<text class="ax" x="${sx(t)}" y="${H - pad.b + 14}" text-anchor="middle">${tickFmt(t)}</text>`;
+    s += `<circle class="dot" cx="${sx(t)}" cy="${sy(fn(t))}" r="4" data-tip="${esc(`${xLabel} ${fmtNum(t)} → +${fn(t).toFixed(2)}`)}"/>`;
+    s += `<text class="ax" x="${sx(t)}" y="${H - pad.b + 14}" text-anchor="middle">${t >= 1000 ? `${t / 1000}k` : t}</text>`;
   });
   s += `<text class="ax-l" x="${W - pad.r}" y="${H - 4}" text-anchor="end">${esc(xLabel)} →</text>`;
   return `${s}</svg>`;
 }
 
-// 系列 × 档位的档位加成矩阵；格子底色随加成加深
-function modelMatrix() {
-  const families = Object.keys(RULES.families);
-  const tiers = RULES.modelTiers.filter((t) => t.key !== 'other');
-  const maxBonus = Math.max(...tiers.map((t) => t.bonus));
-  const tint = (bonus) => Math.round(6 + (bonus / (maxBonus || 1)) * 44);
-  const other = [...RULES.models.filter((m) => m.tier === 'other'), RULES.modelNone].map((m) => m.short).join('、');
-  const rows = families.map((f) => `<tr><th>${esc(f)}<br><span class="meta">最新 ${RULES.families[f].latest}</span></th>${tiers.map((t) => {
-    const ms = RULES.models.filter((m) => m.family === f && m.tier === t.key);
-    if (!ms.length) return '<td class="na">—</td>';
-    const how = t.versioned === false ? '不看版本' : '再乘版本系数';
-    const tip = ms.map((m) => `<b>${esc(m.label)}</b>　档位加成 +${t.bonus}，${how}<br><span class="k">识别：</span>${esc(m.pattern.source)}`).join('<br>');
-    return `<td style="background:color-mix(in srgb, var(--s2) ${tint(t.bonus)}%, transparent)" data-tip="${esc(tip)}">${ms.map((m) => esc(m.short)).join('<br>')}</td>`;
-  }).join('')}</tr>`).join('');
-  return `<table class="mx">
-    <tr><th></th>${tiers.map((t) => `<th>${esc(t.label)}<br><span class="k">+${t.bonus}</span></th>`).join('')}</tr>
-    ${rows}
-    <tr><th>其他</th><td colspan="${tiers.length}" class="other">${esc(other)}　×1</td></tr>
-  </table>`;
+// 按家族列出模型系数，「其他」排最后；底色随加成加深，扣分工具用红色
+function modelTable() {
+  const all = [...RULES.models, RULES.modelNone];
+  const families = [...new Set(all.map((m) => m.family))].sort((a, b) => (a === '其他') - (b === '其他'));
+  const max = Math.max(...all.map((m) => m.weight));
+  const tint = (w) => (w < 1 ? 'var(--critical) 22%' : `var(--s2) ${Math.round(((w - 1) / (max - 1 || 1)) * 44)}%`);
+  const chip = (m) => {
+    const tip = m.pattern ? `<b>${esc(m.label)}</b><br><span class="k">识别：</span>${esc(m.pattern.source)}` : '没有识别到任何 AI 署名';
+    return `<span style="background:color-mix(in srgb, ${tint(m.weight)}, transparent)" data-tip="${esc(tip)}">${esc(m.short)} <b>×${m.weight}</b></span>`;
+  };
+  return `<div class="mrows">${families.map((f) => `<span class="fam">${esc(f)}</span>
+    <div class="ex-chips">${all.filter((m) => m.family === f).sort((a, b) => b.weight - a.weight).map(chip).join('')}</div>`).join('')}</div>`;
 }
 
 function renderFactors() {
   const S = RULES.score;
-  const d = RULES.versionDecay;
-  const examples = MODEL_EXAMPLES.map((n) => modelOf(n, RULES));
   $('factors').innerHTML = `<div class="factors">
-    <div><h3>改动行 → 加分 <span class="meta">×10 → +${S.lines}</span></h3>${curveChart({ fn: (x) => S.lines * Math.log10(1 + x), xMin: 0, xMax: 3000, ticks: [100, 1000, 3000], xLabel: '改动行' })}</div>
-    <div><h3>commit 数 → 加分 <span class="meta">×2 → +${S.commits}</span></h3>${curveChart({ fn: (x) => S.commits * Math.log2(1 + x), xMin: 0, xMax: 30, ticks: [1, 3, 10, 30], xLabel: 'commit 数' })}</div>
-    <div><h3>落后版本 → 版本系数</h3>${curveChart({ fn: (x) => Math.max(0, 1 - d * x), xMin: 0, xMax: 1, ticks: [0, 0.4, 0.8], xLabel: '落后版本数', yMax: 1, yFmt: (v) => `×${v}`, tickFmt: (t) => t.toFixed(1), tipFmt: (x, y) => `落后 ${x.toFixed(1)} 个版本 → 版本系数 ×${y.toFixed(2)}` })}</div>
+    <div><h3>改动行 → 加分 <span class="meta">×10 → +${S.lines}</span></h3>${curveChart({ fn: (x) => S.lines * Math.log10(1 + x), xMax: 3000, ticks: [100, 1000, 3000], xLabel: '改动行' })}</div>
+    <div><h3>commit 数 → 加分 <span class="meta">×2 → +${S.commits}</span></h3>${curveChart({ fn: (x) => S.commits * Math.log2(1 + x), xMax: 30, ticks: [1, 3, 10, 30], xLabel: 'commit 数' })}</div>
   </div>
-  <h3 class="sub-h">档位加成（悬停格子查看识别规则）</h3>
-  ${modelMatrix()}
-  <h3 class="sub-h">算出来的模型系数</h3>
-  <div class="ex-chips">${examples.map((m) => `<span>${esc(m.label)} <b>×${m.weight.toFixed(2)}</b></span>`).join('')}</div>`;
+  <h3 class="sub-h">模型系数 <span class="meta">按组织偏好定档，不区分版本；悬停查看识别规则</span></h3>
+  ${modelTable()}`;
 }
 
 function renderMapping() {
@@ -642,9 +623,9 @@ function renderBlind(limits) {
   $('blind').innerHTML = [
     '数据是上传脚本生成的快照，页面不实时拉取；更新频率取决于上传任务的执行间隔。',
     '只展示人维度的贡献度，不展示任何仓库维度的信息；看板仓库本身的 PR 与 issue 不计入。',
-    `模型来自 commit 的 Co-Authored-By 标记，是提交者自行声明的文本，可以手工伪造；只看每个 PR 最后 ${limits.commits} 个 commit。`,
-    'Codex CLI 默认署名「Codex」、Cursor 默认署名「Cursor」，都不含型号，分别按「未注明型号」和「其他」计。需要按型号计分时，在工具里把署名配置成带型号的名字（如 Codex 的 commit_attribution）。',
-    '模型系数的跨厂商对齐按「当代旗舰 / 中端 / 轻量」划分，没有基准测试依据；新型号发布后需要更新识别规则。',
+    `模型来自 commit 的 Co-Authored-By 标记，是提交者自行声明的文本，可以伪造，也可以删掉；只看每个 PR 最后 ${limits.commits} 个 commit。删掉了标记的 PR 按「无 AI 标注」计，所以 AI 占比是下限。`,
+    'Codex CLI 默认署名「Codex」、Cursor 默认署名「Cursor」，都不含型号，分别按「GPT 其他」和 ×1 计。需要按型号计分时，在工具里把署名配置成带型号的名字（如 Codex 的 commit_attribution）。TRAE CLI 默认署名「TRAE CLI」，按扣分计。',
+    '模型系数按组织偏好整体定档：Claude 强于 GPT；DeepSeek 胜在速度、Gemini 胜在成本，系数低于前两家。不区分版本，也不对应具体的基准测试分数；出现新的型号名或代号时需要更新识别规则。',
     '直接推送到默认分支的 commit 不计入；仓库要求「所有改动走 PR」之前的贡献会被低估。',
     'AI 生成的 PR 记在开 PR 的账号名下，账号持有人对内容负责。',
     `每个 PR 和 issue 只读取前 ${limits.nested} 条 review 和前 ${limits.nested} 条评论。`,
@@ -773,7 +754,7 @@ function renderLeaderboard() {
   const max = Math.max(1, ...b.people.map((p) => p.bonus));
   const weekMax = Math.max(1, ...b.people.flatMap((p) => [...p.weekly.values()]));
   $('leaderboard').innerHTML = shown.length ? shown.map((p) => {
-    // 条宽按全员最高魔力缩放，右侧留 44px 给数值标签
+    // 条宽按全员最高魔力缩放，右侧留 44px 给数值标签；扣分工具的负加成从 PR 段里扣除
     const seg = (cls, v) => (v >= 0.05 ? `<i class="seg ${cls}" style="width:calc((100% - 44px) * ${(v / max).toFixed(4)})"></i>` : '');
     return `
     <div class="lb-row" data-tip="${esc(personTip(p, b.now))}">
@@ -786,7 +767,7 @@ function renderLeaderboard() {
         </div>
       </div>
       <span>${levelChip(p)}</span>
-      <div class="bar">${seg('p', p.bonusPr)}${seg('m', p.bonusModel)}${seg('c', p.bonusCollab)}<span class="v">${fmtBonus(p.bonus)}</span></div>
+      <div class="bar">${seg('p', p.bonusPr + Math.min(0, p.bonusModel))}${seg('m', Math.max(0, p.bonusModel))}${seg('c', p.bonusCollab)}<span class="v">${fmtBonus(p.bonus)}</span></div>
       <span>${sparkline(p, b.weeks, weekMax)}</span>
     </div>`;
   }).join('') : '<div class="empty">没有符合条件的人</div>';
@@ -886,7 +867,7 @@ function modelChart(b) {
   const total = rows.reduce((n, m) => n + m.count, 0);
   return `<div class="hbars">${rows.map((m) => `
     <div class="hb" data-tip="${esc(`<b>${esc(m.label)}</b><br>合入 PR ${m.count} 个，占 ${pct(m.count / total)}<br>模型系数 ×${m.weight}`)}">
-      <span>${esc(m.label)} ${m.weight > 1 ? `<span class="meta">×${m.weight}</span>` : ''}</span>
+      <span>${esc(m.label)} ${m.weight !== 1 ? `<span class="meta">×${m.weight}</span>` : ''}</span>
       <span class="hb-b"><i style="width:${(m.count / max) * 100}%"></i></span>
       <span class="hb-v">${fmtNum(m.count)} <span class="meta">${pct(m.count / total)}</span></span>
     </div>`).join('')}</div>`;

@@ -15,57 +15,28 @@ const RULES = {
     // 每参与一个他人的 PR 或 issue
     collab: 1,
   },
-  // 模型系数 = 1 + 档位加成 × 版本系数。各家同档按「当代旗舰 / 中端 / 轻量」对齐，没有基准测试依据，可按团队体验调整。
-  modelTiers: [
-    { key: 'top', label: '顶配', bonus: 0.5 },
-    { key: 'flagship', label: '旗舰', bonus: 0.3 },
-    { key: 'second', label: '次旗舰', bonus: 0.2 },
-    { key: 'mid', label: '中端', bonus: 0.1 },
-    { key: 'light', label: '轻量', bonus: 0 },
-    { key: 'unknown', label: '未注明型号', bonus: 0.1, versioned: false },
-    { key: 'other', label: '其他工具 / 无 AI 标注', bonus: 0, versioned: false },
-  ],
-  // 版本系数 = max(0, 1 − versionDecay × (系列最新版本 − 署名版本))：落后 0.4 版加成减半，落后 0.8 版不再加成。
-  // 版本号在同一系列内比较（各家产品线共用版本号），新版本发布后更新 latest。
-  // latest 依据 2026-11 的公开发布：Claude Opus 5.5、GPT-6.1（Sol / Terra）、Gemini 4（Argon / Carbon）、DeepSeek V4.1 Flash。
-  versionDecay: 1.25,
-  // 署名有型号但没有版本号时的版本系数
-  unknownVersionFactor: 0.5,
-  families: {
-    Claude: { latest: 5.5, version: /\b(?:fable|opus|sonnet|haiku)[ -]?(\d+)(?:[.-](\d{1,2})(?!\d))?|\bclaude[ -](\d)[.-](\d)[ -](?:fable|opus|sonnet|haiku)\b/i },
-    GPT: { latest: 6.1, version: /\bgpt[- ]?(\d+)(?:\.(\d{1,2}))?/i },
-    Gemini: { latest: 4, version: /\bgemini[ -]?(\d+)(?:\.(\d{1,2}))?/i },
-    DeepSeek: { latest: 4.1, version: /\bdeepseek[ -]?v(\d+)(?:\.(\d{1,2}))?/i },
-  },
-  // 按 commit 作者与共同作者（Co-Authored-By）的名字识别模型。
-  // 同一个署名按列表顺序取第一个匹配，所以更具体的型号（mini、nano、Flash-Lite）排在前面；
-  // 一个 PR 出现多个模型时取系数最高的。
+  // 按 commit 作者与共同作者（Co-Authored-By）的名字识别模型，PR 分乘以 weight。
+  // 系数按组织偏好整体定档，不区分版本：Claude 强于 GPT；DeepSeek 胜在速度、Gemini 胜在成本，系数低于前两家。
+  // 同一个署名按列表顺序取第一个匹配，所以扣分工具与更具体的代号排在前面。
+  // 一个 PR 出现多个模型时取系数最高的；出现系数低于 1 的扣分工具时按扣分计。
   models: [
-    { key: 'fable', family: 'Claude', short: 'Fable', label: 'Claude Fable', tier: 'top', pattern: /\bfable\b/i },
-    { key: 'opus', family: 'Claude', short: 'Opus', label: 'Claude Opus', tier: 'flagship', pattern: /\bopus\b/i },
-    { key: 'sonnet', family: 'Claude', short: 'Sonnet', label: 'Claude Sonnet', tier: 'mid', pattern: /\bsonnet\b/i },
-    { key: 'haiku', family: 'Claude', short: 'Haiku', label: 'Claude Haiku', tier: 'light', pattern: /\bhaiku\b/i },
-    { key: 'claude', family: 'Claude', short: 'Claude、Claude Code', label: 'Claude 未注明型号', tier: 'unknown', pattern: /\bclaude\b/i },
-    // GPT-6 起用代号分档：Astra 旗舰 > Sol 高端 > Terra 中端 > Luna 快速；mini、nano、Instant 沿用旧档位
-    { key: 'gptLight', family: 'GPT', short: 'Luna、nano、Instant', label: 'GPT Luna / nano', tier: 'light', pattern: /\b(gpt|codex)\b[\w. -]*?\b(luna|nano|instant)\b/i },
-    { key: 'gptMid', family: 'GPT', short: 'Terra、mini', label: 'GPT Terra / mini', tier: 'mid', pattern: /\b(gpt|codex)\b[\w. -]*?\b(terra|mini)\b/i },
-    { key: 'gptSol', family: 'GPT', short: 'Sol', label: 'GPT Sol', tier: 'flagship', pattern: /\bgpt\b[\w. -]*?\bsol\b/i },
-    { key: 'gptTop', family: 'GPT', short: 'Astra、Pro', label: 'GPT Astra / Pro', tier: 'top', pattern: /\bgpt\b[\w. -]*?\b(astra|pro)\b/i },
-    { key: 'gptVer', family: 'GPT', short: 'GPT-5、5.x 等无代号版本', label: 'GPT', tier: 'flagship', pattern: /\bgpt[- ]?([5-9]|\d{2,})(\.\d+)?\b/i },
-    { key: 'gpt', family: 'GPT', short: 'Codex 默认署名', label: 'GPT / Codex 未注明型号', tier: 'unknown', pattern: /\b(gpt|codex|openai|chatgpt)\b/i },
-    // Gemini 4 起用代号分档：Carbon 最强 > Argon 旗舰；Flash、Flash-Lite 沿用旧档位
-    { key: 'geminiLite', family: 'Gemini', short: 'Flash-Lite', label: 'Gemini Flash-Lite', tier: 'light', pattern: /\bgemini\b[\w. -]*?\bflash[- ]?lite\b/i },
-    { key: 'geminiFlash', family: 'Gemini', short: 'Flash', label: 'Gemini Flash', tier: 'mid', pattern: /\bgemini\b[\w. -]*?\bflash\b/i },
-    { key: 'geminiTop', family: 'Gemini', short: 'Carbon、Ultra', label: 'Gemini Carbon', tier: 'top', pattern: /\bgemini\b[\w. -]*?\b(carbon|ultra)\b/i },
-    { key: 'geminiPro', family: 'Gemini', short: 'Argon、Pro', label: 'Gemini Argon / Pro', tier: 'flagship', pattern: /\bgemini\b[\w. -]*?\b(argon|pro)\b/i },
-    { key: 'gemini', family: 'Gemini', short: 'Gemini', label: 'Gemini 未注明型号', tier: 'unknown', pattern: /\bgemini\b/i },
-    { key: 'deepseekPro', family: 'DeepSeek', short: 'Pro、Reasoner', label: 'DeepSeek Pro / Reasoner', tier: 'second', pattern: /\bdeepseek\b[\w. -]*?\b(pro|reasoner|r\d)\b/i },
-    { key: 'deepseekFlash', family: 'DeepSeek', short: 'Flash、Chat', label: 'DeepSeek Flash / Chat', tier: 'mid', pattern: /\bdeepseek\b[\w. -]*?\b(flash|chat|v\d[\w.]*)\b/i },
-    { key: 'deepseek', family: 'DeepSeek', short: 'DeepSeek', label: 'DeepSeek 未注明型号', tier: 'unknown', pattern: /\bdeepseek\b/i },
-    { key: 'cursor', family: '其他', short: 'Cursor', label: 'Cursor', tier: 'other', pattern: /\bcursor\b/i },
-    { key: 'copilot', family: '其他', short: 'Copilot', label: 'Copilot', tier: 'other', pattern: /\bcopilot\b/i },
+    { key: 'trae', family: '其他', short: 'TRAE CLI', label: 'TRAE CLI', weight: 0.9, pattern: /\btrae\b/i },
+    { key: 'opus', family: 'Claude', short: 'Opus', label: 'Claude Opus', weight: 1.3, pattern: /\bopus\b/i },
+    { key: 'fable', family: 'Claude', short: 'Fable', label: 'Claude Fable', weight: 1.25, pattern: /\bfable\b/i },
+    { key: 'sonnet', family: 'Claude', short: 'Sonnet', label: 'Claude Sonnet', weight: 1.2, pattern: /\bsonnet\b/i },
+    { key: 'haiku', family: 'Claude', short: 'Haiku', label: 'Claude Haiku', weight: 1.1, pattern: /\bhaiku\b/i },
+    { key: 'claude', family: 'Claude', short: '未注明型号', label: 'Claude 未注明型号', weight: 1.1, pattern: /\bclaude\b/i },
+    { key: 'gptTop', family: 'GPT', short: 'Astra、Pro', label: 'GPT Astra / Pro', weight: 1.2, pattern: /\bgpt\b[\w. -]*?\b(astra|pro)\b/i },
+    { key: 'gptSol', family: 'GPT', short: 'Sol', label: 'GPT Sol', weight: 1.15, pattern: /\bgpt\b[\w. -]*?\bsol\b/i },
+    { key: 'gpt', family: 'GPT', short: 'Terra、Luna、mini 等，Codex 默认署名', label: 'GPT 其他', weight: 1.05, pattern: /\b(gpt|codex|openai|chatgpt)\b/i },
+    { key: 'geminiPro', family: 'Gemini', short: 'Carbon、Argon、Pro', label: 'Gemini Carbon / Argon', weight: 1.1, pattern: /\bgemini\b[\w. -]*?\b(carbon|argon|ultra|pro)\b/i },
+    { key: 'gemini', family: 'Gemini', short: 'Flash 等', label: 'Gemini 其他', weight: 1.05, pattern: /\bgemini\b/i },
+    { key: 'deepseekPro', family: 'DeepSeek', short: 'Pro、Reasoner', label: 'DeepSeek Pro', weight: 1.1, pattern: /\bdeepseek\b[\w. -]*?\b(pro|reasoner|r\d)\b/i },
+    { key: 'deepseek', family: 'DeepSeek', short: 'Flash 等', label: 'DeepSeek 其他', weight: 1.05, pattern: /\bdeepseek\b/i },
+    { key: 'cursor', family: '其他', short: 'Cursor', label: 'Cursor', weight: 1, pattern: /\bcursor\b/i },
+    { key: 'copilot', family: '其他', short: 'Copilot', label: 'Copilot', weight: 1, pattern: /\bcopilot\b/i },
   ],
-  modelNone: { key: 'none', family: '其他', short: '无 AI 标注', label: '无 AI 标注', tier: 'other' },
+  modelNone: { key: 'none', family: '其他', short: '无 AI 标注', label: '无 AI 标注', weight: 1 },
   // PR 打开超过这么多天仍未合入也未关闭，算作「未收尾」
   staleOpenDays: 14,
   newbie: {
@@ -135,44 +106,22 @@ function prRawScore(lines, commits, rules) {
   return 1 + rules.score.lines * Math.log10(1 + lines) + rules.score.commits * Math.log2(1 + commits);
 }
 
-// 从署名中解析版本号：正则的捕获组两两一组（主版本、次版本），取第一组匹配到的
-function parseVersion(text, re) {
-  const m = text.match(re);
-  if (!m) return null;
-  const groups = m.slice(1);
-  const i = groups.findIndex((g) => g !== undefined);
-  if (i < 0) return null;
-  return Number(groups[i + 1] !== undefined ? `${groups[i]}.${groups[i + 1]}` : groups[i]);
-}
-
-// 单个署名的模型、版本与系数：系数 = 1 + 档位加成 × 版本系数
 function modelOf(text, rules) {
-  const model = rules.models.find((x) => x.pattern.test(text)) || rules.modelNone;
-  const tier = rules.modelTiers.find((t) => t.key === model.tier);
-  const family = rules.families[model.family];
-  let version = null;
-  let factor = 1;
-  if (family && tier.versioned !== false) {
-    version = parseVersion(text, family.version);
-    factor = version === null
-      ? rules.unknownVersionFactor
-      : Math.min(1, Math.max(0, 1 - rules.versionDecay * (family.latest - version)));
-  }
-  const weight = Math.round((1 + tier.bonus * factor) * 100) / 100;
-  const label = version === null ? model.label : `${model.label} ${version}`;
-  return { key: version === null ? model.key : `${model.key}@${version}`, label, model, version, weight };
+  return rules.models.find((x) => x.pattern.test(text)) || rules.modelNone;
 }
 
-// PR 内所有 commit 作者与共同作者中系数最高的模型，系数相同取先出现的
+// PR 内所有 commit 作者与共同作者的模型：有扣分工具（系数低于 1）时按它计，否则取系数最高的，系数相同取先出现的
 function detectModel(pr, rules) {
   let best = null;
   for (const c of pr.commits?.nodes || []) {
     for (const a of c.commit?.authors?.nodes || []) {
       const m = modelOf(`${a.name || ''} ${a.email || ''}`, rules);
-      if (m.model !== rules.modelNone && (!best || m.weight > best.weight)) best = m;
+      if (m === rules.modelNone) continue;
+      if (m.weight < 1) return m;
+      if (!best || m.weight > best.weight) best = m;
     }
   }
-  return best || modelOf('', rules);
+  return best || rules.modelNone;
 }
 
 // data: { org, members: [login], repos: [{ name, prs: [PR node], issues: [Issue node] }] }
@@ -185,7 +134,7 @@ function computeBoard(data, rules, now) {
   const people = new Map();
   const weekActive = new Map();
   const weekMerged = new Map();
-  // 合入 PR 按「型号@版本」计数：key → { label, weight, count }
+  // 合入 PR 按模型计数：key → { label, weight, count }
   const modelCounts = new Map();
 
   const human = (actor) => {
@@ -246,7 +195,7 @@ function computeBoard(data, rules, now) {
         stats.merged++;
         if (reviewed) stats.mergedReviewed++;
         if (owner && human(pr.mergedBy) === owner) stats.mergedSelf++;
-        if (model.model !== rules.modelNone) stats.mergedAi++;
+        if (model !== rules.modelNone) stats.mergedAi++;
         const mc = modelCounts.get(model.key) || { label: model.label, weight: model.weight, count: 0 };
         mc.count++;
         modelCounts.set(model.key, mc);
@@ -276,7 +225,7 @@ function computeBoard(data, rules, now) {
     const mergedPrs = p.prs.filter((x) => x.merged);
     const mergedTimes = mergedPrs.map((x) => x.merged).sort((a, b) => a - b);
     const threadTimes = [...p.threads.values()].sort((a, b) => a - b);
-    // 动作：合入 PR 得分拆成规模部分 pr 与模型加成 model；协作得分 collab
+    // 动作：合入 PR 得分拆成规模部分 pr 与模型加减 model（扣分工具为负）；协作得分 collab
     const acts = [
       ...mergedPrs.map((x) => ({ t: x.merged, pr: x.raw, model: x.raw * (x.model.weight - 1), collab: 0 })),
       ...threadTimes.map((t) => ({ t, pr: 0, model: 0, collab: rules.score.collab })),
