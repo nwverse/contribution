@@ -125,21 +125,29 @@ input[type=search] { font: inherit; font-size: 13px; padding: 5px 10px; border: 
 .more { margin-top: 8px; text-align: center; }
 .more button { font: inherit; font-size: 12px; background: none; border: none; color: var(--s1); cursor: pointer; }
 
-/* 公式 */
-.formula { padding: 12px 14px; background: var(--page); border-radius: 8px; display: grid; gap: 10px; }
-.fl { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 15px; }
-.fl .lhs { font-weight: 600; min-width: 48px; }
-.fl .sum { display: inline-flex; flex-direction: column; align-items: center; line-height: 1; }
-.fl .sum span { font-size: 24px; }
-.fl .sum small { font-size: 10px; color: var(--muted); margin-top: 2px; }
-.fl .term { display: inline-flex; align-items: center; gap: 5px; padding: 1px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 13px; }
-.fl .k { font-weight: 600; font-variant-numeric: tabular-nums; }
+/* 公式：一行主公式，下面是左右对齐的定义表 */
+.formula { padding: 14px 16px; background: var(--page); border-radius: 8px; }
+.fmain { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--grid); }
+.fmain .lhs { font-weight: 600; }
+.fmain .sum { display: inline-flex; flex-direction: column; align-items: center; line-height: 1; }
+.fmain .sum span { font-size: 22px; }
+.fmain .sum small { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.fdefs { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 14px; margin: 12px 0 0; font-size: 13px; align-items: baseline; }
+.fdefs dt { display: flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+.fdefs dd { margin: 0; font-variant-numeric: tabular-nums; }
+.fdefs .k { font-weight: 600; }
+.fdefs .note { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
 .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
 .sw.s1 { background: var(--s1); }
 .sw.s2 { background: var(--s2); }
 .sw.s3 { background: var(--s3); }
-.example { margin-top: 10px; font-size: 12px; color: var(--ink-2); display: grid; gap: 4px; }
-.example b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.sw.none { border: 1px solid var(--axis); }
+.examples { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 10px; margin: 12px 0 0; font-size: 12.5px; color: var(--ink-2); }
+.examples dt { color: var(--muted); }
+.examples dd { margin: 0; }
+.examples b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.formula-ref { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+.nw { white-space: nowrap; }
 
 /* 进化路径 */
 .cond { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -179,8 +187,6 @@ input[type=search] { font: inherit; font-size: 13px; padding: 5px 10px; border: 
 .ex-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ex-chips span { padding: 2px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; color: var(--ink-2); }
 .ex-chips b { color: var(--ink); font-variant-numeric: tabular-nums; }
-.fl.sub { font-size: 13px; }
-.fl.sub .term { font-size: 12px; }
 table.mx { table-layout: fixed; font-size: 12px; }
 table.mx th, table.mx td { white-space: normal; text-align: center; padding: 6px 4px; border: 1px solid var(--grid); position: static; cursor: default; }
 table.mx th { background: transparent; }
@@ -419,46 +425,35 @@ function renderFormula() {
   const exLines = S.lines * Math.log10(1 + ex.lines);
   const exCommits = S.commits * Math.log2(1 + ex.commits);
   const exScore = (1 + exLines + exCommits) * ex.model.weight;
-  const latest = Object.entries(RULES.families).map(([f, v]) => `${f} ${v.latest}`).join('、');
-  const tiers = RULES.modelTiers.filter((t) => t.key !== 'other');
+  const decay = RULES.versionDecay;
   $('formula-card').innerHTML = `
     <h2>贡献度公式 <span class="meta">贡献度 = 魔力，按魔力降序排名</span></h2>
     <div class="formula">
-      <div class="fl">
+      <div class="fmain">
         <span class="lhs">魔力</span><span>=</span>
         <span class="sum"><span>Σ</span><small>每周</small></span>
         <span>min(1, ${cap} ÷ 动作数) ×</span>
-        <span class="sum"><span>Σ</span><small>当周动作</small></span>
+        <span class="sum"><span>Σ</span><small>当周</small></span>
         <span>动作分</span>
       </div>
-      <div class="fl">
-        <span class="lhs"><i class="sw s1"></i> PR 分</span><span>=</span>
-        <span>( 1 + <span class="k">${S.lines}</span>·log₁₀(1+改动行) + <span class="k">${S.commits}</span>·log₂(1+commit 数) )</span>
-        <span>×</span><span class="term"><i class="sw s2"></i>模型系数</span>
-      </div>
-      <div class="fl">
-        <span class="lhs"><i class="sw s3"></i> 协作分</span><span>=</span><span class="k">${S.collab}</span>
-        <span class="meta">每参与一个他人的 PR 或 issue（review、评论、代合入），或提一个有效 issue</span>
-      </div>
-      <div class="fl">
-        <span class="lhs"><i class="sw s2"></i> 模型系数</span><span>=</span>
-        <span>1 +</span><span class="term">档位加成</span><span>×</span><span class="term">版本系数</span>
-        <span class="meta">一个 PR 用了多个模型取最高</span>
-      </div>
-      <div class="fl sub">
-        <span class="lhs">档位加成</span>
-        ${tiers.map((t) => `<span class="term">${esc(t.label)} <span class="k">+${t.bonus}</span></span>`).join('')}
-      </div>
-      <div class="fl sub">
-        <span class="lhs">版本系数</span>
-        <span>max(0, 1 − <span class="k">${RULES.versionDecay}</span> × 落后版本数)</span>
-        <span class="meta">落后版本数 = 系列最新版本 − 署名版本（${esc(latest)}）；署名没写版本号按 ×${RULES.unknownVersionFactor}；未注明型号不看版本</span>
-      </div>
+      <dl class="fdefs">
+        <dt><i class="sw s1"></i>PR 分</dt>
+        <dd><span class="nw">(1 + <span class="k">${S.lines}</span>·log₁₀(1+改动行)</span> <span class="nw">+ <span class="k">${S.commits}</span>·log₂(1+commit 数))</span> <span class="nw">× 模型系数</span></dd>
+        <dt><i class="sw s3"></i>协作分</dt>
+        <dd><span class="k">${S.collab}</span><span class="note">每参与一个他人的 PR 或 issue（review、评论、代合入），或提一个有效 issue</span></dd>
+        <dt><i class="sw s2"></i>模型系数</dt>
+        <dd>1 + 档位加成 × 版本系数<span class="note">一个 PR 用了多个模型时取最高</span></dd>
+        <dt><i class="sw none"></i>版本系数</dt>
+        <dd>max(0, 1 − <span class="k">${decay}</span> × 落后版本数)<span class="note">落后 ${(0.5 / decay).toFixed(1)} 个版本加成减半，${(1 / decay).toFixed(1)} 个版本归零；没写版本号按 ×${RULES.unknownVersionFactor}</span></dd>
+      </dl>
     </div>
-    <div class="example">
-      <span>例 1：改 ${ex.lines} 行、${ex.commits} 个 commit、${esc(ex.model.label)} 的 PR = (1 + ${exLines.toFixed(2)} + ${exCommits.toFixed(2)}) × ${ex.model.weight.toFixed(2)} = <b>${exScore.toFixed(2)}</b></span>
-      <span>例 2：一周合入 12 个 PR、协作 3 次，共 15 个动作 → 当周得分按 ${cap}/15 折算</span>
-    </div>`;
+    <dl class="examples">
+      <dt>例 1</dt>
+      <dd>改 ${ex.lines} 行、${ex.commits} 个 commit、${esc(ex.model.label)} 的 PR：<span class="nw">(1 + ${exLines.toFixed(2)} + ${exCommits.toFixed(2)}) × ${ex.model.weight.toFixed(2)} = <b>${exScore.toFixed(2)}</b></span></dd>
+      <dt>例 2</dt>
+      <dd>一周合入 12 个 PR、协作 3 次，共 15 个动作：当周得分 × ${cap}/15</dd>
+    </dl>
+    <p class="formula-ref">档位加成与各系列最新版本见「计分因子」。</p>`;
 }
 
 function curveChart({ fn, xMin, xMax, ticks, xLabel, logX = false, yMax = null, yFmt = (v) => `+${v}`, tickFmt = (t) => (t >= 1000 ? `${t / 1000}k` : t), tipFmt = (x, y) => `${xLabel} ${fmtNum(x)} → +${y.toFixed(2)}` }) {
