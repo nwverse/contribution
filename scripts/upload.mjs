@@ -15,7 +15,7 @@ const PAGES_REPO = process.env.PAGES_REPO || 'nwverse/contribution';
 const PAGES_BRANCH = process.env.PAGES_BRANCH || 'gh-pages';
 const DRY_RUN = process.argv.includes('--dry-run');
 // 随数据一起发布的站点文件，保证页面与生成数据的引擎是同一版本
-const SITE_FILES = ['index.html', 'engine.js', '.nojekyll'];
+const SITE_FILES = ['index.html', 'engine.js', '.nojekyll', 'favicon.svg', 'favicon-32.png', 'apple-touch-icon.png'];
 
 const engineSource = fs.readFileSync(path.join(ROOT, 'engine.js'), 'utf8');
 const { RULES, computeBoard } = vm.runInNewContext(`${engineSource}\n;({ RULES, computeBoard })`);
@@ -280,8 +280,9 @@ async function publish(token, files, message) {
   const ref = await rest(token, 'GET', `${base}/git/ref/heads/${PAGES_BRANCH}`);
   const parent = await rest(token, 'GET', `${base}/git/commits/${ref.object.sha}`);
   const entries = [];
+  // 一律按 base64 上传，PNG 等二进制文件才能原样提交
   for (const f of files) {
-    const blob = await rest(token, 'POST', `${base}/git/blobs`, { content: f.content, encoding: 'utf-8' });
+    const blob = await rest(token, 'POST', `${base}/git/blobs`, { content: f.content.toString('base64'), encoding: 'base64' });
     entries.push({ path: f.path, mode: '100644', type: 'blob', sha: blob.sha });
   }
   const tree = await rest(token, 'POST', `${base}/git/trees`, { base_tree: parent.tree.sha, tree: entries });
@@ -320,8 +321,8 @@ async function main() {
   }
 
   const files = [
-    ...SITE_FILES.map((f) => ({ path: f, content: fs.readFileSync(path.join(ROOT, f), 'utf8') })),
-    { path: 'data/board.json', content: json },
+    ...SITE_FILES.map((f) => ({ path: f, content: fs.readFileSync(path.join(ROOT, f)) })),
+    { path: 'data/board.json', content: Buffer.from(json) },
   ];
   const stamp = new Date(board.now + RULES.tzOffsetHours * 3600000).toISOString().slice(0, 16).replace('T', ' ');
   const message = `更新贡献度数据 ${stamp}（UTC+${RULES.tzOffsetHours}）`;
