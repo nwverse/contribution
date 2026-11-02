@@ -170,6 +170,7 @@ function computeBoard(data, rules, now) {
       const owner = human(pr.author);
       const key = `${repo.name}#${pr.number}`;
       const merged = toTime(pr.mergedAt);
+      const closed = merged ? null : toTime(pr.closedAt);
       const lines = pr.additions + pr.deletions;
       const commits = pr.commits?.totalCount ?? 1;
       const model = detectModel(pr, rules);
@@ -177,7 +178,9 @@ function computeBoard(data, rules, now) {
         get(owner).prs.push({
           created: toTime(pr.createdAt),
           merged,
-          closed: merged ? null : toTime(pr.closedAt),
+          closed,
+          // 作者自己关闭视为撤回；closedBy 缺失（未查到关闭人）时按被他人关闭计
+          withdrawn: closed !== null && human(pr.closedBy) === owner,
           lines,
           commits,
           model,
@@ -263,20 +266,24 @@ function computeBoard(data, rules, now) {
       total.bonus = total.pr + total.model + total.collab;
       return total;
     };
+    // 合入率 = 合入 ÷ 已收尾；已收尾 = 合入 + 被他人关闭 + 超期未合，作者自己关闭的（撤回）不计入
     const prStatsAt = (t) => {
       let merged = 0;
       let closed = 0;
+      let withdrawn = 0;
       let stale = 0;
       let inflight = 0;
       for (const pr of p.prs) {
         if (pr.created > t) continue;
         if (pr.merged && pr.merged <= t) merged++;
-        else if (pr.closed && pr.closed <= t) closed++;
-        else if (t - pr.created > rules.staleOpenDays * DAY) stale++;
+        else if (pr.closed && pr.closed <= t) {
+          if (pr.withdrawn) withdrawn++;
+          else closed++;
+        } else if (t - pr.created > rules.staleOpenDays * DAY) stale++;
         else inflight++;
       }
       const resolved = merged + closed + stale;
-      return { merged, closed, stale, inflight, resolved, rate: resolved ? merged / resolved : null };
+      return { merged, closed, withdrawn, stale, inflight, resolved, rate: resolved ? merged / resolved : null };
     };
 
     // 新手考核：首次贡献起 nb.days 天内，各项全部达标即通过
@@ -361,6 +368,7 @@ function computeBoard(data, rules, now) {
       merged: mergedTimes.length,
       opened: p.prs.length,
       closedUnmerged: cur.closed,
+      withdrawn: cur.withdrawn,
       stale: cur.stale,
       inflight: cur.inflight,
       resolved: cur.resolved,

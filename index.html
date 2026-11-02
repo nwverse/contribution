@@ -356,7 +356,7 @@ const TERMS = (() => {
   const a = RULES.newbie.anomaly;
   return {
     collab: { name: '协作', text: `参与别人的 PR 或 issue：review、评论、帮人合入。同一个 PR 或 issue 只算一次；自己提的有效 issue 也算。每次 +${RULES.score.collab} 魔力。` },
-    rate: { name: '合入率', text: `合入 PR ÷ 已收尾 PR。已收尾指已合入、关闭未合入，或打开超过 ${RULES.staleOpenDays} 天还没合入。` },
+    rate: { name: '合入率', text: `合入 PR ÷ 已收尾 PR。已收尾指已合入、被别人关闭，或打开超过 ${RULES.staleOpenDays} 天还没合入。自己关闭的 PR 视为撤回，不计入。` },
     warn: { name: '合入率警告', tag: 'tag st warning', text: `已收尾 PR 超过 ${first.resolved} 个后，合入率低于 ${pct(first.rate)} 就会被标记；超过 ${rest.map((l) => l.resolved).join(' / ')} 个时，要求依次提高到 ${rest.map((l) => pct(l.rate)).join(' / ')}。只是提醒，不扣魔力；形态降级另看降级线。` },
     outsider: { name: '组织外', tag: 'tag', text: '数据更新时不在 nwverse 组织成员名单里的账号，例如从 fork 提 PR 的外部贡献者、已退出的人。贡献照常计分。' },
     anomaly: { name: '新手异常', tag: 'tag st serious', text: `孵化期内开了 ${a.opened} 个以上 PR，合入的不到 ${pct(a.rate)}。最近 ${a.graceHours} 小时内开的 PR 不计。` },
@@ -696,7 +696,8 @@ function personTip(p, now) {
 
   if (p.opened) {
     const pr = [`合入 ${p.merged}`];
-    if (p.closedUnmerged) pr.push(`关闭未合 ${p.closedUnmerged}`);
+    if (p.withdrawn) pr.push(`自己关闭 ${p.withdrawn}`);
+    if (p.closedUnmerged) pr.push(`被别人关闭 ${p.closedUnmerged}`);
     if (p.stale) pr.push(`超 ${RULES.staleOpenDays} 天未合 ${p.stale}`);
     if (p.inflight) pr.push(`进行中 ${p.inflight}`);
     add('PR', pr.join(' · '));

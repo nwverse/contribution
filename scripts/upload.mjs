@@ -37,7 +37,7 @@ const CONCURRENCY = 16;
 const MAX_ATTEMPTS = 4;
 
 const PR_FIELDS = `
-  number state createdAt mergedAt closedAt additions deletions
+  id number state createdAt mergedAt closedAt additions deletions
   author { login __typename }
   mergedBy { login __typename }
   reviews(first: ${NESTED_LIMIT}) { totalCount nodes { author { login __typename } submittedAt } }
@@ -63,6 +63,14 @@ const META_QUERY = `query($org: String!, $memberCursor: String, $repoCursor: Str
         issues(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) { totalCount nodes { number } }
       }
     }
+  }
+}`;
+
+// 关闭未合入的 PR 由谁关闭：timelineItems 是嵌套连接，只对这类 PR 单独查询，主查询每批仍是 1 点
+const CLOSER_BATCH = 100;
+const CLOSER_QUERY = `query($ids: [ID!]!) {
+  nodes(ids: $ids) {
+    ... on PullRequest { id timelineItems(itemTypes: [CLOSED_EVENT], last: 1) { nodes { ... on ClosedEvent { actor { login __typename } } } } }
   }
 }`;
 
@@ -208,7 +216,27 @@ async function fetchAll(token, org) {
       from += BATCH_SIZE;
     }
   }
+  await fetchClosers(token, loaded.flatMap((r) => r.prs.filter((p) => p.state === 'CLOSED')));
   return { org, members: meta.members, repos: loaded.map(({ name, prs, issues }) => ({ name, prs, issues })) };
+}
+
+// 给关闭未合入的 PR 补上关闭人 closedBy（{ login, __typename }）；查不到时保持缺失，引擎按被他人关闭计
+async function fetchClosers(token, prs) {
+  const byId = new Map(prs.map((p) => [p.id, p]));
+  const ids = [...byId.keys()];
+  const tasks = [];
+  for (let i = 0; i < ids.length; i += CLOSER_BATCH) {
+    const chunk = ids.slice(i, i + CLOSER_BATCH);
+    tasks.push(async () => {
+      const d = await gql(token, CLOSER_QUERY, { ids: chunk }, { allowMissing: true });
+      for (const n of d.nodes) {
+        const actor = n?.timelineItems.nodes[0]?.actor;
+        if (actor) byId.get(n.id).closedBy = actor;
+      }
+    });
+  }
+  await runPool(tasks, CONCURRENCY);
+  log(`查询了 ${ids.length} 个关闭未合入 PR 的关闭人，共 ${tasks.length} 批`);
 }
 
 // ---------- 输出 ----------
