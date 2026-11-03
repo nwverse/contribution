@@ -32,3 +32,9 @@ token 权限：
 ## 修改规则或页面
 
 计分规则在 `engine.js` 的 `RULES`，页面在 `index.html`。改动通过 PR 合入 `main` 后，下次运行上传脚本时随数据一起发布。
+
+## CI
+
+CI checks the scoring engine and upload script syntax without reading or
+publishing organization data. `CI_LINUX_RUNNER` selects the HomeLab executor
+only for trusted default-branch runs. Pull requests use hosted runners.
