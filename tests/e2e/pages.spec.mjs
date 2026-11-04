@@ -1,5 +1,5 @@
 // 各页主要交互，数字与测试数据逐一核对。
-import { test, expect, open, BOARD, LAST, THIS_WEEK, weekValue, mag } from './fixtures.mjs';
+import { test, expect, open, BOARD, RULES, LAST, THIS_WEEK, weekValue, mag } from './fixtures.mjs';
 
 const P = BOARD.people;
 const byLogin = new Map(P.map((p) => [p.login, p]));
@@ -102,4 +102,30 @@ test.describe('形态池', () => {
 test('档案页不带 #u= 时打开总榜第一名', async ({ page }) => {
   await open(page, '/profile.html');
   await expect(page.locator('.drawer.on #pfBody')).toContainText(BOARD.people[0].login);
+});
+
+// 掉队：按规则独立重算一遍，与页面对照
+function laggards() {
+  const { weeks: n, minMagic } = RULES.laggard;
+  const W = BOARD.weeks.map((w) => w.start);
+  const end = Math.min(BOARD.now, W[LAST] + 7 * 86400000);
+  return P.filter((p) => end - p.firstAt >= RULES.newbie.days * 86400000)
+    .filter((p) => W.slice(LAST - n + 1).reduce((s, w) => s + weekValue(p, w), 0) < minMagic);
+}
+
+test('首页掉队预警人数与规则一致，查看全部带筛选进入排行榜', async ({ page }) => {
+  const expected = laggards();
+  await open(page, '/index.html');
+  const evo = page.locator('#evo');
+  await expect(evo).toContainText(`掉队预警 ${expected.length}`);
+  await expect(evo.locator('.upc.lag')).toHaveCount(Math.min(5, expected.length));
+  for (const row of await evo.locator('.upc.lag').all()) {
+    expect(expected.map((p) => p.login)).toContain(await row.getAttribute('data-login'));
+  }
+  if (expected.length > 5) {
+    await evo.locator('.lag-more').click();
+    await expect(page).toHaveURL(/ranking\.html\?flag=lag/);
+    await expect(page.locator('.chip[data-v="lag"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#lbCard [data-key]')).toHaveCount(expected.length);
+  }
 });

@@ -23,6 +23,7 @@ window.RULES = window.RULES || RULES;
     models: R.models,
     modelNone: R.modelNone,
     tzOffsetHours: R.tzOffsetHours,
+    laggard: R.laggard,
   };
 
   // 孵化后取魔力达到的最高一级；未孵化返回 null
@@ -63,6 +64,27 @@ window.RULES = window.RULES || RULES;
     p.spark = W.slice(-12).map((w) => p.wk.get(w) || 0); // 近 12 周每周魔力
     p.daysSinceLast = Math.floor((B.now - p.lastAt) / DAY);
   }
+
+  // 第 i 周的掉队名单：该周结束时首次贡献已满新手考核期，且最近 laggard.weeks 周魔力合计低于 laggard.minMagic。
+  // 返回 [{ p, recent, quietWeeks }]：recent = 窗口内魔力；quietWeeks = 截至该周连续几周没有魔力（从未有过为 null）。
+  // 按窗口魔力升序、沉寂周数降序排列。
+  function laggardsAt(i) {
+    const { weeks: n, minMagic } = RULES.laggard;
+    const end = Math.min(B.now, W[i] + WEEK);
+    const out = [];
+    for (const p of people) {
+      if (end - p.firstAt < RULES.newbie.days * DAY) continue;
+      let recent = 0;
+      for (let k = Math.max(0, i - n + 1); k <= i; k++) recent += p.wk.get(W[k]) || 0;
+      if (recent >= minMagic) continue;
+      let k = i;
+      while (k >= 0 && !(p.wk.get(W[k]) > 0)) k--;
+      out.push({ p, recent, quietWeeks: k < 0 ? null : i - k });
+    }
+    return out.sort((a, b) => a.recent - b.recent || (b.quietWeeks ?? Infinity) - (a.quietWeeks ?? Infinity) || a.p.rank - b.p.rank);
+  }
+  const lagNow = new Map(laggardsAt(last).map((x) => [x.p.login, x]));
+  for (const p of people) p.laggard = lagNow.get(p.login) || null; // 当前是否掉队
 
   // 第 i 周末的排名（1 起）：只排该周结束前已有首次贡献的人。
   // 最后一周直接用线上排名；历史周按累计魔力降序、账号名升序。
@@ -117,7 +139,7 @@ window.RULES = window.RULES || RULES;
     B, LV, RULES, DAY, WEEK,
     weeks, W, last, people,
     byLogin: new Map(people.map((p) => [p.login, p])),
-    levelOf, ranksAt, weekSnapshot, fmt,
+    levelOf, ranksAt, weekSnapshot, laggardsAt, fmt,
     avatar: (login, size = 64) => `https://github.com/${encodeURIComponent(login)}.png?size=${size}`,
     summary: B.summary,
     now: B.now,

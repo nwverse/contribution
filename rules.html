@@ -360,6 +360,7 @@
       outsider: { name: '组织外', tag: 'tag tag-out', text: '数据更新时不在 nwverse 组织成员名单里的账号，例如从 fork 提 PR 的外部贡献者、已退出的人。贡献照常计分。' },
       anomaly: { name: '新手异常', tag: 'tag tag-warn', icon: 'zap', text: `孵化期内开了 ${a.opened} 个以上 PR，合入的不到 ${pct(a.rate)}。最近 ${a.graceHours} 小时内开的 PR 不计。` },
       dormant: { name: '冬眠', tag: 'tag tag-sleep', icon: 'moon-z', text: `超过 ${R.dormantDays} 天没有任何动作。只做标记；${R.levels[R.dormantExemptLevel].name}及以上不标记。` },
+      laggard: { name: '掉队', tag: 'tag tag-warn', icon: 'trending-down', text: `首次贡献已满 ${R.newbie.days} 天，且最近 ${R.laggard.weeks} 周（含本周）魔力合计低于 ${R.laggard.minMagic}，约等于平均每周不到 1 个合入 PR 或 1 次协作。名单用于定期清理不再贡献的人；只做提醒，不影响魔力与形态。` },
     };
   })();
 
@@ -645,6 +646,7 @@
       ['等级与降级线', '奶蛙进化（只看魔力）', 'M-Team 升级同时看注册时间、上传量和分享率；这里只看魔力，不设降级线，合入率只用于警告。'],
       ['分享率警告期', '合入率警告线', '已收尾 PR 越多，合入率要求越高。'],
       ['40 天不登录删号', `${R.dormantDays} 天无动作 → 冬眠`, `只标记不处理；${R.levels[R.dormantExemptLevel].name}及以上豁免。`],
+      ['考核不达标清退', `近 ${R.laggard.weeks} 周魔力 < ${R.laggard.minMagic} → 掉队`, '看板只给出名单，是否移除由组织决定；任何形态都会进入名单，不设豁免。'],
       ['魔力兑换、连坐', '不映射', '兑换需要保存余额，违背无状态；组织没有邀请树。', true],
     ];
     $('#mapping').setAttribute('role', 'list');
@@ -738,6 +740,7 @@
     '直接推送到默认分支的 commit 不计入；仓库要求「所有改动走 PR」之前的贡献会被低估。',
     'AI 生成的 PR 记在开 PR 的账号名下，账号持有人对内容负责。',
     `每个 PR 和 issue 只读取前 ${LIM.nested} 条 review 和前 ${LIM.nested} 条评论。`,
+    `掉队只看魔力：只开 PR 未合入、线下讨论、组织外的工作都不计；本周还没结束时，窗口里的本周只算到数据更新时刻。`,
     `「首次贡献」代替入组时间；第一次贡献很早、之后长期不活跃的人，新手考核会按那次贡献起算，之后要靠魔力达到 ${R.levels[1].bonus} 孵化。`,
   ].map((t) => `<li>${esc(t)}</li>`).join('');
 

@@ -64,6 +64,9 @@ const RULES = {
   dormantDays: 40,
   // 达到该等级下标及以上免于冬眠标记
   dormantExemptLevel: 2,
+  // 掉队：首次贡献已满新手考核期（newbie.days 天），且最近 weeks 周（含进行中的本周）魔力合计低于 minMagic。
+  // minMagic 4 约等于平均每周不到 1 个合入 PR 或 1 次协作。只用于页面展示，不影响魔力与形态。
+  laggard: { weeks: 4, minMagic: 4 },
   // 不计为有效 issue 的关闭原因
   invalidIssueReasons: ['NOT_PLANNED', 'DUPLICATE'],
   // GitHub 类型为 User、但实际是自动化的账号

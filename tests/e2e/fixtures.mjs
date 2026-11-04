@@ -1,7 +1,10 @@
 // 公共夹具：读取测试数据、拦截外部请求、收集控制台报错（每个用例结束时断言为空）。
 import fs from 'node:fs';
+import vm from 'node:vm';
 import { test as base, expect } from '@playwright/test';
 
+// 计分规则直接取 engine.js，测试与页面同一来源
+export const RULES = vm.runInNewContext(`${fs.readFileSync(new URL('../../engine.js', import.meta.url), 'utf8')}\n;RULES`);
 export const BOARD = JSON.parse(fs.readFileSync(new URL('../fixtures/board.json', import.meta.url), 'utf8'));
 export const LAST = BOARD.weeks.length - 1;
 export const THIS_WEEK = BOARD.weeks[LAST].start;
