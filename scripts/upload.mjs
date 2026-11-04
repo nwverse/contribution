@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 拉取 GitHub 组织数据，计算人维度的贡献度，把页面、引擎与 data/board.json 一次提交到发布分支。
+// 拉取 GitHub 组织数据，计算人维度的贡献度，把页面、资源、引擎与 data/board.json 一次提交到发布分支。
 // 用法：node scripts/upload.mjs [--dry-run]
 //   --dry-run  只拉取和计算，结果写到 dist/board.json，不发布
 // 环境变量见 README.md。依赖 Node.js 18 及以上，无第三方依赖。
@@ -15,7 +15,12 @@ const PAGES_REPO = process.env.PAGES_REPO || 'nwverse/contribution';
 const PAGES_BRANCH = process.env.PAGES_BRANCH || 'gh-pages';
 const DRY_RUN = process.argv.includes('--dry-run');
 // 随数据一起发布的站点文件，保证页面与生成数据的引擎是同一版本
-const SITE_FILES = ['index.html', 'engine.js', '.nojekyll', 'favicon.svg', 'favicon-32.png', 'apple-touch-icon.png'];
+const SITE_FILES = [
+  'index.html', 'ranking.html', 'profile.html', 'hatchery.html', 'pond.html', 'rules.html',
+  'engine.js',
+  'assets/boot.js', 'assets/derive.js', 'assets/icons.js', 'assets/kit.js', 'assets/tokens.css',
+  '.nojekyll', 'favicon.svg', 'favicon-32.png', 'apple-touch-icon.png',
+];
 
 const engineSource = fs.readFileSync(path.join(ROOT, 'engine.js'), 'utf8');
 const { RULES, computeBoard } = vm.runInNewContext(`${engineSource}\n;({ RULES, computeBoard })`);

@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>档案 · 奶蛙宇宙</title>
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="assets/tokens.css">
+<!-- 读取 data/board.json 后加载 engine.js、assets/derive.js、icons.js、kit.js，再执行下方 type="text/x-nw-page" 的页面脚本 -->
+<script src="assets/boot.js"></script>
+<style>
+  /* ───── 背景：排行榜（抽屉后面虚化） ───── */
+  .lb-bar { display: flex; align-items: center; gap: 12px; padding: 14px 20px 12px; flex-wrap: wrap; }
+  .lb-bar .card-title span { font-weight: 500; font-size: var(--fs-xs); color: var(--ink-3); }
+  .lb-bar .search { width: 220px; margin-left: auto; }
+  .lb { --cols: 28px 40px minmax(150px, 1.25fr) 170px minmax(120px, 1fr) 64px 96px; }
+  .lb .lrow { gap: 14px; }
+  .lb .fm { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; }
+  .lb .fm .fn { display: flex; justify-content: space-between; gap: 6px; font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; }
+  .lb .fm .fn span { font-weight: 500; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .lb .fm .meter { margin-top: 5px; height: 4px; }
+  .lb .lrow.is-cur { background: color-mix(in srgb, var(--yolk-soft) 55%, var(--surface)); }
+  .lb .lrow.is-cur::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--yolk-deep); }
+  .lb .lrow:focus { outline: none; }
+  .lb .lrow:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); }
+  .lb-empty { display: none; }
+  .lb-empty.on { display: block; }
+  .reopen { display: none; }
+  .reopen.on { display: inline-flex; animation: swap-in var(--dur-4) var(--ease-out) both; }
+  @media (max-width: 1100px) {
+    .lb { --cols: 28px 40px minmax(140px, 1.3fr) 160px 64px 96px; }
+    .lb .c-comp { display: none; }
+  }
+  @media (max-width: 720px) {
+    .lb { --cols: 24px 34px minmax(0, 1fr) 60px; }
+    .lb .c-form, .lb .c-spark { display: none; }
+    .lb .lrow { gap: 10px; padding-left: 14px; padding-right: 14px; }
+    .lb-bar { padding: 12px 14px 10px; }
+    .lb-bar .search { width: 100%; margin-left: 0; }
+  }
+
+  /* ───── 抽屉：头部工具条 ───── */
+  .drawer.pf { --drawer-w: 600px; }
+  .pf .drawer-head { gap: 6px; padding-left: 16px; }
+  .pf-pos { font-size: var(--fs-2xs); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pf-find { position: relative; flex: 1; min-width: 0; max-width: 260px; margin-left: auto; }
+  .pf-find .search { height: 30px; }
+  .pf-find .search kbd { flex: none; }
+  .pf-where { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; flex: 0 1 auto; margin-right: auto; }
+  .pf-pop { position: absolute; z-index: 5; top: calc(100% + 6px); right: 0; width: min(420px, calc(100vw - 32px)); border-radius: var(--r-lg); background: var(--surface-raised); border: 1px solid var(--line); box-shadow: var(--sh-hl), var(--sh-3); opacity: 0; transform: translateY(-4px) scale(.985); transform-origin: top right; pointer-events: none; transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-3) var(--ease-spring); }
+  .pf-pop.on { opacity: 1; transform: none; pointer-events: auto; }
+  .pf-pop .cmdk-list { max-height: min(360px, 56vh); }
+  .pf-pop .cmdk-empty { padding: 22px 14px; text-align: center; font-size: var(--fs-sm); color: var(--ink-3); line-height: 1.6; }
+  .pf-pop .cmdk-item .num { min-width: 30px; text-align: right; }
+  .pf-pop .cmdk-item .mg { min-width: 42px; text-align: right; color: var(--ink-2); font-weight: 600; }
+  .pf-pop .cmdk-item > .ellipsis { flex: 0 1 auto; min-width: 0; }
+  .pf .drawer-body { scroll-behavior: auto; }
+  /* 中文长句不留单字孤行 */
+  .pf .callout, .pf-note, .zz-t, .rate-lines span, .comp3 .cd, .rule-h { text-wrap: pretty; }
+  /* 图上文字压在线上时，用表面色描边把线挖开 */
+  .wk-host .val-l, .wk-host .anno-tx, .cum .th-tx { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+
+  /* ───── 头部：头像 / 身份 / 魔力 ───── */
+  .pf-hero { position: relative; isolation: isolate; padding: 22px 20px 0; }
+  .pf-hero::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(420px 200px at 100% 0%, var(--yolk-wash), transparent 70%), linear-gradient(180deg, transparent 40%, var(--pond-bottom)); }
+  .pf-id { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "av nm mg"; align-items: center; gap: 16px; }
+  .pf-id > .avr, .pf-id > .av { grid-area: av; }
+  .pf-nm { grid-area: nm; min-width: 0; }
+  .pf-nm h2 { font-family: var(--font-display); font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pf-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 7px; }
+  .pf-mg { grid-area: mg; text-align: right; }
+  .pf-mg .big { display: block; font-family: var(--font-display); font-size: var(--fs-5xl); font-weight: 700; line-height: 1; letter-spacing: -0.03em; color: var(--ink); }
+  .pf-mg .cap { display: block; margin-top: 6px; font-size: var(--fs-xs); color: var(--ink-3); }
+  .pf-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 20px -20px 0; border-top: 1px solid var(--line-soft); }
+  .pf-cell { min-width: 0; padding: 12px 16px 14px; border-left: 1px solid var(--line-soft); }
+  .pf-cell:first-child { border-left: 0; padding-left: 20px; }
+  .pf-cell .k { font-size: var(--fs-2xs); font-weight: 650; color: var(--ink-3); letter-spacing: .02em; }
+  .pf-cell .v { display: flex; align-items: center; gap: 7px; margin-top: 5px; font-size: var(--fs-lg); font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pf-cell .s { margin-top: 3px; font-size: var(--fs-2xs); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pf-cell .v .delta.pill { height: 20px; padding: 0 7px; }
+
+  /* ───── 区块 ───── */
+  .pf .drawer-sec-h .t { display: inline-flex; align-items: center; gap: 8px; }
+  .pf .drawer-sec-h .t .ic { color: var(--ink-3); }
+  .pf .drawer-sec-h .seg { margin: -4px 0; }
+  .pf-note { margin-top: 10px; font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.6; }
+  .pf-note b { color: var(--ink-2); font-weight: 650; font-variant-numeric: tabular-nums; }
+
+  /* 真实比例尺 */
+  .rule { margin-top: 16px; }
+  .rule-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: var(--fs-xs); color: var(--ink-3); }
+  .rule-h b { color: var(--ink-2); font-weight: 650; font-variant-numeric: tabular-nums; }
+  .rule-t { position: relative; height: 26px; margin-top: 8px; }
+  .rule-t::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 4px; border-radius: 2px; background: var(--bg-sunken); }
+  :root[data-theme="dark"] .rule-t::before { background: rgba(170, 225, 205, 0.1); }
+  .rule-fill { position: absolute; left: 0; top: 4px; height: 4px; border-radius: 2px; background: var(--leaf); transform-origin: left; animation: rule-in var(--dur-6) var(--ease-out) both 200ms; }
+  @keyframes rule-in { from { transform: scaleX(0); } }
+  .rule-tk { position: absolute; top: 0; width: 1px; height: 12px; background: var(--line-strong); }
+  .rule-tk span { position: absolute; top: 14px; left: 0; transform: translateX(-50%); font-size: 10.5px; color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rule-tk.on { background: var(--leaf); }
+  .rule-tk.on span { color: var(--ink-2); font-weight: 600; }
+  .rule-tk:last-child span { transform: translateX(-100%); }
+  .rule-me { position: absolute; z-index: 1; top: 1px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--surface); box-shadow: inset 0 0 0 2.5px var(--yolk-deep), 0 0 0 2px var(--surface); }
+
+  /* 魔力构成 */
+  .comp3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+  .comp3 > div { padding: 10px 12px 11px; border-radius: var(--r-md); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-soft); min-width: 0; }
+  .comp3 .key { font-weight: 600; }
+  .comp3 .cv { margin-top: 6px; font-size: var(--fs-lg); font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .comp3 .cv.neg { color: var(--rust); }
+  .comp3 .cd { margin-top: 4px; font-size: var(--fs-2xs); color: var(--ink-3); line-height: 1.55; }
+  .comp3 .cd b { color: var(--ink-2); font-weight: 650; font-variant-numeric: tabular-nums; }
+
+  /* 每周魔力 / 累计 */
+  .wk-legend { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; min-height: 18px; margin-bottom: 8px; }
+  .wk-host { position: relative; min-height: 172px; }
+  .cum .ar { fill: var(--leaf-wash); }
+  .cum .ln { fill: none; stroke: var(--leaf); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .cum .pj { fill: none; stroke: var(--leaf); stroke-width: 2; stroke-dasharray: 2 4; stroke-linecap: round; opacity: .7; }
+  .cum .th { stroke: var(--yolk-deep); stroke-width: 1; stroke-dasharray: 3 3; opacity: .8; }
+  .cum .th-tx { font-size: 10.5px; fill: var(--yolk-ink); font-weight: 650; }
+  .cum .ev { fill: var(--yolk); stroke: var(--surface); stroke-width: 2; }
+  .cum .end { fill: var(--leaf); stroke: var(--surface); stroke-width: 2; }
+  .cum .hv { fill: var(--leaf); stroke: var(--surface); stroke-width: 2; opacity: 0; transition: opacity var(--dur-1); }
+  .key.dash::before { width: 14px; height: 2px; border-radius: 0; background: repeating-linear-gradient(90deg, var(--k) 0 3px, transparent 3px 6px); }
+
+  /* 合入率 */
+  .rate-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .rate-v { display: flex; align-items: baseline; gap: 10px; }
+  .rate-v .big { font-family: var(--font-display); font-size: var(--fs-3xl); font-weight: 720; letter-spacing: -0.02em; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .rate-v .eq { font-size: var(--fs-xs); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .rate-m { position: relative; margin-top: 30px; }
+  .rate-bar { position: relative; }
+  .rate-m .meter { height: 8px; border-radius: 4px; overflow: visible; }
+  .rate-m .meter > i { border-radius: 4px; }
+  .rate-m .meter .mark { top: -4px; bottom: -4px; }
+  .rate-m .meter .mark.next { background: none; border-left: 2px dashed var(--ink-3); width: 0; margin-left: -1px; }
+  .rate-m .ml { position: absolute; bottom: calc(100% + 6px); transform: translateX(-50%); font-size: 10.5px; font-weight: 650; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rate-m .ml.next { bottom: auto; top: calc(100% + 6px); color: var(--ink-3); font-weight: 550; }
+  .rate-m .ml.r { transform: translateX(-100%); }
+  .rate-ax { display: flex; justify-content: space-between; margin-top: 6px; min-height: 14px; font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .rate-lines { display: grid; gap: 6px; margin-top: 14px; }
+  .rate-lines > div { display: flex; gap: 8px; align-items: flex-start; font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.55; }
+  .rate-lines .ic { flex: none; margin-top: 3px; color: var(--ink-3); }
+  .rate-lines b { color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+  .rate-comp { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line); }
+  .rate-comp .label { margin-bottom: 8px; }
+  .rate-comp .legend { margin-top: 9px; }
+  .rate-comp .excl { margin-left: auto; color: var(--ink-3); }
+
+  /* 模型使用 */
+  .mdl { display: grid; grid-template-columns: minmax(0, 150px) 46px minmax(0, 1fr) 40px; align-items: center; gap: 6px 12px; }
+  .mdl .ml { font-size: var(--fs-sm); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mdl .ml.none { color: var(--ink-3); }
+  .mdl .co { justify-self: start; height: 18px; padding: 0 6px; border-radius: var(--r-pill); font-size: var(--fs-2xs); font-weight: 650; line-height: 18px; color: var(--ink-3); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-soft); font-variant-numeric: tabular-nums; }
+  .mdl .co.up { color: var(--yolk-ink); background: color-mix(in srgb, var(--amber) 12%, var(--surface)); box-shadow: none; }
+  .mdl .co.dn { color: var(--rust); background: var(--rust-soft); box-shadow: none; }
+  .mdl .br { height: 8px; }
+  .mdl .br i { display: block; height: 100%; border-radius: 0 3px 3px 0; background: var(--c); transform-origin: left; animation: rule-in var(--dur-6) var(--ease-out) both 150ms; min-width: 2px; }
+  .mdl .ct { text-align: right; font-size: var(--fs-sm); font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* 新手考核时间线 */
+  .nb { position: relative; margin-top: 4px; }
+  .nb-track { position: relative; height: 64px; margin: 0 6px; }
+  .nb-track::before { content: ""; position: absolute; left: 0; right: 0; top: 30px; height: 6px; border-radius: 3px; background: var(--bg-sunken); }
+  :root[data-theme="dark"] .nb-track::before { background: rgba(170, 225, 205, 0.1); }
+  .nb-fill { position: absolute; left: 0; top: 30px; height: 6px; border-radius: 3px; background: var(--leaf); transform-origin: left; animation: rule-in var(--dur-6) var(--ease-out) both 150ms; }
+  .nb-fill.wait { background: var(--yolk-deep); }
+  .nb-fill.fail { background: var(--ink-4); }
+  .nb-mk { position: absolute; top: 25px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); box-shadow: inset 0 0 0 2px var(--line-strong), 0 0 0 3px var(--surface); color: var(--on-leaf); }
+  .nb-mk .ic { width: 10px; height: 10px; stroke-width: 3.2; }
+  .nb-mk.ok { background: var(--leaf); box-shadow: 0 0 0 3px var(--surface); }
+  .nb-mk.now { background: var(--yolk); box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--yolk-wash); }
+  .nb-mk.x { background: var(--rust); box-shadow: 0 0 0 3px var(--surface); }
+  .nb-lb { position: absolute; transform: translateX(-50%); font-size: var(--fs-2xs); color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .nb-lb.top { top: 2px; font-weight: 650; color: var(--ink-2); }
+  .nb-lb.bot { top: 48px; }
+  .nb-lb.l { transform: none; }
+  .nb-lb.r { transform: translateX(-100%); }
+  .nb-req { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  .nb-req > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 10px; padding: 9px 12px; border-radius: var(--r-md); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-soft); font-size: var(--fs-xs); color: var(--ink-2); }
+  .nb-req b { font-size: var(--fs-sm); color: var(--ink); font-weight: 680; font-variant-numeric: tabular-nums; }
+  .nb-req .ok b { color: var(--leaf-ink); }
+  .nb-req .pips { grid-column: 1 / -1; }
+  .nb .callout { margin-top: 12px; }
+
+  /* 冬眠 */
+  .zz { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; }
+  .zz-t { font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.6; }
+  .zz-t b { color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+  .zz-ic { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-soft); color: var(--ink-3); }
+  .zz-ic.ok { background: var(--leaf-soft); color: var(--leaf-ink); box-shadow: none; }
+
+  /* 底栏：上一位 / 下一位 */
+  .pf-foot { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); background: var(--surface-2); }
+  .pf-step { display: inline-flex; align-items: center; gap: 8px; min-width: 0; height: 36px; padding: 0 10px; border-radius: var(--r-md); color: var(--ink-2); font-size: var(--fs-xs); transition: background-color var(--dur-1); }
+  .pf-step:hover { background: var(--surface-hover); color: var(--ink); }
+  .pf-step[disabled] { opacity: .35; pointer-events: none; }
+  .pf-step .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--ink); }
+  .pf-step .rk { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .pf-step.nx { justify-self: end; flex-direction: row-reverse; }
+  .pf-keys { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-2xs); color: var(--ink-3); white-space: nowrap; }
+
+  .pf-swap { animation: swap-in var(--dur-4) var(--ease-out) both; }
+  .pf-missing { padding: 40px 20px; }
+
+  @media (max-width: 720px) {
+    .pf .drawer-head { padding: 14px 8px 8px 14px; min-height: 58px; }
+    .pf-pos { display: none; }
+    .pf-find { max-width: none; }
+    .pf-hero { padding: 18px 16px 0; }
+    .pf-id { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "av nm" "mg mg"; gap: 12px 14px; }
+    .pf-mg { display: flex; align-items: baseline; gap: 8px; text-align: left; }
+    .pf-mg .big { font-size: 40px; }
+    .pf-mg .cap { margin: 0; }
+    .pf-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 16px -16px 0; }
+    .pf-cell { padding: 11px 14px 12px; }
+    .pf-cell:first-child, .pf-cell:nth-child(3) { padding-left: 16px; border-left: 0; }
+    .pf-cell:nth-child(n + 3) { border-top: 1px solid var(--line-soft); }
+    .pf .drawer-sec { padding: 16px; }
+    .comp3 { grid-template-columns: 1fr; }
+    .comp3 > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: 10px; }
+    .comp3 .cv { margin-top: 0; grid-row: 1; grid-column: 2; }
+    .comp3 .cd { grid-column: 1 / -1; }
+    .mdl { grid-template-columns: minmax(0, 1fr) 46px 64px 34px; }
+    .pf-keys { display: none; }
+    .pf-foot { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  }
+</style>
+</head>
+<body>
+<header id="appbar"></header>
+
+<main class="page">
+  <section class="section">
+    <div class="sec-h">
+      <div><span class="eyebrow">档案</span><h2>我离下一级还差什么</h2><p>点排行榜里任何一个人，打开档案<span class="only-kbd">；<kbd>←</kbd> <kbd>→</kbd> 换人，<kbd>esc</kbd> 关闭</span></p></div>
+      <button type="button" class="btn reopen" id="reopen"></button>
+    </div>
+    <div class="card card-flush">
+      <div class="lb-bar">
+        <div class="card-title">贡献度排行 <span id="lbCount"></span></div>
+        <label class="search" id="lbSearchWrap"></label>
+      </div>
+      <div class="lb">
+        <div class="lrow lrow-head" aria-hidden="true"><span class="r">#</span><span>变化</span><span>贡献者</span><span class="c-form">形态 · 到下一级</span><span class="c-comp">魔力构成</span><span class="r">魔力</span><span class="r c-spark">近 12 周</span></div>
+        <div class="rows" id="rows" role="listbox" tabindex="0" aria-label="排行榜，回车打开档案"></div>
+        <div class="lb-empty" id="lbEmpty"></div>
+      </div>
+      <div class="card-foot"><span>总榜按累计魔力排名</span><span class="spacer"></span><span class="legend"><span class="key" style="--k:var(--series-pr)">PR 分</span><span class="key" style="--k:var(--series-model)">模型加成</span><span class="key" style="--k:var(--series-collab)">协作</span></span></div>
+    </div>
+  </section>
+</main>
+
+<script type="text/x-nw-page">
+(function () {
+  'use strict';
+  const K = NWK, fmt = K.fmt, mag = K.mag, esc = K.esc, icon = K.icon;
+  const W = NW.W, LAST = NW.last, DAY = NW.DAY, R = NW.RULES, LV = NW.LV;
+  const PEOPLE = NW.people; // 已按名次排序
+  const DEFAULT = PEOPLE.length ? PEOPLE[0].login : ''; // 没带 #u= 时打开总榜第一名
+  const $ = (s, r = document) => r.querySelector(s);
+  const typing = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+
+  K.appHeader(document.getElementById('appbar'), { active: 'c3' });
+
+  // ───────── 口径小工具 ─────────
+  // 总榜名次变化：上周还没开始 = 新；上周 0 魔力 = 上榜（不算涨幅）；现在也 0 魔力 = 不比较
+  function moveOf(p) {
+    if (p.prank === null) return null;
+    if (p.bonus <= 0.005) return 'none';
+    if (p.prev <= 0.005) return undefined;
+    return p.move;
+  }
+  const deltaHTML = (p, opt) => { const m = moveOf(p); return m === 'none' ? '<span class="delta flat" title="还没有魔力，暂不比较名次" aria-label="暂不比较名次">—</span>' : K.delta(m, opt); };
+  const moveText = (p) => {
+    const m = moveOf(p);
+    if (m === null) return '本周首次上榜';
+    if (m === 'none') return '还没有魔力';
+    if (m === undefined) return '上周还没有魔力';
+    return `上周 #${p.prank}`;
+  };
+  const modelW = new Map(NW.summary.models.map((m) => [m.label, m.weight]));
+  const AI_NONE = '无 AI 标注';
+  // kit 图标里没有「链接」，这里补一个同风格的 Lucide link
+  const LINK_IC = '<svg class="ic" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+  const snaps = [];
+  const snap = (i) => snaps[i] || (snaps[i] = NW.weekSnapshot(i));
+  const avg4 = (p, i) => { let s = 0; for (let k = i - 3; k <= i; k++) s += k >= 0 ? p.wk.get(W[k]) || 0 : 0; return s / 4; };
+  const firstIdx = (p) => Math.max(0, p.started.findIndex(Boolean));
+  const hatchIdx = (p) => p.levels.findIndex((l) => l !== null);
+  const weekName = (i) => (i === LAST ? '本周' : i === LAST - 1 ? '上周' : `${fmt.week(W[i])} 这一周`);
+
+  // ───────── 背景排行榜 ─────────
+  const rowsEl = document.getElementById('rows');
+  const maxB = Math.max(...PEOPLE.map((p) => p.bonus));
+  document.getElementById('lbSearchWrap').innerHTML = `${icon('search', 15)}<input id="lbSearch" type="text" placeholder="筛选账号" aria-label="筛选账号" autocomplete="off" spellcheck="false" data-focus-fallback>`;
+  function rowHTML(p) {
+    const fo = K.formOf(p), nx = K.nextInfo(p);
+    const form = fo.hatched
+      ? `<div class="fm">${K.frogOf(p, 20)}<div style="min-width:0"><div class="fn">${fo.name}<span>${nx ? `差 ${mag(nx.gap)}` : '最高'}</span></div><div class="meter"><i style="width:${(p.progress * 100).toFixed(1)}%"></i></div></div></div>`
+      : `<div class="fm">${K.frogOf(p, 20)}<div style="min-width:0"><div class="fn">${fo.name}<span>魔力 ${mag(p.bonus)}/50</span></div><div class="meter yolk"><i style="width:${(p.progress * 100).toFixed(1)}%"></i></div></div></div>`;
+    const tags = `${p.member ? '' : '<span class="tag tag-out">组织外</span>'}${p.dormant ? `<span class="tag tag-sleep">${icon('moon-z', 11)}冬眠</span>` : ''}`;
+    const sub = `合入 ${fmt.int(p.merged)} · 协作 ${fmt.int(p.collab)}${p.resolved ? ` · 合入率 ${fmt.pct(p.rate)}` : ''}`;
+    return `<div class="lrow is-click" role="option" tabindex="-1" aria-selected="false" data-login="${esc(p.login)}">`
+      + `<span class="rank ${p.rank <= 3 ? 'top' : ''} ${p.bonus <= 0.005 ? 'none' : ''}">${p.rank}</span><span>${deltaHTML(p)}</span>`
+      + `<span style="min-width:0">${K.who(p, { size: 28, sub, tags })}</span><span class="c-form">${form}</span>`
+      + `<span class="c-comp">${K.comp(p, { scale: p.bonus / maxB })}</span>`
+      + `<span class="val r">${mag(p.bonus)}</span><span class="r c-spark">${K.sparkline(p.spark, { w: 88, h: 22, max: 25 })}</span></div>`;
+  }
+  rowsEl.innerHTML = PEOPLE.map(rowHTML).join('');
+  const rowOf = (login) => rowsEl.querySelector(`.lrow[data-login="${CSS.escape(login)}"]`);
+  let kb = -1;
+  function filterRows(q) {
+    let n = 0;
+    rowsEl.querySelectorAll('.lrow').forEach((r) => { const on = !q || r.dataset.login.toLowerCase().includes(q); r.hidden = !on; if (on) n++; });
+    document.getElementById('lbCount').textContent = q ? `筛出 ${n} / ${PEOPLE.length} 人` : `总榜 · ${PEOPLE.length} 人`;
+    const em = document.getElementById('lbEmpty');
+    em.classList.toggle('on', !n);
+    if (!n) {
+      em.innerHTML = K.empty({ art: 'egg', title: `没有找到「${q}」`, body: '只有有贡献记录的人会出现在排行榜上。', action: `<button type="button" class="btn btn-sm" id="lbClear">${icon('rotate-ccw', 14)}清空筛选</button>` });
+      em.querySelector('#lbClear').addEventListener('click', () => { const i = document.getElementById('lbSearch'); i.value = ''; filterRows(''); i.focus(); });
+    }
+    kb = -1;
+  }
+  filterRows('');
+  document.getElementById('lbSearch').addEventListener('input', (e) => filterRows(e.target.value.trim().toLowerCase()));
+  document.getElementById('lbSearch').addEventListener('keydown', (e) => { if (e.key === 'ArrowDown') { e.preventDefault(); rowsEl.focus(); moveKb(1); } });
+  const visRows = () => [...rowsEl.querySelectorAll('.lrow:not([hidden])')];
+  function moveKb(d) {
+    const v = visRows(); if (!v.length) return;
+    kb = K.clamp(kb + d, 0, v.length - 1);
+    v.forEach((r, k) => r.setAttribute('aria-selected', String(k === kb)));
+    v[kb].scrollIntoView({ block: 'nearest' });
+  }
+  rowsEl.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); moveKb(e.key === 'ArrowDown' ? 1 : -1); }
+    else if (e.key === 'Enter' && kb >= 0) { e.preventDefault(); e.stopPropagation(); const r = visRows()[kb]; trigger = r; show(r.dataset.login, { open: true }); }
+  });
+  rowsEl.addEventListener('click', (e) => { const r = e.target.closest('.lrow'); if (!r) return; trigger = r; if (!e.target.closest('[data-person]')) show(r.dataset.login, { open: true }); });
+
+  // ───────── 抽屉 ─────────
+  const d = K.drawer({ label: '贡献者档案', width: 600, onClose });
+  d.el.classList.add('pf');
+  let cur = null, trigger = null, charts = [], view = 'week', lastMag = null;
+  d.el.innerHTML = `<div class="drawer-head" id="pfHead">
+      <span class="pf-where"><span class="eyebrow">档案</span><span class="pf-pos" id="pfPos"></span></span>
+      <div class="pf-find">
+        <label class="search">${icon('search', 14)}<input id="pfQ" type="text" placeholder="换一个人…" aria-label="搜索贡献者，切换档案" role="combobox" aria-expanded="false" aria-controls="pfList" aria-autocomplete="list" autocomplete="off" spellcheck="false"><kbd class="only-kbd">/</kbd></label>
+        <div class="pf-pop" id="pfPop"><div class="cmdk-list" id="pfList" role="listbox" aria-label="搜索结果"></div></div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" id="pfShare" aria-label="复制档案链接" data-tip="复制档案链接">${LINK_IC}</button>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" data-drawer-close aria-label="关闭档案" data-tip="关闭  esc">${icon('x', 16)}</button>
+    </div>
+    <div class="drawer-body" id="pfBody"></div>
+    <div class="pf-foot" id="pfFoot"></div>`;
+  const body = $('#pfBody', d.el), foot = $('#pfFoot', d.el);
+  // 抽屉滑入是 transform 动画，标注圆点不会自己跟上；滑入结束后让标注层重新定位
+  d.el.addEventListener('transitionend', (e) => { if (e.target === d.el) dispatchEvent(new Event('resize')); });
+
+  function step(dir) {
+    if (!cur) return;
+    const k = PEOPLE.indexOf(cur) + dir;
+    if (k < 0 || k >= PEOPLE.length) { K.toast(dir < 0 ? '已经是第一名了' : '已经是最后一位了', { ms: 1400 }); return; }
+    show(PEOPLE[k].login, { keepScroll: true });
+  }
+  d.onKey = (e) => {
+    if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return false;
+    if (e.key === '/') { e.preventDefault(); $('#pfQ', d.el).focus(); return true; }
+    // 焦点在图表或分段控件上时，←/→ 留给它们自己
+    if (e.target.closest && e.target.closest('.chart, .seg, [role="radiogroup"]')) return false;
+    if (e.key === 'ArrowLeft') { step(-1); return true; }
+    if (e.key === 'ArrowRight') { step(1); return true; }
+    return false;
+  };
+
+  function setHash(login) {
+    const u = `${location.pathname}${location.search}${login ? `#u=${encodeURIComponent(login)}` : ''}`;
+    history.replaceState(history.state, '', u);
+  }
+  function onClose() {
+    setHash(null);
+    document.title = '档案 · 奶蛙宇宙';
+    const b = document.getElementById('reopen');
+    if (cur) { b.innerHTML = `${K.avatar(cur.login, 18)}<span>重新打开 ${esc(cur.login)} 的档案</span>`; b.classList.add('on'); }
+    $('#pfPop', d.el).classList.remove('on');
+    // 抽屉里 ←/→ 换过人时，焦点落在当前这个人的行上，而不是最初打开抽屉的那一行（否则会出现两行同时高亮）
+    const r = cur && rowOf(cur.login);
+    if (r && !r.hidden && document.activeElement && document.activeElement.closest && document.activeElement.closest('.lrow') && document.activeElement !== r) r.focus({ preventScroll: true });
+  }
+  document.getElementById('reopen').addEventListener('click', (e) => { if (cur) { trigger = e.currentTarget; show(cur.login, { open: true }); } });
+
+  // 本页接管「打开档案」：⌘K、人名、人物卡都在抽屉里换人
+  K.setPersonHandler((login) => show(login, { open: true }));
+
+  function show(login, { open = false, keepScroll = false } = {}) {
+    const p = NW.byLogin.get(login) || [...NW.byLogin.values()].find((x) => x.login.toLowerCase() === String(login).toLowerCase());
+    const prevTop = body.scrollTop;
+    charts.forEach((c) => c && c.destroy && c.destroy());
+    charts = [];
+    K.tip.hide();
+    if (!p) { renderMissing(login); }
+    else {
+      const same = cur === p;
+      cur = p;
+      render(p, same ? null : lastMag);
+      lastMag = p.bonus;
+      setHash(p.login);
+      document.title = `${p.login} · 档案 · 奶蛙宇宙`;
+      rowsEl.querySelectorAll('.lrow.is-cur').forEach((r) => r.classList.remove('is-cur'));
+      const r = rowOf(p.login);
+      if (r) { r.classList.add('is-cur'); if (!r.hidden && booted) r.scrollIntoView({ block: 'center' }); }
+    }
+    body.scrollTop = keepScroll ? prevTop : 0;
+    document.getElementById('reopen').classList.remove('on');
+    if (open || !d.isOpen()) d.open(trigger && trigger.isConnected ? trigger : (cur && rowOf(cur.login)) || undefined);
+    trigger = null;
+  }
+
+  function renderMissing(login) {
+    $('#pfPos', d.el).textContent = '';
+    body.innerHTML = `<div class="pf-missing pf-swap">${K.empty({ art: 'egg', title: `没有找到「${login}」`, body: '只有有贡献记录的人才有档案。账号名要和 GitHub 上一致，可以用上面的搜索找一找。', action: `<button type="button" class="btn btn-sm" data-go="${esc(DEFAULT)}">${icon('arrow-right', 14)}看看 ${esc(DEFAULT)} 的档案</button>` })}</div>`;
+    foot.innerHTML = '';
+    body.querySelector('[data-go]').addEventListener('click', (e) => show(e.currentTarget.dataset.go));
+    document.title = '没有找到 · 档案 · 奶蛙宇宙';
+  }
+
+  // ───────── 渲染一份档案 ─────────
+  function render(p, fromMag) {
+    const k = PEOPLE.indexOf(p);
+    $('#pfPos', d.el).textContent = `第 ${k + 1} / ${PEOPLE.length} 位`;
+    const f = K.formOf(p);
+    body.innerHTML = `<div class="pf-swap">${heroHTML(p, f)}${evoHTML(p)}${weeklyHTML(p)}${compHTML(p)}${rateHTML(p)}${modelHTML(p)}${newbieHTML(p, f)}${dormHTML(p)}</div>`;
+    // 魔力数字从上一个人的值滚到这个人
+    K.countUp(body.querySelector('#pfMag'), p.bonus, { from: fromMag ?? 0, format: mag, dur: fromMag === null ? 0 : 700 });
+    mountWeekly(p);
+    // 底栏
+    const prev = PEOPLE[k - 1], next = PEOPLE[k + 1];
+    const stepBtn = (q, dir) => q
+      ? `<button type="button" class="pf-step ${dir > 0 ? 'nx' : ''}" data-step="${dir}" aria-label="${dir < 0 ? '上一位' : '下一位'}：${esc(q.login)}">${icon(dir < 0 ? 'chevron-left' : 'chevron-right', 15)}${K.avatar(q.login, 20, { dim: q.dormant })}<span class="rk">#${q.rank}</span><span class="nm">${esc(q.login)}</span></button>`
+      : `<button type="button" class="pf-step ${dir > 0 ? 'nx' : ''}" disabled aria-label="${dir < 0 ? '已经是第一名' : '已经是最后一位'}">${icon(dir < 0 ? 'chevron-left' : 'chevron-right', 15)}<span class="nm">${dir < 0 ? '已是第一名' : '已是最后一位'}</span></button>`;
+    foot.innerHTML = `${stepBtn(prev, -1)}<span class="pf-keys only-kbd"><kbd>←</kbd><kbd>→</kbd>按名次换人</span>${stepBtn(next, 1)}`;
+  }
+  foot.addEventListener('click', (e) => { const b = e.target.closest('[data-step]'); if (b) step(+b.dataset.step); });
+
+  function heroHTML(p, f) {
+    const tags = [p.member ? '<span class="tag tag-member">组织成员</span>' : '<span class="tag tag-out">组织外</span>', K.levelBadge(p, { pill: true })];
+    if (moveOf(p) === null) tags.push('<span class="tag tag-new">新面孔</span>');
+    if (p.dormant) tags.push(`<span class="tag tag-sleep">${icon('moon-z', 11)}冬眠</span>`);
+    const left = Math.max(0, Math.ceil(R.dormantDays - (NW.now - p.lastAt) / DAY));
+    const exempt = p.level !== null && p.level >= R.dormantExemptLevel;
+    const m = moveOf(p);
+    const cells = [
+      { k: '总榜名次', v: `<span class="${p.bonus <= 0.005 ? 'muted' : ''}">#${p.rank}</span>${deltaHTML(p, { pill: m !== null && m !== undefined && m !== 'none' })}`, s: moveText(p) },
+      // 新面孔上周还没开始、两周都是 0 时，「较上周」没有意义，不画涨跌
+      { k: '本周魔力', v: `+${mag(p.tw)}${m === null || (p.tw <= 0.005 && p.lw <= 0.005) ? '' : K.change(p.tw, p.lw, { f: mag })}`, s: m === null ? '第一周 · 本周进行中' : `上周 ${mag(p.lw)} · 本周进行中` },
+      { k: '近 4 周均速', v: `${mag(p.pace)}<span class="muted" style="font-size:var(--fs-xs);font-weight:500;margin-left:-4px">/周</span>`, s: `近 4 周共 ${mag(p.l4)}` },
+      { k: '距冬眠', v: p.dormant ? `<span class="tag tag-sleep">${icon('moon-z', 11)}冬眠中</span>` : exempt ? '<span class="tag tag-leaf">豁免</span>' : `${left} 天`, s: `最近动作 ${fmt.ago(p.daysSinceLast)}` },
+    ];
+    return `<section class="pf-hero" aria-label="概览">
+      <div class="pf-id">${K.avatar(p.login, 64, { progress: p.progress, ring: f.hatched ? null : 'egg', dim: p.dormant })}
+        <div class="pf-nm"><h2 title="${esc(p.login)}">${esc(p.login)}</h2><div class="pf-tags">${tags.join('')}</div></div>
+        <div class="pf-mg"><span class="big fig num" id="pfMag">${mag(p.bonus)}</span><span class="cap">魔力 · 只增不减</span></div>
+      </div>
+      <div class="pf-strip">${cells.map((c) => `<div class="pf-cell"><div class="k">${c.k}</div><div class="v">${c.v}</div><div class="s">${c.s}</div></div>`).join('')}</div>
+    </section>`;
+  }
+
+  // kit 的 evoAxis 在均速为 0 时会写成「按近 4 周均速 0.0/周，近 4 周没有新魔力」，这里去掉重复的前半句
+  const evoAxisHTML = (p) => { const h = K.evoAxis(p); return p.pace > 0 ? h : h.replace(`按近 4 周均速 ${mag(0)}/周，`, ''); };
+  function evoHTML(p) {
+    const f = K.formOf(p);
+    const top = LV[LV.length - 1].bonus;
+    const ticks = LV.slice(1).map((L) => `<span class="rule-tk ${p.bonus >= L.bonus ? 'on' : ''}" style="left:${(L.bonus / top * 100).toFixed(2)}%"><span>${fmt.int(L.bonus)}</span></span>`).join('');
+    const toTop = top - p.bonus;
+    const eta = p.pace > 0 ? Math.ceil(toTop / p.pace) : null;
+    const head = f.hatched ? `${f.name} → ${p.next ? LV[p.next.level].name : '最高'}` : f.egg ? '新手考核中' : '考核期已过';
+    return `<section class="drawer-sec" aria-label="进化进度">
+      <div class="drawer-sec-h"><span class="t">${icon('target', 15)}进化进度</span><span>${head}</span></div>
+      ${evoAxisHTML(p)}
+      <div class="rule" role="img" aria-label="真实比例：魔力 ${mag(p.bonus)} / ${fmt.int(top)}">
+        <div class="rule-h"><span class="nowrap">真实比例</span><span>${toTop > 0 ? `离宇宙奶蛙还差 <b>${mag(toTop)}</b>${eta ? (eta > 52 ? '，按近 4 周均速要一年以上' : `，按近 4 周均速约 <b>${eta}</b> 周`) : ''}` : '<b>已到宇宙奶蛙</b>'}</span></div>
+        <div class="rule-t" aria-hidden="true"><i class="rule-fill" style="width:${Math.min(100, p.bonus / top * 100).toFixed(2)}%"></i><i class="rule-me" style="left:${Math.min(100, p.bonus / top * 100).toFixed(2)}%"></i>${ticks}</div>
+      </div>
+    </section>`;
+  }
+
+  function compHTML(p) {
+    const parts = K.compParts(p);
+    const ai = p.modelMix.filter((m) => m.label !== AI_NONE).reduce((s, m) => s + m.count, 0);
+    const neg = p.bonusModel < 0;
+    const cut = p.modelMix.filter((m) => (modelW.get(m.label) ?? 1) < 1).map((m) => m.label);
+    const empty = p.bonus <= 0.005;
+    return `<section class="drawer-sec" aria-label="魔力构成">
+      <div class="drawer-sec-h"><span class="t">${icon('layers', 15)}魔力构成</span><span>合计 ${mag(p.bonus)}</span></div>
+      ${K.comp(p, { h: 10 })}
+      ${empty ? '' : `<div class="comp3">
+        <div><span class="key" style="--k:var(--series-pr)">PR 分</span><div class="cv">${mag(neg ? p.bonusPr + p.bonusModel : p.bonusPr)}</div><div class="cd">合入 <b>${fmt.int(p.merged)}</b> 个 PR · 改动 <b>${fmt.int(p.lines)}</b> 行 · <b>${fmt.int(p.commits)}</b> 个 commit</div></div>
+        <div><span class="key" style="--k:var(--series-model)">模型加成</span><div class="cv ${neg ? 'neg' : ''}">${neg ? '−' : '+'}${mag(Math.abs(p.bonusModel))}</div><div class="cd">${ai ? `<b>${fmt.int(ai)}</b> 个 PR 有 AI 署名${neg ? `；${esc(cut.join('、'))} 系数低于 1，扣分已从 PR 分里减掉` : '，按模型系数加分'}` : '没有带 AI 署名的 PR'}</div></div>
+        <div><span class="key" style="--k:var(--series-collab)">协作</span><div class="cv">${mag(p.bonusCollab)}</div><div class="cd">参与他人 PR / issue 与自提有效 issue 共 <b>${fmt.int(p.collab)}</b> 次${p.issuesFiled ? `，其中自提 issue <b>${fmt.int(p.issuesFiled)}</b> 个` : ''}</div></div>
+      </div>`}
+      <p class="pf-note">${empty ? '还没有魔力：合入第一个 PR 或参与一次协作后就会出现。' : `每个合入 PR 得 1 + 0.25·log₁₀(1+改动行) + 0.15·log₂(1+commit 数)，再乘模型系数；协作每次 +1。每周最多按 ${R.weeklyActionCap} 个动作计分，超出按比例折算，所以分数比动作数少。`}</p>
+    </section>`;
+  }
+
+  function weeklyHTML(p) {
+    return `<section class="drawer-sec" aria-label="每周魔力">
+      <div class="drawer-sec-h"><span class="t">${icon('activity', 15)}每周魔力</span><div id="wkSeg" aria-label="图表视图"></div></div>
+      <div class="wk-legend" id="wkLegend"></div>
+      <div class="wk-host" id="wkHost"></div>
+      <p class="pf-note" id="wkNote"></p>
+    </section>`;
+  }
+
+  // 图表 x 轴：从首次贡献那周起；不足 6 周时往前补，补出来的周用括号标「还没开始贡献」
+  function chartIdx(p) {
+    const fi = firstIdx(p);
+    const from = Math.max(0, Math.min(fi, LAST - 5));
+    const idx = [];
+    for (let i = from; i <= LAST; i++) idx.push(i);
+    return { idx, pad: fi - from, fi };
+  }
+
+  function mountWeekly(p) {
+    const host = body.querySelector('#wkHost');
+    if (p.bonus <= 0.005) body.querySelector('#wkSeg').hidden = true;
+    const seg = K.segmented(body.querySelector('#wkSeg'), [{ value: 'week', label: '每周' }, { value: 'cum', label: '累计' }], (v) => { view = v; draw(true); }, { size: 'sm', value: view });
+    const { idx, pad, fi } = chartIdx(p);
+    const legend = body.querySelector('#wkLegend'), note = body.querySelector('#wkNote');
+    let chart = null;
+    function draw(anim) {
+      if (chart) chart.destroy();
+      const el = document.createElement('div');
+      host.replaceChildren(el);
+      if (p.bonus <= 0.005) {
+        legend.innerHTML = '';
+        host.style.minHeight = '0';
+        el.innerHTML = K.empty({ art: 'egg', sleep: !!p.dormant, title: '还没有魔力', body: `${fmt.md(p.firstAt)} 第一次出现（提了 PR），还没有合入或协作。合入第一个 PR 后，这里会长出第一根柱子。` });
+        note.textContent = '';
+        chart = null;
+        return;
+      }
+      host.style.minHeight = '';
+      if (anim) { host.classList.remove('pf-swap'); void host.offsetWidth; host.classList.add('pf-swap'); }
+      if (view === 'week') {
+        legend.innerHTML = `<span class="key" style="--k:var(--leaf)">本周（进行中）</span><span class="key" style="--k:var(--viz-dim)">往周</span>${pad > 0 ? '' : '<span class="key line" style="--k:var(--viz-avg)">近 4 周均值</span>'}`;
+        const data = idx.map((i) => ({ label: `${fmt.week(W[i])}${i === LAST ? ' · 进行中' : ''}`, v: p.wk.get(W[i]) || 0, t: W[i], i }));
+        let best = -1;
+        data.forEach((x, k) => { if (x.v > 0 && (best < 0 || x.v > data[best].v)) best = k; });
+        const ann = [];
+        if (pad > 0) ann.push({ type: 'bracket', from: 0, to: pad - 1, text: '还没开始贡献' });
+        else {
+          let run = [-1, -1], longest = [-1, -1];
+          data.forEach((x, k) => { if (x.v <= 0) { run = run[0] < 0 ? [k, k] : [run[0], k]; if (run[1] - run[0] > longest[1] - longest[0]) longest = run.slice(); } else run = [-1, -1]; });
+          const len = longest[1] - longest[0] + 1;
+          if (longest[0] >= 0 && len >= 3) ann.push({ type: 'bracket', from: longest[0], to: longest[1], text: `连续 ${len} 周没有魔力` });
+        }
+        if (best >= 0 && best !== data.length - 1 && data.length - pad >= 3) ann.push({ type: 'note', at: best, side: best > data.length / 2 ? 'left' : 'right', dx: 10, dy: 18, text: `最高一周 ${mag(data[best].v)}` });
+        chart = K.columns(el, {
+          data, hi: data.length - 1, avg: pad > 0 ? null : idx.map((i) => avg4(p, i)), unit: '魔力', height: 172,
+          // 本周是 0 且落在「连续 N 周没有魔力」的括号里时，「0.0」会压在括号上，括号已经说明了
+          valueLabel: data[data.length - 1].v > 0 || !ann.some((a) => a.type === 'bracket' && a.to === data.length - 1), ariaLabel: `${p.login} 每周魔力，柱为当周，线为近 4 周均值`,
+          annotations: ann,
+          tip: (x, k) => {
+            const i = x.i;
+            if (i < fi) return `<div class="t-h">${esc(x.label)}</div><div class="t-l">还没开始贡献</div>`;
+            const s = snap(i), r = s.top.findIndex((y) => y.p === p);
+            return `<div class="t-h">${esc(x.label)}</div>`
+              + `<div class="t-row"><span class="t-key box" style="--k:${k === data.length - 1 ? 'var(--leaf)' : 'var(--viz-dim)'}"></span><span class="t-v">${mag(x.v)}</span><span class="t-l">当周魔力${r >= 0 ? ` · 第 ${r + 1} / ${s.top.length} 名` : ''}</span></div>`
+              + (pad > 0 ? '' : `<div class="t-row"><span class="t-key" style="--k:var(--viz-avg)"></span><span class="t-v">${mag(avg4(p, i))}</span><span class="t-l">近 4 周均值</span></div>`)
+              + `<div class="t-row"><span class="t-key" style="--k:transparent"></span><span class="t-v">${mag(p.cum[i])}</span><span class="t-l">周末累计</span></div>`;
+          },
+        });
+        const act = idx.filter((i) => i >= fi && (p.wk.get(W[i]) || 0) > 0).length;
+        note.innerHTML = `从首次贡献（${fmt.md(p.firstAt)}）那周画起，${idx.length - pad} 周里有 <b>${act}</b> 周拿到魔力。本周还没结束，数字会继续增长。`;
+      } else {
+        chart = cumChart(el, p, idx, fi, legend, note);
+      }
+      charts = [chart];
+    }
+    draw(false);
+    charts = [chart];
+    return seg;
+  }
+
+  // 累计魔力曲线：形态门槛虚线 + 进化点 + 按近 4 周均速的预测虚线
+  function niceStep(raw) { const pw = Math.pow(10, Math.floor(Math.log10(raw || 1))); const m = raw / pw; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * pw; }
+  function cumChart(host, p, idx, fi, legend, note) {
+    host.classList.add('chart', 'cum');
+    host.tabIndex = 0;
+    host.setAttribute('role', 'img');
+    const nx = K.nextInfo(p);
+    const target = nx ? (nx.hatch ? R.hatchBonus : p.next.bonus) : null;
+    const eta = nx ? nx.eta : null;
+    const projW = target !== null && eta !== null && eta <= 8 ? eta : 0;
+    const n = idx.length;
+    const vals = idx.map((i) => (i < fi ? null : p.cum[i]));
+    // 形态变化点：孵化 / 进化（与上一周末相比）
+    const events = [];
+    idx.forEach((i, k) => {
+      if (i < fi || i === 0) return;
+      const a = p.levels[i - 1], b = p.levels[i];
+      if (b !== null && (a === null || b > a)) events.push({ k, i, text: a === null ? '孵化' : `成为${LV[b].name}` });
+    });
+    const evShow = events.slice(-2);
+    legend.innerHTML = `<span class="key line" style="--k:var(--leaf)">累计魔力</span>${projW ? '<span class="key dash" style="--k:var(--leaf)">按近 4 周均速预测</span>' : ''}<span class="key dash" style="--k:var(--yolk-deep)">形态门槛</span>`;
+    let hov = -1, G = null;
+    function render() {
+      const Wd = host.clientWidth || 480, H = 172, padL = 30, padR = 6, padT = 22, padB = 22;
+      const slots = n + projW;
+      const maxV = Math.max(1e-9, p.bonus, projW ? target : 0);
+      const step = niceStep(maxV / 4);
+      const top = Math.ceil((maxV * 1.04) / step) * step;
+      const iw = Wd - padL - padR, ih = H - padT - padB;
+      const band = iw / Math.max(1, slots);
+      const x = (k) => padL + k * band + band / 2;
+      const y = (v) => padT + ih - (v / top) * ih;
+      G = { band, x, y, padL };
+      let s = `<svg width="${Wd}" height="${H}" viewBox="0 0 ${Wd} ${H}" aria-hidden="true">`;
+      for (let t = 0; t <= top + 1e-9; t += step) {
+        const yy = Math.round(y(t)) + 0.5;
+        s += `<line class="${t === 0 ? 'bl' : 'gl'}" x1="${padL}" x2="${Wd - padR}" y1="${yy}" y2="${yy}"/><text class="ax" x="${padL - 8}" y="${yy + 3.5}" text-anchor="end">${Math.round(t).toLocaleString('zh-CN')}</text>`;
+      }
+      // 门槛
+      LV.slice(1).forEach((L) => {
+        if (L.bonus > top) return;
+        const yy = Math.round(y(L.bonus)) + 0.5;
+        s += `<line class="th" x1="${padL}" x2="${Wd - padR}" y1="${yy}" y2="${yy}"/><text class="th-tx" x="${padL + 4}" y="${yy - 4}">${L.name} ${L.bonus}</text>`;
+      });
+      s += `<line class="xh" x1="0" x2="0" y1="${padT - 6}" y2="${y(0)}"/>`;
+      const pts = vals.map((v, k) => (v === null ? null : [x(k), y(v)])).filter(Boolean);
+      const k0 = vals.findIndex((v) => v !== null);
+      if (pts.length) {
+        const dd = pts.map((q, k) => `${k ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('');
+        s += `<path class="ar" d="${dd}L${pts[pts.length - 1][0].toFixed(1)} ${y(0)}L${pts[0][0].toFixed(1)} ${y(0)}Z"/><path class="ln" d="${dd}"/>`;
+      }
+      if (projW) {
+        const x1 = x(n - 1), y1 = y(p.bonus), x2 = x(n - 1 + projW), y2 = y(Math.min(target, p.bonus + p.pace * projW));
+        s += `<path class="pj" d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${x2.toFixed(1)} ${y2.toFixed(1)}"/><circle class="anno-dot" cx="${x2.toFixed(1)}" cy="${y2.toFixed(1)}" r="2.5"/>`
+          + `<text class="anno-tx" x="${Math.min(x2, Wd - padR).toFixed(1)}" y="${(y2 - 8).toFixed(1)}" text-anchor="end">${K.etaText(eta)}到${nx.hatch ? '孵化线' : LV[p.next.level].name}</text>`;
+        // 预测区的 x 刻度：「+N 周」
+        s += `<text class="ax" x="${x2.toFixed(1)}" y="${H - 6}" text-anchor="middle">+${projW} 周</text>`;
+      }
+      // 曲线只升不降：标签优先放在点的左上方（空白区）；左边放不下时放右下方
+      const tw = (t) => [...t].reduce((a, c) => a + (/[\u3000-\u9fff\uff00-\uffef]/.test(c) ? 11 : 6.2), 0);
+      evShow.forEach((e) => {
+        const ex = x(e.k), ey = y(p.cum[e.i]);
+        const t = `${fmt.week(W[e.i])} ${e.text}`;
+        const left = ex - 8 - tw(t) > padL + 4;
+        const below = !left && ey + 16 < y(0) - 6; // 右下方要离基线够远，否则放右上方（描边把曲线挖开）
+        s += `<circle class="ev" cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="4.5"/>`
+          + `<text class="anno-tx" x="${(ex + (left ? -8 : 8)).toFixed(1)}" y="${(ey + (below ? 16 : -8)).toFixed(1)}" text-anchor="${left ? 'end' : 'start'}">${t}</text>`;
+      });
+      if (pts.length) s += `<circle class="end" cx="${x(n - 1).toFixed(1)}" cy="${y(p.bonus).toFixed(1)}" r="4"/><text class="val-l" x="${(x(n - 1) - 8).toFixed(1)}" y="${(y(p.bonus) - 8).toFixed(1)}" text-anchor="end">${mag(p.bonus)}</text>`;
+      // x 轴：每月第一周标「N月」
+      let lastM = -1, lastX = -99;
+      idx.forEach((i, k) => { const m = new Date(W[i] + 8 * 3600000).getUTCMonth(); if (m !== lastM) { lastM = m; if (x(k) - lastX > 34) { s += `<text class="ax" x="${x(k)}" y="${H - 6}" text-anchor="middle">${m + 1}月</text>`; lastX = x(k); } } });
+      s += `<circle class="hv" r="4.5" cx="0" cy="0"/></svg>`;
+      host.innerHTML = s;
+      host.setAttribute('aria-label', `${p.login} 累计魔力曲线，现在 ${mag(p.bonus)}${projW ? `，按近 4 周均速${K.etaText(eta)}到 ${target}` : ''}`);
+      if (k0 < 0) return;
+    }
+    function hover(k) {
+      const svg = host.querySelector('svg'); if (!svg || !G) return;
+      hov = k;
+      const xh = svg.querySelector('.xh'), dot = svg.querySelector('.hv');
+      if (k < 0 || vals[k] === null) { xh.style.opacity = 0; dot.style.opacity = 0; K.tip.hide(); return; }
+      const cx = G.x(k), cy = G.y(vals[k]);
+      xh.setAttribute('x1', cx); xh.setAttribute('x2', cx); xh.style.opacity = 1;
+      dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.style.opacity = 1;
+      const i = idx[k];
+      const fo = K.formOf(p, i);
+      const html = `<div class="t-h">${fmt.week(W[i])}${i === LAST ? ' · 进行中' : ''}</div>`
+        + `<div class="t-row"><span class="t-key" style="--k:var(--leaf)"></span><span class="t-v">${mag(vals[k])}</span><span class="t-l">${i === LAST ? '截至此刻累计' : '周末累计'}</span></div>`
+        + `<div class="t-row"><span class="t-key" style="--k:transparent"></span><span class="t-v">+${mag(p.wk.get(W[i]) || 0)}</span><span class="t-l">当周</span></div>`
+        + `<div class="t-row"><span class="t-key" style="--k:transparent"></span><span class="t-v">${fo.name}</span><span class="t-l">${i === LAST ? '现在的形态' : '当时的形态'}</span></div>`;
+      const r = host.getBoundingClientRect();
+      K.tip.show(html, { getBoundingClientRect: () => ({ left: r.left + cx - 1, width: 2, top: r.top + cy - 8, bottom: r.top + cy - 4, height: 4 }) });
+    }
+    const idxAt = (cx) => { const r = host.getBoundingClientRect(); return K.clamp(Math.floor((cx - r.left - G.padL) / G.band), 0, n - 1); };
+    const onMove = (e) => { if (G) { const k = idxAt(e.clientX); if (k !== hov) hover(k); } };
+    const onLeave = () => hover(-1);
+    const onKey = (e) => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+      e.preventDefault(); e.stopPropagation();
+      let k = hov < 0 ? n - 1 : hov;
+      if (e.key === 'ArrowLeft') k = Math.max(fi - idx[0], k - 1);
+      if (e.key === 'ArrowRight') k = Math.min(n - 1, k + 1);
+      if (e.key === 'Home') k = Math.max(0, fi - idx[0]);
+      if (e.key === 'End') k = n - 1;
+      hover(k);
+    };
+    host.addEventListener('pointermove', onMove);
+    host.addEventListener('pointerleave', onLeave);
+    host.addEventListener('keydown', onKey);
+    host.addEventListener('blur', onLeave);
+    const ro = new ResizeObserver(() => { render(); if (hov >= 0) hover(hov); });
+    ro.observe(host);
+    render();
+    const evTxt = events.length ? `形态变化 ${events.length} 次，最近一次是 ${fmt.week(W[events[events.length - 1].i])} 这一周${events[events.length - 1].text}。` : '';
+    note.innerHTML = `${evTxt}${nx ? (projW ? `按近 4 周均速 <b>${mag(p.pace)}</b>/周，虚线是预计走势。` : `${nx.hatch ? '孵化线 50' : `${LV[p.next.level].name} ${fmt.int(p.next.bonus)}`}还差 <b>${mag(nx.gap)}</b>，${K.etaText(eta)}，超出图的范围。`) : '已是最高形态。'}`;
+    return {
+      destroy() {
+        ro.disconnect();
+        host.removeEventListener('pointermove', onMove); host.removeEventListener('pointerleave', onLeave);
+        host.removeEventListener('keydown', onKey); host.removeEventListener('blur', onLeave);
+        host.classList.remove('chart', 'cum'); host.removeAttribute('tabindex'); host.removeAttribute('role'); host.removeAttribute('aria-label');
+        host.innerHTML = '';
+      },
+    };
+  }
+
+  // 已收尾 res 个时生效的警告线（超过 10/50/100/200 个才有）
+  const lineAt = (res) => { let l = null; for (const w of R.warnLines) if (res > w.resolved) l = w; return l; };
+  // 还能承受几个被关或超期：逐个加进分母，警告线会随已收尾数升档，所以按当时的线判断
+  function roomOf(p) { let c = 0; for (;;) { const res = p.resolved + c + 1, l = lineAt(res); if ((l && p.merged / res < l.rate) || c > 9999) return c; c++; } }
+  // 要连续合入几个才回到线上：合入同样会增加已收尾，也可能换档
+  function needOf(p) { let m = 0; for (;;) { const res = p.resolved + m, l = lineAt(res); if (!l || (p.merged + m) / res >= l.rate || m > 9999) return m; m++; } }
+  function rateHTML(p) {
+    const lines = R.warnLines;
+    const curL = p.warnLine;
+    const nextL = lines.find((l) => p.resolved <= l.resolved) || null;
+    const has = p.resolved > 0;
+    const below = curL && p.rate < curL.rate;
+    let status;
+    if (!has) status = '<span class="tag tag-ghost">还没有收尾的 PR</span>';
+    else if (!curL) status = '<span class="tag">还没有警告线</span>';
+    else if (below) status = `<span class="tag tag-warn">${icon('alert-triangle', 11)}低于警告线 ${fmt.pct(curL.rate)}</span>`;
+    else status = `<span class="tag tag-leaf">${icon('check', 11)}高于警告线 ${fmt.pct(curL.rate)}</span>`;
+    const rows = [];
+    if (curL) {
+      if (!below) {
+        const room = roomOf(p);
+        const fallL = lineAt(p.resolved + room + 1);
+        const shift = fallL && fallL.rate !== curL.rate ? `（那时已收尾超过 ${fallL.resolved} 个，警告线升到 ${fmt.pct(fallL.rate)}）` : '';
+        rows.push(`<div>${icon('check', 14)}<span>已收尾 <b>${fmt.int(p.resolved)}</b> 个（超过 ${curL.resolved}），当前警告线 <b>${fmt.pct(curL.rate)}</b>。${room > 0 ? `还能承受 <b>${room}</b> 个被关或超期，第 ${room + 1} 个会掉到线下${shift}。` : `再有 1 个被关或超期就会掉到线下${shift}。`}</span></div>`);
+      } else {
+        const need = needOf(p);
+        rows.push(`<div>${icon('alert-triangle', 14)}<span>比警告线低 <b>${(curL.rate - p.rate) * 100 < 1 ? '不到 1' : Math.round((curL.rate - p.rate) * 100)}</b> 个百分点；接下来连续合入 <b>${need}</b> 个 PR 能回到线上。警告只是提醒，不扣魔力。</span></div>`);
+      }
+    } else if (has) {
+      rows.push(`<div>${icon('info', 14)}<span>已收尾 <b>${fmt.int(p.resolved)}</b> 个；超过 ${lines[0].resolved} 个后才有警告线（${fmt.pct(lines[0].rate)}）。</span></div>`);
+    }
+    if (nextL && (curL || has)) {
+      const gap = nextL.resolved + 1 - p.resolved;
+      if (curL || nextL !== lines[0]) rows.push(`<div>${icon('arrow-up-right', 14)}<span>再收尾 <b>${gap}</b> 个（到 ${nextL.resolved + 1} 个）后，警告线升到 <b>${fmt.pct(nextL.rate)}</b>${has && p.rate < nextL.rate ? '，按现在的合入率会落在线下' : ''}。</span></div>`);
+    } else if (!nextL && curL) {
+      rows.push(`<div>${icon('info', 14)}<span>已到最高一档，警告线不会再升。</span></div>`);
+    }
+    if (!has) rows.push(`<div>${icon('info', 14)}<span>合入率 = 合入 ÷ 已收尾（合入 + 被他人关闭 + 超 ${R.staleOpenDays} 天未合）。还没有 PR 收尾，暂不计算。</span></div>`);
+    const pctL = (r) => `${(r * 100).toFixed(2)}%`;
+    const marks = has ? `${curL ? `<span class="mark" style="left:${pctL(curL.rate)}"></span>` : ''}${nextL && (!curL || nextL.rate !== curL.rate) ? `<span class="mark next" style="left:${pctL(nextL.rate)}"></span>` : ''}` : '';
+    const lab = (l, cls, txt) => `<span class="ml ${cls} ${l.rate >= 0.88 ? 'r' : ''}" style="left:${pctL(l.rate)}">${txt}</span>`;
+    // 两条线挨得近（只差 10%）时，标签并排写在各自的刻度上；90% 的标签靠右收
+    const labels = has ? `${curL ? lab(curL, '', `当前线 ${fmt.pct(curL.rate)}`) : ''}${nextL && (!curL || nextL.rate !== curL.rate) ? lab(nextL, 'next', `下一条 ${fmt.pct(nextL.rate)}`) : ''}` : '';
+    const parts = [
+      { label: '合入', value: p.merged, color: 'var(--leaf)' },
+      { label: '被他人关闭', value: p.closedUnmerged, color: 'var(--rust)' },
+      { label: `超 ${R.staleOpenDays} 天未合`, value: p.stale, color: 'var(--ink-3)' },
+    ];
+    return `<section class="drawer-sec" aria-label="合入率">
+      <div class="drawer-sec-h"><span class="t">${icon('git-merge', 15)}合入率</span>${status}</div>
+      ${has ? `<div class="rate-top"><div class="rate-v"><span class="big">${has ? fmt.pct(p.rate) : '—'}</span><span class="eq">${has ? `合入 ${fmt.int(p.merged)} ÷ 已收尾 ${fmt.int(p.resolved)}` : '暂无已收尾的 PR'}</span></div></div>` : ''}
+      ${has ? `<div class="rate-m"><div class="rate-bar">${labels}<div class="meter ${below ? 'rust' : ''}" role="img" aria-label="合入率 ${fmt.pct(p.rate)}${curL ? `，警告线 ${fmt.pct(curL.rate)}` : ''}"><i style="width:${pctL(p.rate)}"></i>${marks}</div></div><div class="rate-ax"><span>0%</span><span>100%</span></div></div>` : ''}
+      <div class="rate-lines">${rows.join('')}</div>
+      ${!has ? `<p class="pf-note">不计入合入率：撤回 <b>${fmt.int(p.withdrawn)}</b> · 进行中 <b>${fmt.int(p.inflight)}</b></p>` : `<div class="rate-comp">
+        <div class="label">收尾构成</div>
+        ${K.stackedBar(parts, { h: 8, label: '收尾构成', f: fmt.int })}
+        <div class="legend">${parts.map((x) => `<span class="key" style="--k:${x.color}">${x.label} <b>${fmt.int(x.value)}</b></span>`).join('')}<span class="excl">不计入：撤回 <b class="num">${fmt.int(p.withdrawn)}</b> · 进行中 <b class="num">${fmt.int(p.inflight)}</b></span></div>
+      </div>`}
+    </section>`;
+  }
+
+  function modelHTML(p) {
+    const mix = p.modelMix.slice().sort((a, b) => (a.label === AI_NONE) - (b.label === AI_NONE) || b.count - a.count);
+    const total = mix.reduce((s, m) => s + m.count, 0);
+    const ai = mix.filter((m) => m.label !== AI_NONE).reduce((s, m) => s + m.count, 0);
+    const mx = Math.max(1, ...mix.map((m) => m.count));
+    const rows = mix.map((m) => {
+      const w = modelW.get(m.label) ?? 1;
+      const none = m.label === AI_NONE;
+      const c = none ? 'var(--viz-dim)' : w < 1 ? 'var(--rust)' : 'var(--series-model)';
+      return `<span class="ml ${none ? 'none' : ''}" title="${esc(m.label)}">${esc(m.label)}</span><span class="co ${w > 1 ? 'up' : w < 1 ? 'dn' : ''}">×${w}</span>`
+        + `<span class="br" data-tip="${esc(`${m.label}：${m.count} 个 PR，占 ${fmt.pct(m.count / total)}`)}"><i style="--c:${c};width:${(m.count / mx * 100).toFixed(1)}%"></i></span><span class="ct">${fmt.int(m.count)}</span>`;
+    }).join('');
+    return `<section class="drawer-sec" aria-label="模型使用">
+      <div class="drawer-sec-h"><span class="t">${icon('sparkles', 15)}模型使用</span><span>${total ? `${fmt.int(total)} 个合入 PR · AI 署名 ${fmt.pct(ai / total)}` : ''}</span></div>
+      ${total ? `<div class="mdl">${rows}</div><p class="pf-note">${ai ? `按 PR 里的 AI 署名识别模型，每个 PR 的得分乘以对应系数（×1 不加不减）。这些系数带来的加减合计 <b>${p.bonusModel < 0 ? '−' : '+'}${mag(Math.abs(p.bonusModel))}</b>，已算进魔力。` : '合入的 PR 都没有 AI 署名，系数都是 ×1，不加不减。'}</p>`
+        : '<p class="pf-note" style="margin-top:0">还没有合入的 PR，暂无模型数据。</p>'}
+    </section>`;
+  }
+
+  function newbieHTML(p, f) {
+    const nb = p.newbie, days = R.newbie.days;
+    const at = (day) => `${K.clamp(day / days * 100, 0, 100).toFixed(2)}%`;
+    const lbAlign = (day) => (day <= 3 ? 'l' : day >= days - 3 ? 'r' : '');
+    let tag, fill, marks = '', labels = '', call = '';
+    const req = (ok, n, of, label) => `<div class="${ok ? 'ok' : ''}"><span>${label}</span><b>${n}<span class="muted" style="font-weight:500"> / 需 ${of}</span></b><span class="pips ${ok ? '' : 'miss'}">${Array.from({ length: of }, (_, k) => `<i class="${k < n ? 'on' : ''}"></i>`).join('')}</span></div>`;
+    const reqs = `<div class="nb-req">${req(nb.merged >= R.newbie.merged, nb.merged, R.newbie.merged, '考核期内合入')}${req(nb.activeWeeks >= R.newbie.activeWeeks, nb.activeWeeks, R.newbie.activeWeeks, '活跃周')}</div>`;
+    labels += `<span class="nb-lb bot l" style="left:0">${fmt.md(p.firstAt)} 首次贡献</span><span class="nb-lb bot r" style="left:100%">${fmt.md(nb.end)} 期满</span>`;
+    if (nb.status === 'passed') {
+      tag = `<span class="tag tag-leaf">${icon('check', 11)}已通过</span>`;
+      const day = nb.passDay;
+      fill = `<i class="nb-fill" style="width:${at(day)}"></i>`;
+      marks = `<i class="nb-mk ok" style="left:${at(day)}">${icon('check', 10)}</i>`;
+      labels += `<span class="nb-lb top ${lbAlign(day)}" style="left:${at(day)}">第 ${day} 天通过 · ${fmt.md(nb.passAt)}</span>`;
+      call = `<div class="callout leaf">${icon('check', 15)}<span>第 <b>${day}</b> 天满足「合入 ≥${R.newbie.merged}、活跃周 ≥${R.newbie.activeWeeks}」，完成孵化。</span></div>`;
+    } else if (nb.status === 'pending') {
+      tag = `<span class="tag tag-live">${icon('hourglass', 11)}考核中 · 剩 ${nb.daysLeft} 天</span>`;
+      const day = K.clamp(days - nb.daysLeft, 0, days);
+      fill = `<i class="nb-fill wait" style="width:${at(Math.max(day, 0.6))}"></i>`;
+      marks = `<i class="nb-mk now" style="left:${at(day)}"></i>`;
+      labels += `<span class="nb-lb top ${lbAlign(day)}" style="left:${at(day)}">今天 · 第 ${day + 1} 天</span>`;
+      call = `<p class="pf-note">考核从首次贡献起算 ${days} 天，期满在 ${fmt.md(nb.end)}。差哪一项、怎么补，见上面的进化进度。</p>`;
+    } else {
+      const hk = hatchIdx(p);
+      fill = `<i class="nb-fill fail" style="width:100%"></i>`;
+      marks = `<i class="nb-mk x" style="left:100%">${icon('x', 10)}</i>`;
+      labels += `<span class="nb-lb top r" style="left:100%">期满未达标</span>`;
+      if (p.level !== null) {
+        tag = `<span class="tag">${icon('sparkle', 11)}未通过 · 靠魔力孵化</span>`;
+        call = `<div class="callout leaf">${icon('sparkles', 15)}<span>考核期内没达标，但魔力在 <b>${hk >= 0 ? (hk >= LAST - 1 ? weekName(hk) : K.week.range(hk)) : '后来'}</b>${hk >= 0 && hk < LAST - 1 ? ' 这一周' : ''}攒到了 50，直接孵化。</span></div>`;
+      } else {
+        tag = '<span class="tag">未通过 · 未孵化</span>';
+        call = `<div class="callout plain">${icon('info', 15)}<span>考核期已过，还差 <b>${mag(Math.max(0, R.hatchBonus - p.bonus))}</b> 魔力（到 50）就能直接孵化${p.pace > 0 ? `，按近 4 周均速${K.etaText(Math.ceil((R.hatchBonus - p.bonus) / p.pace))}` : '；近 4 周没有新魔力'}。</span></div>`;
+      }
+    }
+    return `<section class="drawer-sec" aria-label="新手考核">
+      <div class="drawer-sec-h"><span class="t">${icon('egg', 15)}新手考核 · ${days} 天</span>${tag}</div>
+      <div class="nb">
+        <div class="nb-track" role="img" aria-label="${esc(`考核期 ${fmt.md(p.firstAt)} 到 ${fmt.md(nb.end)}`)}">${fill}${marks}${labels}</div>
+        ${reqs}${call}
+      </div>
+    </section>`;
+  }
+
+  function dormHTML(p) {
+    const exempt = p.level !== null && p.level >= R.dormantExemptLevel;
+    const left = Math.max(0, Math.ceil(R.dormantDays - (NW.now - p.lastAt) / DAY));
+    let art, txt;
+    if (exempt) {
+      art = `<span class="zz-ic ok">${icon('check', 20)}</span>`;
+      txt = `<b>奶蛙及以上豁免冬眠</b>，多久不来都不会被标记。最近一次动作在 ${fmt.md(p.lastAt)}（${fmt.ago(p.daysSinceLast)}）。`;
+    } else if (p.dormant) {
+      art = `<span class="zz-ic">${icon('moon-z', 20)}</span>`;
+      txt = `<b>冬眠中</b>：最近一次动作在 ${fmt.md(p.lastAt)}，已经 <b>${p.daysSinceLast}</b> 天没有动作。再提 PR、合入或参与协作就会醒来；冬眠只是标记，不影响形态和魔力。`;
+    } else {
+      art = K.countdown(left, { total: R.dormantDays, size: 48 });
+      txt = `距冬眠还有 <b>${left}</b> 天。连续 ${R.dormantDays} 天没有任何动作（提 PR、合入、协作）会被标记冬眠；最近一次动作在 ${fmt.md(p.lastAt)}（${fmt.ago(p.daysSinceLast)}）。长到奶蛙就豁免。`;
+    }
+    return `<section class="drawer-sec" aria-label="冬眠">
+      <div class="drawer-sec-h"><span class="t">${icon('moon', 15)}冬眠</span><span>${R.dormantDays} 天无动作</span></div>
+      <div class="zz">${art}<div class="zz-t">${txt}</div></div>
+    </section>`;
+  }
+
+  // ───────── 抽屉内搜索 ─────────
+  const q = $('#pfQ', d.el), pop = $('#pfPop', d.el), list = $('#pfList', d.el);
+  let res = [], sel = 0;
+  const hl = (s, t) => { if (!t) return esc(s); const k = s.toLowerCase().indexOf(t); return k < 0 ? esc(s) : `${esc(s.slice(0, k))}<mark>${esc(s.slice(k, k + t.length))}</mark>${esc(s.slice(k + t.length))}`; };
+  function find() {
+    const t = q.value.trim().toLowerCase();
+    res = t ? PEOPLE.filter((p) => p.login.toLowerCase().includes(t)).sort((a, b) => (b.login.toLowerCase().startsWith(t) - a.login.toLowerCase().startsWith(t)) || a.rank - b.rank).slice(0, 8)
+      : PEOPLE.slice().sort((a, b) => b.tw - a.tw || a.rank - b.rank).slice(0, 6);
+    sel = 0;
+    list.innerHTML = res.length
+      ? `<div class="cmdk-group">${t ? `贡献者 · ${res.length}` : '本周最活跃'}</div>` + res.map((p, k) => `<button type="button" class="cmdk-item" role="option" id="pf-o-${k}" data-i="${k}" aria-selected="${k === 0}">${K.avatar(p.login, 22, { dim: p.dormant })}<span class="ellipsis">${hl(p.login, t)}</span>${p.member ? '' : '<span class="tag tag-out">组织外</span>'}<span class="end">${K.levelBadge(p, { size: 16 })}<span class="num">#${p.rank}</span><span class="num mg">${mag(p.bonus)}</span></span></button>`).join('')
+      : `<div class="cmdk-empty">没有找到「${esc(q.value.trim())}」<br><span style="font-size:var(--fs-xs)">只有有贡献记录的人才有档案</span></div>`;
+    mark();
+    pop.classList.add('on');
+    q.setAttribute('aria-expanded', 'true');
+  }
+  function mark() {
+    list.querySelectorAll('.cmdk-item').forEach((b) => b.setAttribute('aria-selected', String(+b.dataset.i === sel)));
+    const a = list.querySelector(`[data-i="${sel}"]`);
+    if (a) { a.scrollIntoView({ block: 'nearest' }); q.setAttribute('aria-activedescendant', a.id); }
+  }
+  function closePop() { pop.classList.remove('on'); q.setAttribute('aria-expanded', 'false'); q.removeAttribute('aria-activedescendant'); }
+  function pick(p) { closePop(); q.value = ''; q.blur(); d.el.focus({ preventScroll: true }); show(p.login); }
+  q.addEventListener('focus', find);
+  q.addEventListener('input', find);
+  q.addEventListener('blur', () => setTimeout(() => { if (!d.el.contains(document.activeElement) || document.activeElement !== q) closePop(); }, 120));
+  q.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); if (res.length) { sel = (sel + (e.key === 'ArrowDown' ? 1 : -1) + res.length) % res.length; mark(); } }
+    else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (res[sel]) pick(res[sel]); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (q.value) { q.value = ''; find(); } else { closePop(); q.blur(); d.el.focus({ preventScroll: true }); } }
+  });
+  list.addEventListener('pointerdown', (e) => e.preventDefault()); // 不让输入框失焦
+  list.addEventListener('pointermove', (e) => { const b = e.target.closest('.cmdk-item'); if (b && +b.dataset.i !== sel) { sel = +b.dataset.i; mark(); } });
+  list.addEventListener('click', (e) => { const b = e.target.closest('.cmdk-item'); if (b) pick(res[+b.dataset.i]); });
+  d.el.addEventListener('pointerdown', (e) => { if (!e.target.closest('.pf-find')) closePop(); });
+
+  // ───────── 分享链接 ─────────
+  async function share() {
+    if (!cur) return;
+    const u = new URL(`profile.html#u=${encodeURIComponent(cur.login)}`, location.href);
+    const t = NWK.theme.source === 'param' ? NWK.theme.get() : null;
+    u.search = t ? `?theme=${t}` : '';
+    let ok = false;
+    try { await navigator.clipboard.writeText(u.href); ok = true; } catch (e) { ok = false; }
+    K.toast(ok ? `已复制 ${esc(cur.login)} 的档案链接` : `复制失败，地址是 ${esc(u.pathname.split('/').pop())}#u=${esc(cur.login)}`, { icon: ok ? 'check' : 'info' });
+  }
+  $('#pfShare', d.el).addEventListener('click', share);
+
+  // ───────── 手机：下拉把手关闭底部面板 ─────────
+  (function dragToClose() {
+    const head = $('#pfHead', d.el);
+    let y0 = null, dy = 0;
+    head.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' || innerWidth > 720 || e.target.closest('button, input, .pf-find')) return;
+      y0 = e.clientY; dy = 0; d.el.style.transition = 'none';
+      head.setPointerCapture(e.pointerId);
+    });
+    head.addEventListener('pointermove', (e) => { if (y0 === null) return; dy = Math.max(0, e.clientY - y0); d.el.style.transform = `translateY(${dy}px)`; });
+    const end = () => {
+      if (y0 === null) return;
+      y0 = null; d.el.style.transition = ''; d.el.style.transform = '';
+      if (dy > 110) d.close();
+    };
+    head.addEventListener('pointerup', end);
+    head.addEventListener('pointercancel', end);
+  })();
+
+  // ───────── 键盘与命令 ─────────
+  K.keys.add([
+    { key: 'ArrowLeft', label: '上一位（按名次）', group: '档案', handler: () => { if (!cur) return false; trigger = null; step(-1); return true; } },
+    { key: 'ArrowRight', label: '下一位（按名次）', group: '档案', handler: () => { if (!cur) return false; trigger = null; step(1); return true; } },
+    { key: 'o', display: 'O', label: '重新打开档案', group: '档案', handler: () => { if (!cur || d.isOpen()) return false; show(cur.login, { open: true }); return true; } },
+  ]);
+  K.cmdk.add({ label: '复制当前档案链接', icon: 'external-link', run: share });
+
+  // ───────── 地址 #u=login ─────────
+  const fromHash = () => { const m = location.hash.match(/(?:^#|&)u=([^&]+)/); return m ? decodeURIComponent(m[1]) : null; };
+  addEventListener('hashchange', () => { const l = fromHash(); if (l) show(l, { open: true }); else if (d.isOpen()) d.close(); });
+  let booted = false;
+  K.ready(() => { show(fromHash() || DEFAULT, { open: true }); booted = true; });
+})();
+</script>
+</body>
+</html>

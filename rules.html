@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>规则与口径 · 奶蛙宇宙</title>
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="assets/tokens.css">
+<!-- 读取 data/board.json 后加载 engine.js、assets/derive.js、icons.js、kit.js，再执行下方 type="text/x-nw-page" 的页面脚本 -->
+<script src="assets/boot.js"></script>
+<style>
+  /* 本页布局。颜色、字号、圆角、时长一律用令牌 */
+
+  /* ── 导语 ── */
+  .intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-8); align-items: end; margin: var(--s-2) 0 var(--s-10); }
+  .intro .headline { margin-top: var(--s-3); max-width: 22em; }
+  .intro .lede { max-width: 44em; }
+  .intro .dateline { margin-top: var(--s-3); min-height: 0; }
+  .intro-stats { display: flex; gap: var(--s-6); padding-bottom: 6px; }
+  .istat { min-width: 92px; }
+  .istat .label { font-size: var(--fs-2xs); letter-spacing: .02em; }
+  .istat b { display: block; margin-top: 4px; font-family: var(--font-display); font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .istat b small { margin-left: 3px; font-family: var(--font-sans); font-size: var(--fs-sm); font-weight: 600; letter-spacing: 0; color: var(--ink-3); }
+  .istat > small { display: block; margin-top: 2px; font-size: var(--fs-2xs); color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  /* ── 目录 + 正文 ── */
+  .rl { display: grid; grid-template-columns: 188px minmax(0, 1fr); gap: var(--s-10); align-items: start; }
+  .toc { position: sticky; top: calc(var(--appbar-h) + var(--s-6)); }
+  .toc-h { margin-bottom: var(--s-2); padding-left: 12px; }
+  .toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; border-left: 1px solid var(--line); }
+  .toc a { position: relative; display: flex; align-items: baseline; gap: 8px; margin-left: -1px; padding: 6px 10px 6px 12px; border-left: 2px solid transparent; border-radius: 0 var(--r-sm) var(--r-sm) 0; font-size: var(--fs-sm); color: var(--ink-3); transition: color var(--dur-1), background-color var(--dur-1), border-color var(--dur-2); }
+  .toc a:hover { color: var(--ink); background: var(--surface-hover); }
+  .toc a .i { font-size: var(--fs-2xs); font-weight: 650; color: var(--ink-4); font-variant-numeric: tabular-nums; min-width: 1.4em; }
+  .toc a[aria-current="true"] { color: var(--leaf-ink); font-weight: 650; border-left-color: var(--leaf); background: var(--leaf-wash); }
+  .toc a[aria-current="true"] .i { color: var(--leaf-ink); }
+  .rl-main { min-width: 0; }
+  .rl-main > .section:first-child { margin-top: 0; }
+  .rl-main > .section { scroll-margin-top: calc(var(--appbar-h) + var(--s-5)); }
+  .sec-h .eyebrow .i { font-variant-numeric: tabular-nums; }
+
+  /* ── 01 公式 ── */
+  .fx-main { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; padding: 14px 16px; border-radius: var(--r-lg); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-soft); font-size: var(--fs-md); color: var(--ink-2); }
+  .fx-main .lhs { font-weight: 700; color: var(--ink); }
+  .fx-main .sig { display: inline-flex; flex-direction: column; align-items: center; line-height: 1; }
+  .fx-main .sig b { font-size: 20px; font-weight: 500; color: var(--ink); }
+  .fx-main .sig small { font-size: 10px; color: var(--ink-3); margin-top: 2px; }
+  .fx-main .tm { padding: 2px 8px; border-radius: var(--r-sm); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .fdefs { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--s-3) var(--s-5); margin: var(--s-5) 0 0; font-size: var(--fs-sm); align-items: baseline; }
+  .fdefs dt .key { font-size: var(--fs-sm); font-weight: 650; color: var(--ink); }
+  .fdefs dd { margin: 0; color: var(--ink-2); font-variant-numeric: tabular-nums; line-height: 1.6; }
+  .fdefs dd .k { font-weight: 680; color: var(--ink); }
+  .fdefs .fn { display: block; margin-top: 2px; font-size: var(--fs-xs); color: var(--ink-3); }
+  .nw { white-space: nowrap; }
+  .examples { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--s-2) var(--s-4); margin: var(--s-5) 0 0; padding-top: var(--s-4); border-top: 1px solid var(--line-soft); font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.6; }
+  .examples dt { font-size: var(--fs-xs); font-weight: 650; color: var(--ink-3); padding-top: 1px; }
+  .examples dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .examples b { color: var(--ink); font-weight: 680; }
+  .card-pad > .footnote { margin-top: var(--s-4); }
+  .footnote a { color: var(--leaf-ink); font-weight: 600; }
+
+  /* ── 02 计分因子 ── */
+  .curves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--grid-gap); }
+  .curve-h { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2); flex-wrap: wrap; }
+  .curve-h .card-title { font-size: var(--fs-sm); }
+  .curve-h .tag { font-variant-numeric: tabular-nums; }
+  .cchart { height: 176px; margin-top: var(--s-3); }
+  .cchart .ln { fill: none; stroke: var(--leaf); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .cchart .area { fill: var(--leaf-wash); }
+  .cpt { cursor: default; outline: none; }
+  .cpt .hit { fill: transparent; }
+  .cpt .d { fill: var(--leaf); stroke: var(--surface); stroke-width: 2; transition: r var(--dur-2) var(--ease-spring); }
+  .cpt:hover .d, .cpt:focus-visible .d { r: 6; }
+  .cpt:focus-visible .d { stroke: var(--focus); }
+  .ax-title.end { text-anchor: end; }
+  .models-card { margin-top: var(--grid-gap); }
+  .mtab { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--s-3) var(--s-5); align-items: start; margin-top: var(--s-4); }
+  .mtab .fam { padding-top: 5px; font-size: var(--fs-xs); font-weight: 650; color: var(--ink-2); white-space: nowrap; }
+  .mchips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mchip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: var(--r-md); font-size: var(--fs-xs); font-weight: 550; color: var(--ink-2); background: color-mix(in srgb, var(--series-model) var(--t, 0%), var(--surface-2)); box-shadow: inset 0 0 0 1px var(--line-soft); cursor: help; outline-offset: 2px; transition: box-shadow var(--dur-1); }
+  .mchip:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .mchip b { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .mchip.is-neg { background: var(--rust-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rust) 45%, transparent); color: var(--rust); }
+  .mchip.is-neg b { color: var(--rust); }
+  .mchip .ic { flex: none; }
+  .mlegend { margin-top: var(--s-4); padding-top: var(--s-3); border-top: 1px solid var(--line-soft); }
+  .key.grad::before { width: 28px; background: linear-gradient(90deg, var(--surface-2), color-mix(in srgb, var(--series-model) 34%, var(--surface-2))); box-shadow: inset 0 0 0 1px var(--line-soft); }
+  .key.neg::before { background: var(--rust-soft); box-shadow: inset 0 0 0 1px var(--rust); }
+  .tip code { font-family: var(--font-mono); font-size: 11px; color: var(--tip-ink); word-break: break-all; white-space: normal; }
+
+  /* ── 03 模型分布 ── */
+  .hbars { display: grid; gap: 2px; margin-top: var(--s-3); }
+  .hb { display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) 112px; gap: var(--s-3); align-items: center; min-height: 34px; padding: 0 var(--s-2); border-radius: var(--r-md); font-size: var(--fs-sm); outline-offset: -2px; transition: background-color var(--dur-1); }
+  .hb:hover { background: var(--surface-hover); }
+  .hb-l { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--ink); font-weight: 560; }
+  .hb-l .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hb-l .w { flex: none; display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; font-size: var(--fs-2xs); font-weight: 650; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .hb-l .w.neg { color: var(--rust); }
+  .hb-b { position: relative; height: 12px; }
+  .hb-b i { position: absolute; inset: 0 auto 0 0; min-width: 2px; border-radius: 0 3px 3px 0; background: var(--leaf); }
+  .hb-b i.none { background: var(--viz-dim); }
+  .hb-v { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 650; white-space: nowrap; }
+  .hb-v small { margin-left: 6px; display: inline-block; min-width: 3.2em; font-size: var(--fs-xs); font-weight: 500; color: var(--ink-3); }
+
+  /* ── 04 合入率散点 ── */
+  .sc-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2) var(--s-4); flex-wrap: wrap; }
+  .sc-read { min-height: 20px; font-size: var(--fs-xs); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .sc-read b { color: var(--ink); font-weight: 650; }
+  #scatter { height: 320px; margin-top: var(--s-3); border-radius: var(--r-md); }
+  #scatter .zone { fill: color-mix(in srgb, var(--rust) 9%, transparent); }
+  :root[data-theme="dark"] #scatter .zone { fill: color-mix(in srgb, var(--rust) 14%, transparent); }
+  #scatter .zone-ln { fill: none; stroke: var(--rust); stroke-width: 1.5; stroke-linejoin: round; }
+  #scatter .zone-t { font-size: var(--fs-2xs); font-weight: 650; fill: var(--rust); font-variant-numeric: tabular-nums; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+  #scatter .pt { fill: var(--leaf); fill-opacity: .62; stroke: var(--surface); stroke-width: 1.5; cursor: pointer; transition: r var(--dur-2) var(--ease-spring), fill-opacity var(--dur-1); }
+  #scatter .pt.is-warn { fill: var(--rust); fill-opacity: .85; }
+  #scatter .pt:hover, #scatter .pt.is-on { r: 8; fill-opacity: 1; stroke: var(--ink); stroke-width: 2; }
+  #scatter .anno-tx { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+  .sc-legend { margin-top: var(--s-3); }
+  .key.zone::before { background: color-mix(in srgb, var(--rust) 14%, transparent); box-shadow: inset 0 -1.5px 0 var(--rust); border-radius: 1px; }
+  .note { margin-top: var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--line-soft); font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.75; }
+  .note p + p { margin-top: var(--s-2); }
+  .note b { color: var(--ink); font-weight: 650; }
+
+  /* ── 05 M-Team 对照 ── */
+  .map { display: grid; grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1.35fr); align-items: center; }
+  .map > .mrow { display: contents; }
+  .map .c { padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: var(--fs-sm); }
+  .map .mrow:last-child .c { border-bottom: 0; }
+  .map .from { text-align: right; color: var(--ink-2); padding-right: 2px; }
+  .map .arrow { display: grid; place-items: center; align-self: stretch; color: var(--ink-4); }
+  .map .to { display: flex; flex-direction: column; gap: 2px; padding-left: 2px; }
+  .map .to > span { align-self: flex-start; font-weight: 650; color: var(--ink); cursor: help; border-radius: var(--r-xs); text-decoration: underline dotted var(--line-strong); text-underline-offset: 0.3em; text-decoration-thickness: 1.5px; }
+  .map .to > span:hover { text-decoration-color: var(--leaf); }
+  .map .mrow.off .to > span { font-weight: 450; color: var(--ink-3); }
+  .map .why { display: none; font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.55; }
+  .src { margin-top: var(--s-4); }
+
+  /* ── 06 名词解释 ── */
+  dl.terms { display: grid; grid-template-columns: max-content minmax(0, 1fr); margin: 0; }
+  dl.terms dt, dl.terms dd { padding: 11px 0; border-bottom: 1px solid var(--line-soft); }
+  dl.terms dt:last-of-type, dl.terms dd:last-of-type { border-bottom: 0; }
+  dl.terms dt { padding-right: var(--s-6); font-size: var(--fs-sm); font-weight: 650; color: var(--ink); }
+  dl.terms dd { margin: 0; font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.65; }
+
+  /* ── 07 明细表 ── */
+  .dt-toggle { display: flex; align-items: center; gap: var(--s-3); width: 100%; padding: var(--s-4) var(--s-5); text-align: left; border-radius: var(--r-xl); color: var(--ink); transition: background-color var(--dur-1); }
+  .dt-toggle:hover { background: var(--surface-hover); }
+  .dt-toggle:focus-visible { outline-offset: -2px; }
+  .dt-toggle .t { font-size: 15px; font-weight: 650; }
+  .dt-toggle .s { font-size: var(--fs-xs); color: var(--ink-3); }
+  .dt-toggle .chev { margin-left: auto; color: var(--ink-3); transition: transform var(--dur-3) var(--ease-spring); }
+  .dt-toggle[aria-expanded="true"] { border-radius: var(--r-xl) var(--r-xl) 0 0; }
+  .dt-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
+  .dt-body { border-top: 1px solid var(--line-soft); }
+  .dt-body .tbl-wrap { max-height: min(72vh, 760px); border: 0; border-radius: 0 0 var(--r-xl) var(--r-xl); }
+  .tbl th { padding: 0; }
+  .tbl th .sb { display: flex; align-items: center; width: 100%; height: 34px; padding: 0 12px; font: inherit; color: inherit; letter-spacing: inherit; white-space: nowrap; border-radius: var(--r-xs); }
+  .tbl th.n .sb { justify-content: flex-end; }
+  .tbl th .sb:hover { color: var(--ink); }
+  .tbl th .sb:focus-visible { outline-offset: -3px; }
+  .tbl th[aria-sort="descending"], .tbl th[aria-sort="ascending"] { color: var(--leaf-ink); }
+  .tbl th[aria-sort]::after { content: none !important; }
+  .tbl th .sb::after { content: ""; display: inline-block; width: 1em; margin-left: 2px; text-align: left; }
+  .tbl th[aria-sort="descending"] .sb::after { content: "↓"; }
+  .tbl th[aria-sort="ascending"] .sb::after { content: "↑"; }
+  .tbl td { height: 42px; }
+  .tbl td.strong { color: var(--ink); font-weight: 650; }
+  .tbl td.dim, .tbl td .dim { color: var(--ink-3); }
+  .tbl .c-who { position: sticky; left: 0; z-index: 1; background: var(--surface); }
+  .tbl th.c-who { z-index: 2; background: var(--surface-2); }
+  .tbl tr:hover td.c-who { background: var(--surface-hover); }
+  .tbl .who .nm { font-size: var(--fs-sm); }
+  .tbl .lvl { font-size: var(--fs-xs); }
+
+  /* ── 08 口径与盲区 ── */
+  ul.blind { list-style: none; margin: 0; padding: 0; counter-reset: b; }
+  ul.blind li { position: relative; padding: 10px 0 10px 32px; border-bottom: 1px solid var(--line-soft); font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.7; counter-increment: b; }
+  ul.blind li:last-child { border-bottom: 0; }
+  ul.blind li::before { content: counter(b); position: absolute; left: 0; top: 12px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); font-size: var(--fs-2xs); font-weight: 650; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+  /* ── 平板 ── */
+  @media (max-width: 1100px) {
+    .intro { grid-template-columns: 1fr; gap: var(--s-5); }
+    .rl { grid-template-columns: 1fr; gap: var(--s-6); }
+    .toc { position: static; margin: 0 calc(var(--gutter) * -1); }
+    .toc-h { display: none; }
+    .toc ol { display: flex; gap: 6px; overflow-x: auto; padding: 2px var(--gutter) 6px; border-left: 0; scrollbar-width: none; }
+    .toc ol::-webkit-scrollbar { display: none; }
+    .toc a { margin: 0; padding: 0 12px; height: 32px; align-items: center; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); white-space: nowrap; font-size: var(--fs-xs); font-weight: 600; color: var(--ink-2); }
+    .toc a[aria-current="true"] { border-color: color-mix(in srgb, var(--leaf) 40%, transparent); background: var(--leaf-soft); }
+  }
+
+  /* ── 手机 ── */
+  @media (max-width: 720px) {
+    .intro { margin-bottom: var(--s-6); }
+    .intro-stats { gap: 0; justify-content: space-between; padding-top: var(--s-4); border-top: 1px solid var(--line-soft); }
+    .istat { min-width: 0; }
+    .istat b { font-size: var(--fs-xl); }
+    .card-pad { padding: var(--s-4); }
+    .fx-main { padding: 12px; font-size: var(--fs-sm); }
+    .fdefs, .examples { grid-template-columns: 1fr; gap: 2px; }
+    .fdefs dd, .examples dd { margin-bottom: var(--s-3); }
+    .curves { grid-template-columns: 1fr; }
+    .mtab { grid-template-columns: 1fr; gap: 4px; }
+    .mtab .fam { padding-top: var(--s-2); }
+    .hb { grid-template-columns: minmax(0, 1fr) 92px; grid-template-areas: "l v" "b b"; row-gap: 4px; padding: 6px var(--s-2); }
+    .hb-l { grid-area: l; } .hb-b { grid-area: b; height: 8px; } .hb-v { grid-area: v; }
+    #scatter { height: 260px; }
+    .map { grid-template-columns: minmax(0, .9fr) 22px minmax(0, 1.3fr); }
+    dl.terms { grid-template-columns: 1fr; }
+    dl.terms dt { padding-bottom: 2px; border-bottom: 0; }
+    dl.terms dd { padding-top: 0; }
+    .dt-toggle { padding: var(--s-4); }
+    .dt-toggle .s { display: none; }
+  }
+  /* 触屏没有悬停：映射理由直接写出来 */
+  @media (max-width: 720px), (hover: none) {
+    .map .why { display: block; }
+    .map .c { align-self: start; }
+    .map .from { padding-top: 9px; }
+    .map .arrow { place-items: start center; padding-top: 11px; }
+    .map .to > span { text-decoration: none; cursor: default; }
+  }
+</style>
+</head>
+<body>
+<header id="appbar"></header>
+
+<main class="page rules">
+  <section class="intro">
+    <div>
+      <span class="eyebrow"><span data-ic="book-open"></span>规则与口径</span>
+      <h1 class="headline is-in" id="headline">魔力怎么算，<mark>数字从哪来</mark></h1>
+      <p class="lede" id="lede"></p>
+      <div class="dateline" id="dateline"></div>
+    </div>
+    <div class="intro-stats" id="introStats"></div>
+  </section>
+
+  <div class="rl">
+    <nav class="toc" aria-label="本页目录">
+      <div class="toc-h eyebrow">本页目录</div>
+      <ol id="toc"></ol>
+    </nav>
+
+    <div class="rl-main">
+      <section class="section" id="formula" aria-labelledby="h-formula">
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">01</span> · 公式</span><h2 id="h-formula">贡献度公式</h2><p>贡献度 = 魔力，按魔力降序排名</p></div></div>
+        <div class="card card-pad" id="formulaCard"></div>
+      </section>
+
+      <section class="section" id="factors" aria-labelledby="h-factors">
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">02</span> · 计分因子</span><h2 id="h-factors">计分因子</h2><p>对数压缩：规模越大，边际加分越少</p></div></div>
+        <div class="curves">
+          <div class="card card-pad">
+            <div class="curve-h"><div class="card-title">改动行 → 加分</div><span class="tag" id="tagLines"></span></div>
+            <div class="chart cchart" id="cLines"></div>
+          </div>
+          <div class="card card-pad">
+            <div class="curve-h"><div class="card-title">commit 数 → 加分</div><span class="tag" id="tagCommits"></span></div>
+            <div class="chart cchart" id="cCommits"></div>
+          </div>
+        </div>
+        <div class="card card-pad models-card">
+          <div class="card-title"><span class="card-icon" data-ic="sparkles" data-ic-size="15"></span>模型系数</div>
+          <div class="card-sub">按组织偏好定档，不区分版本；悬停或聚焦查看识别规则</div>
+          <div class="mtab" id="mtab"></div>
+          <div class="legend mlegend" id="mlegend"></div>
+        </div>
+      </section>
+
+      <section class="section" id="models" aria-labelledby="h-models">
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">03</span> · 模型分布</span><h2 id="h-models">合入 PR 的模型分布</h2><p>按 commit 的 Co-Authored-By 识别</p></div></div>
+        <div class="card card-pad">
+          <div class="card-sub" id="mdSub" style="margin-top:0"></div>
+          <div class="hbars" id="hbars"></div>
+        </div>
+      </section>
+
+      <section class="section" id="rate" aria-labelledby="h-rate">
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">04</span> · 合入率</span><h2 id="h-rate">合入率与警告线</h2><p>每个点是一个人；横轴为对数刻度。悬停看人物卡，点击进档案</p></div></div>
+        <div class="card card-pad">
+          <div class="sc-head">
+            <div class="legend sc-legend" style="margin-top:0" id="scLegend"></div>
+            <div class="sc-read" id="scRead" aria-live="polite"></div>
+          </div>
+          <div class="chart" id="scatter"></div>
+          <div class="note" id="rateNote"></div>
+        </div>
+      </section>
+
+      <section class="section" id="mteam" aria-labelledby="h-mteam">
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">05</span> · 对照</span><h2 id="h-mteam">M-Team 规则对照</h2><p>左边是 M-Team 的规则，右边是这里的对应做法；悬停查看映射理由</p></div></div>
+        <div class="card card-pad">
+          <div class="map" id="mapping"></div>
+          <p class="footnote src" id="mapSrc"></p>
+        </div>
+      </section>
+
+      <section class="section" id="terms" aria-labelledby="h-terms">
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">06</span> · 名词</span><h2 id="h-terms">名词解释</h2><p>排行、档案和人物卡上的标签都按这里的定义</p></div></div>
+        <div class="card card-pad"><dl class="terms" id="termsDl"></dl></div>
+      </section>
+
+      <section class="section" id="detail" aria-labelledby="h-detail">
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">07</span> · 明细</span><h2 id="h-detail">完整明细表</h2><p>所有贡献者的全部计分字段；点表头排序，点账号进档案</p></div></div>
+        <div class="card">
+          <button type="button" class="dt-toggle" id="dtToggle" aria-expanded="false" aria-controls="dtBody">
+            <span class="card-icon" data-ic="list" data-ic-size="15"></span>
+            <span class="t" id="dtTitle"></span>
+            <span class="s" id="dtSub"></span>
+            <span class="chev" data-ic="chevron-down"></span>
+          </button>
+          <div class="dt-body" id="dtBody" hidden>
+            <div class="tbl-wrap" tabindex="0" role="region" aria-labelledby="h-detail">
+              <table class="tbl" id="table"><thead></thead><tbody></tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="blind" aria-labelledby="h-blind">
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">08</span> · 口径</span><h2 id="h-blind">口径与盲区</h2><p>这些数字能说明什么、不能说明什么</p></div></div>
+        <div class="card card-pad"><ul class="blind" id="blindList"></ul></div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script type="text/x-nw-page">
+(() => {
+  const K = NWK;
+  const $ = (s) => document.querySelector(s);
+  const esc = K.esc;
+  K.appHeader($('#appbar'), { active: 'rules' });
+
+  const R = window.RULES;
+  const S = R.score;
+  const CAP = R.weeklyActionCap;
+  const SUM = NW.summary;
+  const LIM = NW.B.limits || {};
+  const PEOPLE = NW.people;
+  // 0 与 1% 之间保留一位小数，避免把少量非零值显示成 0%（与旧版口径一致）
+  const pct = (x) => (x == null ? '—' : x > 0 && x < 0.01 ? `${(x * 100).toFixed(1)}%` : `${Math.round(x * 100)}%`);
+  const w2 = (w) => `×${w}`;
+  const tw = (s) => [...String(s)].reduce((n, c) => n + (/[　-鿿＀-￯]/.test(c) ? 11 : 6.2), 0);
+
+  document.querySelectorAll('[data-ic]').forEach((el) => { el.innerHTML = K.icon(el.dataset.ic, +(el.dataset.icSize || 13)); });
+
+  // ───────── 名词（「名词解释」、合入率说明共用；文字照抄旧版） ─────────
+  const TERMS = (() => {
+    const [first, ...rest] = R.warnLines;
+    const a = R.newbie.anomaly;
+    return {
+      collab: { name: '协作', text: `参与别人的 PR 或 issue：review、评论、帮人合入。同一个 PR 或 issue 只算一次；自己提的有效 issue 也算。每次 +${R.score.collab} 魔力。` },
+      rate: { name: '合入率', text: `合入 PR ÷ 已收尾 PR。已收尾指已合入、被别人关闭，或打开超过 ${R.staleOpenDays} 天还没合入。自己关闭的 PR 视为撤回，不计入。` },
+      warn: { name: '合入率警告', tag: 'tag tag-warn', icon: 'alert-triangle', text: `已收尾 PR 超过 ${first.resolved} 个后，合入率低于 ${pct(first.rate)} 就会被标记；超过 ${rest.map((l) => l.resolved).join(' / ')} 个时，要求依次提高到 ${rest.map((l) => pct(l.rate)).join(' / ')}。只是提醒，不扣魔力，也不影响形态。` },
+      outsider: { name: '组织外', tag: 'tag tag-out', text: '数据更新时不在 nwverse 组织成员名单里的账号，例如从 fork 提 PR 的外部贡献者、已退出的人。贡献照常计分。' },
+      anomaly: { name: '新手异常', tag: 'tag tag-warn', icon: 'zap', text: `孵化期内开了 ${a.opened} 个以上 PR，合入的不到 ${pct(a.rate)}。最近 ${a.graceHours} 小时内开的 PR 不计。` },
+      dormant: { name: '冬眠', tag: 'tag tag-sleep', icon: 'moon-z', text: `超过 ${R.dormantDays} 天没有任何动作。只做标记；${R.levels[R.dormantExemptLevel].name}及以上不标记。` },
+    };
+  })();
+
+  // ───────── 导语 ─────────
+  const allModels = [...R.models, R.modelNone];
+  const wMax = Math.max(...allModels.map((m) => m.weight));
+  const wMin = Math.min(...allModels.map((m) => m.weight));
+  const resolvedPeople = PEOPLE.filter((p) => p.resolved > 0);
+  $('#lede').innerHTML = `合入 PR 按改动行、commit 数和署名的模型计分，协作每次 <span class="n">+${S.collab}</span>，每周最多计 <span class="n">${CAP}</span> 个动作。`
+    + `下面的图表和明细都由当前数据快照里 <span class="n">${K.fmt.int(SUM.contributors)}</span> 位贡献者、<span class="n">${K.fmt.int(SUM.merged)}</span> 个合入 PR 算出，规则改了这一页会跟着变。`;
+  $('#dateline').innerHTML = `<span class="asof">数据快照 ${K.fmt.datetime(NW.now)}（UTC+8）</span>`;
+  $('#introStats').innerHTML = [
+    ['合入 PR', K.fmt.int(SUM.merged), '个', `带 AI 署名 ${pct(SUM.merged ? SUM.mergedAi / SUM.merged : null)}`],
+    ['有已收尾 PR', K.fmt.int(resolvedPeople.length), '人', `合入率警告 ${SUM.warn} 人`],
+    ['模型档位', K.fmt.int(allModels.length), '档', `系数 ×${wMin} – ×${wMax}`],
+  ].map(([l, v, u, s]) => `<div class="istat"><span class="label">${l}</span><b>${v}<small>${u}</small></b><small>${s}</small></div>`).join('');
+
+  // ───────── 目录 ─────────
+  const SECS = [...document.querySelectorAll('.rl-main > .section')];
+  $('#toc').innerHTML = SECS.map((s, i) => `<li><a href="#${s.id}" data-sec="${s.id}"><span class="i">${String(i + 1).padStart(2, '0')}</span>${esc(s.querySelector('h2').textContent)}</a></li>`).join('');
+  const tocLinks = new Map([...document.querySelectorAll('#toc a')].map((a) => [a.dataset.sec, a]));
+  let curSec = null;
+  function setCur(id) {
+    if (id === curSec) return;
+    curSec = id;
+    tocLinks.forEach((a, k) => { if (k === id) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
+    // 窄屏目录是横向滚动条：把当前项滚进视野
+    const a = tocLinks.get(id);
+    const ol = $('#toc');
+    if (a && ol.scrollWidth > ol.clientWidth) ol.scrollTo({ left: a.offsetLeft - 16, behavior: K.reduced() ? 'auto' : 'smooth' });
+  }
+  function spy() {
+    const line = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--appbar-h')) || 60) + innerHeight * 0.25;
+    let id = SECS[0].id;
+    for (const s of SECS) if (s.getBoundingClientRect().top <= line) id = s.id;
+    if (innerHeight + scrollY >= document.documentElement.scrollHeight - 4) id = SECS[SECS.length - 1].id;
+    setCur(id);
+  }
+  let spyRaf = 0;
+  addEventListener('scroll', () => { cancelAnimationFrame(spyRaf); spyRaf = requestAnimationFrame(spy); }, { passive: true });
+  addEventListener('resize', spy);
+  document.querySelector('#toc').addEventListener('click', (e) => {
+    const a = e.target.closest('a[data-sec]');
+    if (!a) return;
+    e.preventDefault();
+    const sec = document.getElementById(a.dataset.sec);
+    sec.scrollIntoView({ behavior: K.reduced() ? 'auto' : 'smooth', block: 'start' });
+    history.replaceState(null, '', `${location.pathname}${location.search}#${sec.id}`);
+    setCur(sec.id);
+    const h = sec.querySelector('h2');
+    h.tabIndex = -1;
+    h.focus({ preventScroll: true });
+  });
+
+  // ───────── 01 公式 ─────────
+  (() => {
+    const ex = { lines: 300, commits: 3, model: modelOf('Claude Opus 5.5', R) };
+    const exLines = S.lines * Math.log10(1 + ex.lines);
+    const exCommits = S.commits * Math.log2(1 + ex.commits);
+    const exScore = (1 + exLines + exCommits) * ex.model.weight;
+    const top = R.models.reduce((m, x) => (x.weight > m.weight ? x : m));
+    const penalties = R.models.filter((m) => m.weight < 1).map((m) => `${esc(m.label)} ×${m.weight}`).join('、');
+    const ex2 = { merged: 12, collab: 3 };
+    const ex2n = ex2.merged + ex2.collab;
+    $('#formulaCard').innerHTML = `
+      <div class="fx-main" role="img" aria-label="魔力等于每周的 min(1, ${CAP} 除以动作数) 乘以当周动作分之和，再对所有周求和">
+        <span class="lhs">魔力</span><span>=</span>
+        <span class="sig"><b>Σ</b><small>每周</small></span>
+        <span class="tm">min(1, ${CAP} ÷ 动作数)</span><span>×</span>
+        <span class="sig"><b>Σ</b><small>当周</small></span>
+        <span class="tm">动作分</span>
+      </div>
+      <dl class="fdefs">
+        <dt><span class="key" style="--k:var(--series-pr)">PR 分</span></dt>
+        <dd><span class="nw">(1 + <span class="k">${S.lines}</span>·log₁₀(1+改动行)</span> <span class="nw">+ <span class="k">${S.commits}</span>·log₂(1+commit 数))</span> <span class="nw">× 模型系数</span></dd>
+        <dt><span class="key" style="--k:var(--series-collab)">协作分</span></dt>
+        <dd><span class="k">${S.collab}</span><span class="fn">每参与一个他人的 PR 或 issue（review、评论、代合入），或提一个有效 issue</span></dd>
+        <dt><span class="key" style="--k:var(--series-model)">模型系数</span></dt>
+        <dd>按署名的模型查表，最高 ${esc(top.label)} <span class="k">×${top.weight}</span><span class="fn">一个 PR 用了多个模型时取最高；带扣分工具署名时按扣分计（${penalties}）</span></dd>
+      </dl>
+      <dl class="examples">
+        <dt>例 1</dt>
+        <dd>改 ${ex.lines} 行、${ex.commits} 个 commit、${esc(ex.model.label)} 的 PR：<span class="nw">(1 + ${exLines.toFixed(2)} + ${exCommits.toFixed(2)}) × ${ex.model.weight.toFixed(2)} = <b>${K.mag(exScore)}</b> 魔力</span></dd>
+        <dt>例 2</dt>
+        <dd>一周合入 ${ex2.merged} 个 PR、协作 ${ex2.collab} 次，共 ${ex2n} 个动作：<span class="nw">当周得分 × ${CAP}/${ex2n}</span></dd>
+      </dl>
+      <p class="footnote">${K.icon('info', 13, 'ic')}<span>各模型的系数见<a href="#factors" data-goto="factors">「计分因子」</a>。想拖动滑块试算，去<a href="ranking.html" data-screen="c2">排行榜</a>底部的公式卡。</span></p>`;
+    $('#formulaCard').addEventListener('click', (e) => {
+      const a = e.target.closest('[data-goto]');
+      if (!a) return;
+      e.preventDefault();
+      tocLinks.get(a.dataset.goto).click();
+    });
+  })();
+
+  // ───────── 02 计分因子：加分曲线 ─────────
+  $('#tagLines').textContent = `×10 → +${S.lines}`;
+  $('#tagCommits').textContent = `×2 → +${S.commits}`;
+  $('#tagLines').setAttribute('data-tip', `改动行（加 1 后）每翻 10 倍，加 ${S.lines} 分`);
+  $('#tagCommits').setAttribute('data-tip', `commit 数（加 1 后）每翻 2 倍，加 ${S.commits} 分`);
+  function curve(host, { fn, xMax, ticks, xLabel, unit }) {
+    function draw() {
+      const W = host.clientWidth || 300, H = host.clientHeight || 176;
+      const pad = { l: 40, r: 16, t: 20, b: 34 };
+      const top = Math.ceil(fn(xMax) * 4) / 4;
+      const sx = (v) => pad.l + ((W - pad.l - pad.r) * v) / xMax;
+      const sy = (v) => pad.t + (H - pad.t - pad.b) * (1 - v / top);
+      let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(`${xLabel}与加分的关系，${xLabel} ${ticks.map((t) => `${t} 得 +${fn(t).toFixed(2)}`).join('，')}`)}">`;
+      [0, top / 2, top].forEach((v) => {
+        const y = Math.round(sy(v)) + 0.5;
+        s += `<line class="${v ? 'gl' : 'bl'}" x1="${pad.l}" x2="${W - pad.r}" y1="${y}" y2="${y}"/><text class="ax" x="${pad.l - 8}" y="${y + 3.5}" text-anchor="end">+${+v.toFixed(3)}</text>`;
+      });
+      // 按几何间隔取样，线性横轴上对数曲线开头的陡峭段也能画平滑
+      const lo = 1e-3;
+      const samples = [0];
+      for (let i = 0; i <= 96; i++) samples.push(lo * (xMax / lo) ** (i / 96));
+      const pts = samples.map((v) => `${sx(v).toFixed(1)} ${sy(fn(v)).toFixed(1)}`);
+      s += `<path class="area" d="M${pts.join('L')}L${sx(xMax).toFixed(1)} ${sy(0)}L${sx(0)} ${sy(0)}Z"/>`;
+      s += `<path class="ln" d="M${pts.join('L')}"/>`;
+      if (sx(ticks[0]) - sx(0) > 26) s += `<text class="ax" x="${sx(0)}" y="${H - pad.b + 16}" text-anchor="middle">0</text>`;
+      ticks.forEach((t, i) => {
+        const cx = sx(t), cy = sy(fn(t));
+        const lab = `${K.fmt.int(t)} ${unit} → +${fn(t).toFixed(2)}`;
+        s += `<line class="gl" x1="${cx}" x2="${cx}" y1="${cy + 6}" y2="${sy(0)}" stroke-dasharray="2 3"/>`;
+        s += `<g class="cpt" tabindex="0" role="img" aria-label="${esc(lab)}" data-tip="${esc(lab)}"><circle class="hit" cx="${cx}" cy="${cy}" r="12"/><circle class="d" cx="${cx}" cy="${cy}" r="4.5"/></g>`;
+        s += `<text class="ax" x="${cx}" y="${H - pad.b + 16}" text-anchor="middle">${t >= 1000 ? `${t / 1000}k` : t}</text>`;
+        if (i === ticks.length - 1) s += `<text class="val-l" x="${cx - 8}" y="${cy - 9}" text-anchor="end">+${fn(t).toFixed(2)}</text>`;
+      });
+      s += `<text class="ax-title end" x="${W - pad.r}" y="${H - 3}">${esc(xLabel)} →</text>`;
+      host.innerHTML = `${s}</svg>`;
+    }
+    new ResizeObserver(draw).observe(host);
+    draw();
+  }
+  curve($('#cLines'), { fn: (x) => S.lines * Math.log10(1 + x), xMax: 3000, ticks: [100, 1000, 3000], xLabel: '改动行', unit: '行' });
+  curve($('#cCommits'), { fn: (x) => S.commits * Math.log2(1 + x), xMax: 30, ticks: [1, 3, 10, 30], xLabel: 'commit 数', unit: '个' });
+
+  // ───────── 02 计分因子：模型系数表 ─────────
+  (() => {
+    const families = [...new Set(allModels.map((m) => m.family))].sort((a, b) => (a === '其他') - (b === '其他'));
+    const tint = (w) => (w <= 1 ? 0 : Math.round(((w - 1) / (wMax - 1 || 1)) * 34));
+    const chip = (m) => {
+      const neg = m.weight < 1;
+      const body = m.pattern
+        ? `<div class="t-h">${esc(m.label)}</div><div class="t-row"><span class="t-v">×${m.weight}</span><span class="t-l">${neg ? '扣分工具' : '模型系数'}</span></div><div class="t-l" style="margin-top:4px">识别：<code>${esc(m.pattern.source)}</code></div>`
+        : `<div class="t-h">${esc(m.label)}</div><div class="t-row"><span class="t-v">×${m.weight}</span><span class="t-l">没有识别到任何 AI 署名</span></div>`;
+      return `<span class="mchip${neg ? ' is-neg' : ''}" style="--t:${tint(m.weight)}%" tabindex="0" role="note" aria-label="${esc(`${m.label}，系数 ${m.weight}${neg ? '，扣分' : ''}${m.pattern ? `，识别规则 ${m.pattern.source}` : '，没有识别到任何 AI 署名'}`)}" data-tip-html="${esc(body)}">${neg ? K.icon('alert-triangle', 12, 'ic') : ''}${esc(m.short)} <b>${w2(m.weight)}</b></span>`;
+    };
+    $('#mtab').innerHTML = families.map((f) => `<span class="fam">${esc(f)}</span><div class="mchips">${allModels.filter((m) => m.family === f).sort((a, b) => b.weight - a.weight).map(chip).join('')}</div>`).join('');
+    const negs = R.models.filter((m) => m.weight < 1);
+    $('#mlegend').innerHTML = `<span class="key grad" style="--k:transparent">底色越深，系数越高（×1 → ×${wMax}）</span>`
+      + (negs.length ? `<span class="key neg" style="--k:transparent">系数低于 1 的扣分工具：${negs.map((m) => esc(m.label)).join('、')}</span>` : '');
+  })();
+
+  // ───────── 03 模型分布 ─────────
+  (() => {
+    const rows = SUM.models.filter((m) => m.count > 0).sort((x, y) => y.count - x.count);
+    if (!rows.length) { $('#hbars').innerHTML = K.empty({ title: '没有合入 PR', body: '有合入之后这里会列出各模型的占比' }); return; }
+    const max = Math.max(...rows.map((m) => m.count));
+    const total = rows.reduce((n, m) => n + m.count, 0);
+    const ai = rows.filter((m) => m.label !== R.modelNone.label).reduce((n, m) => n + m.count, 0);
+    $('#mdSub').innerHTML = `共 ${K.fmt.int(total)} 个合入 PR，带 AI 署名的 ${K.fmt.int(ai)} 个（${pct(ai / total)}），识别出 ${rows.length - (rows.some((m) => m.label === R.modelNone.label) ? 1 : 0)} 种模型或工具。灰色为无 AI 标注。`;
+    $('#hbars').innerHTML = rows.map((m) => {
+      const none = m.label === R.modelNone.label;
+      const neg = m.weight < 1;
+      const tip = `<div class="t-h">${esc(m.label)}</div><div class="t-row"><span class="t-key box" style="--k:${none ? 'var(--viz-dim)' : 'var(--leaf)'}"></span><span class="t-v">${K.fmt.int(m.count)}</span><span class="t-l">个合入 PR · 占 ${pct(m.count / total)}</span></div><div class="t-row"><span class="t-key" style="--k:transparent"></span><span class="t-v">×${m.weight}</span><span class="t-l">模型系数${neg ? '（扣分）' : ''}</span></div>`;
+      return `<div class="hb" tabindex="0" role="listitem" aria-label="${esc(`${m.label}，${m.count} 个，占 ${pct(m.count / total)}，系数 ${m.weight}`)}" data-tip-html="${esc(tip)}">
+        <span class="hb-l"><span class="nm">${esc(m.label)}</span>${m.weight !== 1 ? `<span class="w${neg ? ' neg' : ''}">${neg ? K.icon('alert-triangle', 11) : ''}×${m.weight}</span>` : ''}</span>
+        <span class="hb-b"><i class="${none ? 'none' : ''}" style="width:${((m.count / max) * 100).toFixed(2)}%"></i></span>
+        <span class="hb-v">${K.fmt.int(m.count)}<small>${pct(m.count / total)}</small></span>
+      </div>`;
+    }).join('');
+    $('#hbars').setAttribute('role', 'list');
+  })();
+
+  // ───────── 04 合入率散点 ─────────
+  const scatter = (() => {
+    const host = $('#scatter');
+    const read = $('#scRead');
+    const pts = [...resolvedPeople].sort((a, b) => a.resolved - b.resolved || a.rate - b.rate || a.login.localeCompare(b.login));
+    const warned = pts.filter((p) => p.warn);
+    const idle = `${pts.length} 人有已收尾 PR · 警告区内 <b>${warned.length}</b> 人`;
+    $('#scLegend').innerHTML = `<span class="key dot" style="--k:var(--leaf)">一个人</span><span class="key dot" style="--k:var(--rust)">触发合入率警告</span><span class="key zone" style="--k:transparent">警告区</span>`;
+    if (!pts.length) { host.innerHTML = K.empty({ title: '还没有已收尾的 PR', body: '有人合入或被关闭 PR 之后，这里会出现散点' }); host.style.height = 'auto'; return null; }
+    host.tabIndex = 0;
+    host.setAttribute('role', 'group');
+    host.setAttribute('aria-roledescription', '散点图');
+    host.setAttribute('aria-label', `合入率与已收尾 PR 数，${pts.length} 人，警告区内 ${warned.length} 人。用左右方向键逐个查看，回车打开档案。`);
+    let sel = -1;
+    function readout(p) {
+      read.innerHTML = p ? `<b>${esc(p.login)}</b> · 合入率 <b>${pct(p.rate)}</b>（${p.merged} / ${p.resolved}）${p.warn ? ' · 触发合入率警告' : ''}` : idle;
+    }
+    function draw() {
+      const sm = matchMedia('(max-width: 720px)').matches;
+      const W = host.clientWidth || 600, H = host.clientHeight || 320;
+      const pad = { l: sm ? 36 : 44, r: 14, t: 16, b: 36 };
+      const maxX = Math.max(20, ...pts.map((p) => p.resolved)) * 1.15;
+      const x = (v) => pad.l + ((W - pad.l - pad.r) * Math.log10(v)) / Math.log10(maxX);
+      const y = (r) => pad.t + (H - pad.t - pad.b) * (1 - r);
+      let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+      // 警告区：每一级从 resolved 起，合入率低于 rate 的阶梯区域
+      const lines = R.warnLines.filter((l) => l.resolved < maxX);
+      let zoneLabels = '';
+      if (lines.length) {
+        let d = `M${x(lines[0].resolved)},${y(0)}`;
+        let edge = '';
+        lines.forEach((l, i) => {
+          const xEnd = x(Math.min(maxX, lines[i + 1]?.resolved ?? maxX));
+          d += `V${y(l.rate)}H${xEnd}`;
+          edge += `${i ? 'V' : `M${x(l.resolved)},`}${y(l.rate)}H${xEnd}`;
+          const lab = `≥${pct(l.rate)}`;
+          if (!sm || i % 2 === 0) zoneLabels += `<text class="zone-t" x="${x(l.resolved) + 5}" y="${y(l.rate) + 14}">${lab}</text>`;
+        });
+        d += `V${y(0)}Z`;
+        s += `<path class="zone" d="${d}"/>`;
+        s += `<path class="zone-ln" d="${edge}"/>`;
+      }
+      [0, 0.25, 0.5, 0.75, 1].forEach((r) => {
+        const yy = Math.round(y(r)) + 0.5;
+        s += `<line class="${r ? 'gl' : 'bl'}" x1="${pad.l}" x2="${W - pad.r}" y1="${yy}" y2="${yy}" opacity="${r ? 0.9 : 1}"/><text class="ax" x="${pad.l - 8}" y="${yy + 3.5}" text-anchor="end">${r * 100}%</text>`;
+      });
+      const xt = (sm ? [1, 10, 50, 100, 500, 1000] : [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]).filter((t) => t <= maxX);
+      xt.forEach((t) => { s += `<text class="ax" x="${x(t)}" y="${H - pad.b + 16}" text-anchor="middle">${K.fmt.int(t)}</text>`; });
+      s += `<text class="ax-title" x="${W - pad.r}" y="${H - 3}" text-anchor="end">已收尾 PR 数（对数）→</text>`;
+      s += zoneLabels;
+      if (lines.length) {
+        const zx = x(lines[lines.length - 1].resolved) + 6;
+        const zt = `警告区 · ${warned.length} 人`;
+        if (zx + tw(zt) < W - pad.r) s += `<text class="anno-tx" x="${W - pad.r - 4}" y="${y(0) - 8}" text-anchor="end">${zt}</text>`;
+      }
+      pts.forEach((p, i) => {
+        s += `<circle class="pt${p.warn ? ' is-warn' : ''}${i === sel ? ' is-on' : ''}" data-i="${i}" data-person="${esc(p.login)}" cx="${x(p.resolved).toFixed(1)}" cy="${y(p.rate).toFixed(1)}" r="5.5"/>`;
+      });
+      host.innerHTML = `${s}</svg>`;
+    }
+    function select(i, { card = true } = {}) {
+      host.querySelectorAll('.pt.is-on').forEach((c) => c.classList.remove('is-on'));
+      sel = i;
+      if (i < 0) { readout(null); K.personCard.hide(); return; }
+      const c = host.querySelector(`.pt[data-i="${i}"]`);
+      c.classList.add('is-on');
+      c.parentNode.appendChild(c); // 选中点画在最上层
+      readout(pts[i]);
+      if (card) K.personCard.show(c, pts[i].login);
+    }
+    host.addEventListener('pointerover', (e) => {
+      const c = e.target.closest('.pt');
+      if (c) readout(pts[+c.dataset.i]);
+    });
+    host.addEventListener('pointerleave', () => { if (sel < 0 || document.activeElement !== host) readout(null); });
+    host.addEventListener('keydown', (e) => {
+      const n = pts.length;
+      let k = null;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') k = sel < 0 ? 0 : Math.min(n - 1, sel + 1);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') k = sel < 0 ? n - 1 : Math.max(0, sel - 1);
+      else if (e.key === 'Home') k = 0;
+      else if (e.key === 'End') k = n - 1;
+      else if ((e.key === 'Enter' || e.key === ' ') && sel >= 0) { e.preventDefault(); K.openPerson(pts[sel].login); return; }
+      if (k === null) return;
+      e.preventDefault();
+      e.stopPropagation();
+      select(k);
+    });
+    host.addEventListener('focus', () => { if (host.matches(':focus-visible')) select(sel < 0 ? n0() : sel); });
+    host.addEventListener('blur', () => select(-1, { card: false }));
+    const n0 = () => { const w = pts.findIndex((p) => p.warn); return w >= 0 ? w : pts.length - 1; };
+    new ResizeObserver(() => { draw(); if (sel >= 0) select(sel, { card: false }); }).observe(host);
+    draw();
+    readout(null);
+    return { draw };
+  })();
+  $('#rateNote').innerHTML = `<p><b>合入率</b>：${esc(TERMS.rate.text)}</p><p><b>锈红色区域</b>：点落在这里会被标「合入率警告」。${esc(TERMS.warn.text)}</p>`;
+
+  // ───────── 05 M-Team 对照（手写映射与理由照抄旧版，修改 RULES 时同步检查） ─────────
+  (() => {
+    const rows = [
+      ['注册时间', '首次贡献', '首次开 PR、review、评论或提 issue 的时间。GitHub 不向普通成员开放入组时间。'],
+      ['上传量', 'PR 分', '合入 PR 按改动行、commit 数（对数压缩）和模型系数计分。'],
+      ['下载量', '不考核', 'GitHub 上 review 和评论极少，考核协作会误伤大多数人；协作只计入魔力。', true],
+      ['分享率', '合入率', '「给出 ÷ 收到 review」对所有人都是 0/0。合入率看 PR 是否收尾，作用接近 H&R。'],
+      ['做种魔力', `魔力（每周最多计 ${R.weeklyActionCap} 个动作）`, '只能靠持续活跃累积，单周集中刷 PR 收益有限。'],
+      ['新手考核', `${R.newbie.days} 天孵化期`, `合入 PR ≥ ${R.newbie.merged}，活跃周 ≥ ${R.newbie.activeWeeks}。只考一次，没有月考、季考；没通过的人魔力达到 ${R.levels[1].bonus} 也直接孵化。`],
+      ['等级与降级线', '奶蛙进化（只看魔力）', 'M-Team 升级同时看注册时间、上传量和分享率；这里只看魔力，不设降级线，合入率只用于警告。'],
+      ['分享率警告期', '合入率警告线', '已收尾 PR 越多，合入率要求越高。'],
+      ['40 天不登录删号', `${R.dormantDays} 天无动作 → 冬眠`, `只标记不处理；${R.levels[R.dormantExemptLevel].name}及以上豁免。`],
+      ['魔力兑换、连坐', '不映射', '兑换需要保存余额，违背无状态；组织没有邀请树。', true],
+    ];
+    $('#mapping').setAttribute('role', 'list');
+    $('#mapping').innerHTML = rows.map(([from, to, why, off]) => `<div class="mrow${off ? ' off' : ''}" role="listitem">
+      <span class="c from">${esc(from)}</span><span class="c arrow" aria-hidden="true">${K.icon('arrow-right', 14)}</span>
+      <span class="c to"><span tabindex="0" data-tip="${esc(why)}" aria-label="${esc(`${from} 对应 ${to}。${why}`)}">${esc(to)}</span><span class="why" aria-hidden="true">${esc(why)}</span></span>
+    </div>`).join('');
+    $('#mapSrc').innerHTML = `${K.icon('external-link', 13, 'ic')}<span>来源：<a href="https://wiki.m-team.cc/zh-tw/account-rules" target="_blank" rel="noopener">M-Team 帐号规则</a>（2026-08-23 版）</span>`;
+  })();
+
+  // ───────── 06 名词解释 ─────────
+  $('#termsDl').innerHTML = Object.values(TERMS)
+    .map((t) => `<dt>${t.tag ? `<span class="${t.tag}">${t.icon ? K.icon(t.icon, 11) : ''}${esc(t.name)}</span>` : esc(t.name)}</dt><dd>${esc(t.text)}</dd>`).join('');
+
+  // ───────── 07 完整明细表 ─────────
+  const table = (() => {
+    const mainModel = (p) => {
+      const top = (p.modelMix || []).slice().sort((a, b) => b.count - a.count)[0];
+      return top ? top.label : '—';
+    };
+    const NB = { passed: '通过', pending: '考核中', failed: '未通过' };
+    const dim = (v, s) => (v ? s : `<span class="dim">${s}</span>`);
+    const COLUMNS = [
+      { key: 'rank', label: '#', num: true, value: (p) => p.rank, cls: 'dim' },
+      { key: 'login', label: '贡献者', value: (p) => p.login.toLowerCase(), cell: (p) => K.who(p, { size: 22 }), td: 'c-who' },
+      { key: 'level', label: '形态', value: (p) => (p.level ?? -1), cell: (p) => K.levelBadge(p, { size: 16 }) },
+      { key: 'newbie', label: '新手考核', value: (p) => p.newbie.status, cell: (p) => NB[p.newbie.status] || '—' },
+      { key: 'bonus', label: '魔力', num: true, value: (p) => p.bonus, cell: (p) => K.mag(p.bonus), cls: 'strong' },
+      { key: 'bonusPr', label: 'PR 分', num: true, value: (p) => p.bonusPr, cell: (p) => K.mag(p.bonusPr) },
+      { key: 'bonusModel', label: '模型加成', num: true, value: (p) => p.bonusModel, cell: (p) => (p.bonusModel < 0 ? `<span style="color:var(--rust)">${K.fmt.signed(p.bonusModel, K.mag)}</span>` : dim(Math.abs(p.bonusModel) >= 0.05, K.mag(p.bonusModel))) },
+      { key: 'bonusCollab', label: '协作分', num: true, value: (p) => p.bonusCollab, cell: (p) => dim(p.bonusCollab > 0, K.mag(p.bonusCollab)) },
+      { key: 'merged', label: '合入 PR', num: true, value: (p) => p.merged, cell: (p) => dim(p.merged, K.fmt.int(p.merged)) },
+      { key: 'opened', label: '开 PR', num: true, value: (p) => p.opened, cell: (p) => dim(p.opened, K.fmt.int(p.opened)) },
+      { key: 'collab', label: '协作', num: true, value: (p) => p.collab, cell: (p) => dim(p.collab, K.fmt.int(p.collab)) },
+      { key: 'rate', label: '合入率', num: true, value: (p) => p.rate ?? -1, cell: (p) => (p.rate == null ? '<span class="dim">—</span>' : p.warn ? `<span class="tag tag-warn" data-tip="${esc(TERMS.warn.text)}">${pct(p.rate)}</span>` : pct(p.rate)) },
+      { key: 'lines', label: '改动行', num: true, value: (p) => p.lines, cell: (p) => dim(p.lines, K.fmt.int(p.lines)) },
+      { key: 'commits', label: 'commit', num: true, value: (p) => p.commits, cell: (p) => dim(p.commits, K.fmt.int(p.commits)) },
+      { key: 'model', label: '主要模型', value: (p) => mainModel(p), cell: (p) => esc(mainModel(p)) },
+      { key: 'inflight', label: '进行中', num: true, value: (p) => p.inflight, cell: (p) => dim(p.inflight, K.fmt.int(p.inflight)) },
+      { key: 'activeWeeks', label: '活跃周', num: true, value: (p) => p.activeWeeks },
+      { key: 'firstAt', label: '首次贡献', value: (p) => p.firstAt, cell: (p) => K.fmt.date(p.firstAt), cls: 'num' },
+      { key: 'lastAt', label: '最近活动', value: (p) => p.lastAt, cell: (p) => K.fmt.ago(p.daysSinceLast), cls: 'num' },
+    ];
+    const sort = { key: 'rank', dir: 1 };
+    const thead = $('#table thead'), tbody = $('#table tbody');
+    function head() {
+      thead.innerHTML = `<tr>${COLUMNS.map((c) => {
+        const st = c.key === sort.key ? (sort.dir > 0 ? 'ascending' : 'descending') : 'none';
+        return `<th scope="col" class="${c.num ? 'n' : ''} ${c.td || ''}" aria-sort="${st}"><button type="button" class="sb" data-key="${c.key}">${esc(c.label)}</button></th>`;
+      }).join('')}</tr>`;
+    }
+    function body() {
+      const col = COLUMNS.find((c) => c.key === sort.key);
+      const rows = [...PEOPLE].sort((x, y) => {
+        const a = col.value(x), c = col.value(y);
+        return (a < c ? -1 : a > c ? 1 : 0) * sort.dir || x.rank - y.rank;
+      });
+      tbody.innerHTML = rows.map((p) => `<tr>${COLUMNS.map((c) => `<td class="${c.num ? 'n' : ''} ${c.cls || ''} ${c.td || ''}">${c.cell ? c.cell(p) : c.value(p)}</td>`).join('')}</tr>`).join('');
+    }
+    thead.addEventListener('click', (e) => {
+      const b = e.target.closest('.sb');
+      if (!b) return;
+      const key = b.dataset.key;
+      sort.dir = sort.key === key ? -sort.dir : (key === 'rank' || key === 'login' || key === 'model' || key === 'newbie' ? 1 : -1);
+      sort.key = key;
+      head();
+      body();
+      thead.querySelector(`.sb[data-key="${key}"]`).focus();
+    });
+    $('#dtTitle').textContent = `完整明细表（${PEOPLE.length} 人）`;
+    $('#dtSub').textContent = `${COLUMNS.length} 列 · 默认按名次`;
+    const tg = $('#dtToggle'), bd = $('#dtBody');
+    let built = false;
+    function setOpen(on) {
+      if (on && !built) { head(); body(); built = true; }
+      tg.setAttribute('aria-expanded', String(on));
+      bd.hidden = !on;
+      if (on) { bd.classList.remove('swap-in'); void bd.offsetWidth; bd.classList.add('swap-in'); }
+    }
+    tg.addEventListener('click', () => setOpen(tg.getAttribute('aria-expanded') !== 'true'));
+    return { setOpen };
+  })();
+
+  // ───────── 08 口径与盲区（文字照抄旧版） ─────────
+  $('#blindList').innerHTML = [
+    '数据是上传脚本生成的快照，页面不实时拉取；更新频率取决于上传任务的执行间隔。',
+    '只展示人维度的贡献度，不展示任何仓库维度的信息；看板仓库本身的 PR 与 issue 不计入。',
+    `模型来自 commit 的 Co-Authored-By 标记，是提交者自行声明的文本，可以伪造，也可以删掉；只看每个 PR 最后 ${LIM.commits} 个 commit。删掉了标记的 PR 按「无 AI 标注」计，所以 AI 占比是下限。`,
+    'Codex CLI 默认署名「Codex」、Cursor 默认署名「Cursor」，都不含型号，分别按「GPT 其他」和 ×1 计。需要按型号计分时，在工具里把署名配置成带型号的名字（如 Codex 的 commit_attribution）。TRAE CLI 默认署名「TRAE CLI」，按扣分计。',
+    '模型系数按组织偏好整体定档：Claude 强于 GPT；DeepSeek 胜在速度、Gemini 胜在成本，系数低于前两家。不区分版本，也不对应具体的基准测试分数；出现新的型号名或代号时需要更新识别规则。',
+    '直接推送到默认分支的 commit 不计入；仓库要求「所有改动走 PR」之前的贡献会被低估。',
+    'AI 生成的 PR 记在开 PR 的账号名下，账号持有人对内容负责。',
+    `每个 PR 和 issue 只读取前 ${LIM.nested} 条 review 和前 ${LIM.nested} 条评论。`,
+    `「首次贡献」代替入组时间；第一次贡献很早、之后长期不活跃的人，新手考核会按那次贡献起算，之后要靠魔力达到 ${R.levels[1].bonus} 孵化。`,
+  ].map((t) => `<li>${esc(t)}</li>`).join('');
+
+  // ───────── 命令面板 ─────────
+  SECS.forEach((s, i) => K.cmdk.add({ label: `跳到「${s.querySelector('h2').textContent}」`, icon: 'hash', run: () => tocLinks.get(s.id).click() }));
+  K.cmdk.add({ label: '展开 / 收起完整明细表', icon: 'list', run: () => { $('#dtToggle').click(); tocLinks.get('detail').click(); } });
+
+  // ───────── 初始化：#detail 直接展开；有 hash 时滚到对应区块 ─────────
+  const h0 = location.hash.slice(1);
+  if (h0 === 'detail') table.setOpen(true);
+  if (h0 && tocLinks.has(h0)) K.ready(() => setTimeout(() => { document.getElementById(h0).scrollIntoView({ block: 'start' }); spy(); }, 60));
+  spy();
+})();
+</script>
+</body>
+</html>

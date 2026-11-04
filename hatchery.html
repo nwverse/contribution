@@ -1,0 +1,889 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>孵化台 · 奶蛙宇宙</title>
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="assets/tokens.css">
+<!-- 读取 data/board.json 后加载 engine.js、assets/derive.js、icons.js、kit.js，再执行下方 type="text/x-nw-page" 的页面脚本 -->
+<script src="assets/boot.js"></script>
+<style>
+  /* 本页只写布局与少量图形样式；颜色、字号、圆角、时长一律用令牌 */
+
+  /* ── 首屏：标题 + 导语 + 孵化漏斗 ── */
+  .hero-in { padding: var(--s-6) var(--s-8) 0; }
+  .hero-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-8); align-items: start; }
+  .hero-top .headline { margin-top: var(--s-3); }
+  .hero-top .lede { max-width: 40em; }
+  .hero-side { padding-top: 0; }
+  .soon { width: 288px; padding: var(--s-4); display: grid; gap: 10px; }
+  .soon .label .ic { color: var(--rust); }
+  .soon-m { display: flex; align-items: center; gap: 10px; font-size: var(--fs-sm); color: var(--ink-2); }
+  .soon-m b { font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
+  .soon-m .av-stack > * { box-shadow: 0 0 0 2px var(--surface-2); }
+  .soon-s { font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.7; }
+  .soon-s .pname { font-size: var(--fs-sm); }
+  .soon .link { justify-self: start; font-size: var(--fs-xs); }
+  .fx-wrap { position: relative; padding: var(--s-6) var(--s-8) var(--s-5); }
+  .fx-h { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; margin-bottom: var(--s-3); }
+  .fx-h .title { font-size: var(--fs-sm); font-weight: 650; color: var(--ink-2); }
+  .fx-h .hint { margin-left: auto; font-size: var(--fs-xs); color: var(--ink-3); }
+  #funnel { position: relative; min-height: 120px; }
+  #funnel svg { display: block; overflow: visible; }
+  .fx-link { opacity: 0.2; transition: opacity var(--dur-2) var(--ease-out); }
+  .fx-node { cursor: pointer; outline: none; }
+  .fx-node .bx { transition: opacity var(--dur-2) var(--ease-out); }
+  .fx-node:focus-visible .ring-f { stroke: var(--focus); stroke-width: 2; }
+  .ring-f { fill: none; stroke: transparent; }
+  .fx-dim .fx-link { opacity: 0.08; }
+  .fx-dim .fx-link.on { opacity: 0.42; }
+  .fx-dim .fx-node:not(.on) .bx, .fx-dim .fx-node:not(.on) text { opacity: 0.4; }
+  .fx-t1 { font-size: var(--fs-sm); font-weight: 650; fill: var(--ink); }
+  .fx-t2 { font-size: var(--fs-xs); fill: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .fx-big { font-family: var(--font-display); font-size: var(--fs-4xl); font-weight: 700; fill: var(--ink); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .fx-num { font-size: var(--fs-lg); font-weight: 700; fill: var(--ink); font-variant-numeric: tabular-nums; }
+  .fx-l2 { font-size: var(--fs-sm); fill: var(--ink-2); font-weight: 560; }
+  .fx-l2 tspan.n { font-weight: 700; fill: var(--ink); font-variant-numeric: tabular-nums; }
+  .fx-l2 tspan.p { fill: var(--ink-3); font-size: var(--fs-xs); font-weight: 500; }
+  .fx-in .fx-link { animation: fx-link var(--dur-6) var(--ease-out) both; }
+  .fx-in .fx-node .bx { animation: fx-grow var(--dur-5) var(--ease-spring) both; transform-box: fill-box; transform-origin: 0 50%; }
+  @keyframes fx-link { from { opacity: 0; } }
+  @keyframes fx-grow { from { transform: scaleX(0.2); opacity: 0; } }
+  .fx-foot { display: flex; gap: var(--s-2) var(--s-5); flex-wrap: wrap; padding: var(--s-3) var(--s-8) var(--s-5); border-top: 1px solid var(--line-soft); font-size: var(--fs-xs); color: var(--ink-3); }
+  .fx-foot b { color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+
+  /* 手机：漏斗重排为三段条 + 明细 */
+  .fm { display: grid; gap: var(--s-4); }
+  .fm-bar { display: flex; gap: 2px; height: 14px; }
+  .fm-bar i { border-radius: 3px; min-width: 6px; }
+  .fm-g { display: grid; gap: 6px; }
+  .fm-gh { display: flex; align-items: baseline; gap: 8px; font-size: var(--fs-sm); font-weight: 650; }
+  .fm-gh .key { font-size: var(--fs-sm); font-weight: 650; color: var(--ink); }
+  .fm-gh .n { margin-left: auto; font-variant-numeric: tabular-nums; }
+  .fm-gh .pc { font-size: var(--fs-xs); font-weight: 500; color: var(--ink-3); min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+  .fm-sub { display: grid; grid-template-columns: minmax(0, 1fr) 90px 26px; align-items: center; gap: 10px; padding-left: 15px; font-size: var(--fs-xs); color: var(--ink-2); min-height: 28px; border-radius: var(--r-sm); }
+  .fm-sub .meter { height: 4px; }
+  .fm-sub b { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+  button.fm-sub { width: 100%; text-align: left; }
+  button.fm-sub:active { background: var(--surface-press); }
+
+  /* ── 看板工具条 ── */
+  .bar { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; margin-bottom: var(--s-4); }
+  .bar .search { width: 220px; }
+  .bar .sort { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .bar .sort .label { white-space: nowrap; }
+
+  .res { display: flex; align-items: center; gap: var(--s-3); margin: calc(var(--s-1) * -1) 0 var(--s-4); font-size: var(--fs-xs); color: var(--ink-3); }
+  .res[hidden] { display: none; }
+  .chip.is-zero { opacity: 0.55; }
+  .res b { color: var(--ink); font-weight: 680; }
+  .res .link { font-size: var(--fs-xs); }
+  /* ── 分组看板：每组一条泳道 ── */
+  #board { position: relative; display: grid; gap: var(--s-8); }
+  .lane-h { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-3); flex-wrap: wrap; }
+  .lane-h .card-icon { width: 30px; height: 30px; }
+  .lane-h .card-icon.rust { background: var(--rust-soft); color: var(--rust); box-shadow: none; }
+  .lane-h h3 { font-size: var(--fs-lg); font-weight: 680; letter-spacing: -0.005em; }
+  .lane-h .cnt { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .lane-h p { flex-basis: 100%; margin: -6px 0 0 42px; font-size: var(--fs-xs); color: var(--ink-3); }
+  .lane-g { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(262px, 1fr)); gap: var(--s-4); }
+  .lane-empty { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: var(--s-4) var(--s-5); border-radius: var(--r-lg); border: 1px dashed var(--line-strong); font-size: var(--fs-sm); color: var(--ink-3); }
+  .lane-more { grid-column: 1 / -1; justify-self: center; }
+
+  /* 蛙卵卡 */
+  .egg { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4) var(--s-4) var(--s-4); transition: box-shadow var(--dur-3) var(--ease-out), border-color var(--dur-2); }
+  .egg:hover { box-shadow: var(--sh-hl), var(--sh-2); border-color: var(--line); }
+  .egg.is-flash { animation: flash 1.6s var(--ease-out); }
+  @keyframes flash { 0%, 40% { box-shadow: var(--sh-hl), 0 0 0 2px var(--yolk), 0 0 0 7px var(--yolk-wash); } }
+  .egg-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--s-3); }
+  .egg-top .who { font-size: var(--fs-md); }
+  .egg-top .tag { height: 18px; padding: 0 6px; }
+  .egg-req { display: grid; gap: 7px; }
+  .rq { display: grid; grid-template-columns: 52px minmax(0, 1fr) 54px; align-items: center; gap: 10px; font-size: var(--fs-xs); color: var(--ink-2); }
+  .rq .l { white-space: nowrap; }
+  .rq .l[data-tip] { text-decoration: underline dotted var(--ink-4); text-underline-offset: 3px; cursor: help; }
+  .rq .v { justify-self: end; display: inline-flex; align-items: center; gap: 0; font-variant-numeric: tabular-nums; color: var(--ink-3); white-space: nowrap; }
+  .rq .v b { color: var(--ink); font-weight: 680; font-size: var(--fs-sm); }
+  .rq .v .ic { color: var(--leaf); margin-right: 3px; }
+  .rq .v b { margin-right: 1px; }
+  .rq .meter { height: 5px; }
+  .rq.or { padding-top: 7px; border-top: 1px dashed var(--line); }
+  .rq.or .l { color: var(--ink-3); }
+  .rq.or .l em { display: inline-block; font-style: normal; margin-right: 3px; color: var(--ink-3); } /* inline-block：虚线下划线只落在「魔力」上 */
+  .egg-hint { display: flex; align-items: flex-start; gap: 8px; font-size: var(--fs-xs); line-height: 1.55; color: var(--ink-2); }
+  .egg-hint .ic { margin-top: 2px; color: var(--ink-3); }
+  .egg .callout { padding: 8px 10px; font-size: var(--fs-xs); }
+  .egg .callout .ic { margin-top: 2px; }
+  .egg .callout span, .egg-hint span, .lede, .co-panel-h { text-wrap: pretty; } /* 避免末行只剩一个字 */
+  .egg-foot { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: var(--s-2); border-top: 1px solid var(--line-soft); font-size: var(--fs-2xs); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .egg-foot .spacer { flex: 1; }
+  .egg-foot .due { color: var(--rust); font-weight: 650; }
+  .egg-foot .act { display: inline-flex; align-items: center; gap: 4px; color: var(--leaf-ink); font-weight: 600; }
+
+  /* ── 批次孵化率 ── */
+  .co-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
+  #cohort { margin-top: var(--s-3); height: 236px; }
+  #cohort .seg-hit { fill: transparent; }
+  #cohort .co-seg { transition: opacity var(--dur-2) var(--ease-out); }
+  #cohort .band.sel { fill: var(--surface-hover); opacity: 1; }
+  #cohort .ax.sel { fill: var(--ink); font-weight: 700; }
+  .co-note { font-size: var(--fs-xs); color: var(--ink-3); padding-left: 10px; border-left: 1px solid var(--line); }
+  #cohort .n-l { font-size: 10px; fill: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .co-panel { margin-top: var(--s-4); padding: var(--s-4) var(--s-5); }
+  .co-panel-h { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; font-size: var(--fs-sm); color: var(--ink-2); }
+  .co-panel-h b { color: var(--ink); font-weight: 680; }
+  .co-panel-h .r { margin-left: auto; font-size: var(--fs-xs); color: var(--ink-3); }
+  .co-groups { display: grid; gap: 0; margin-top: var(--s-3); }
+  .co-g { display: grid; grid-template-columns: 128px minmax(0, 1fr); align-items: start; gap: var(--s-4); padding: 10px 0; border-top: 1px solid var(--line-soft); }
+  .co-g h5 { display: flex; align-items: center; gap: 6px; height: 26px; font-size: var(--fs-xs); font-weight: 650; color: var(--ink-2); }
+  .co-g h5 .n { color: var(--ink-3); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .co-g ul { display: flex; flex-wrap: wrap; gap: 6px 22px; }
+  .co-g li { display: inline-flex; align-items: center; gap: 8px; min-width: 0; height: 26px; font-size: var(--fs-sm); }
+  .co-g li .meta { font-size: var(--fs-xs); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .co-g .none { display: inline-flex; align-items: center; height: 26px; font-size: var(--fs-xs); color: var(--ink-3); }
+
+  /* ── 未孵化（可折叠） ── */
+  .fold-h { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-4); width: 100%; padding: var(--s-4) var(--s-5); text-align: left; border-radius: var(--r-xl); transition: background-color var(--dur-1); }
+  .fold-h:hover { background: var(--surface-hover); }
+  .fold-h .t { font-size: var(--fs-lg); font-weight: 680; }
+  .fold-h .s { margin-top: 2px; font-size: var(--fs-xs); color: var(--ink-3); }
+  .fold-h .chev { transition: transform var(--dur-4) var(--ease-spring); color: var(--ink-3); }
+  .fold[data-open="true"] .fold-h { border-radius: var(--r-xl) var(--r-xl) 0 0; }
+  .fold[data-open="true"] .fold-h .chev { transform: rotate(180deg); }
+  .fold-b { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur-5) var(--ease-spring); }
+  .fold[data-open="true"] .fold-b { grid-template-rows: 1fr; }
+  .fold-b > div { overflow: hidden; min-height: 0; }
+  .fold-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-4); padding: var(--s-4) var(--s-5); border-top: 1px solid var(--line-soft); }
+  .fs .k { font-size: var(--fs-xs); color: var(--ink-3); }
+  .fs .v { margin-top: 2px; font-family: var(--font-display); font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .fs .v small { margin-left: 3px; font-size: var(--fs-xs); font-weight: 600; color: var(--ink-3); letter-spacing: 0; }
+  .fs .d { font-size: var(--fs-2xs); color: var(--ink-3); }
+  .fl { --cols: minmax(150px, 1.3fr) 150px minmax(150px, 1fr) 96px 120px; }
+  .fl .lrow { gap: var(--s-4); }
+  .fl .mg { display: grid; grid-template-columns: minmax(0, 1fr) 64px; align-items: center; gap: 10px; }
+  .fl .mg .meter { height: 5px; }
+  .fl .mg span { text-align: right; font-size: var(--fs-xs); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .fl .mg span b { color: var(--ink); font-weight: 680; }
+  .fl .tst { font-size: var(--fs-xs); color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .fl .tst b { color: var(--ink); font-weight: 650; }
+  .fl .tst b.ok { color: var(--leaf-ink); }
+  .fl .sm { font-size: var(--fs-xs); color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  .rules { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-5); }
+  .rules h4 { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 650; margin-bottom: 4px; }
+  .rules h4 .ic { color: var(--ink-3); }
+  .rules p { font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.65; }
+
+  @media (max-width: 1100px) {
+    .hero-in { padding: var(--s-5) var(--s-6) 0; }
+    .fx-wrap { padding: var(--s-5) var(--s-6) var(--s-4); }
+    .fx-foot { padding: var(--s-3) var(--s-6) var(--s-4); }
+    .fl { --cols: minmax(150px, 1.3fr) 140px minmax(130px, 1fr) 96px; }
+    .fl .c-eta { display: none; }
+    .fold-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 720px) {
+    .hero-in { padding: var(--s-5) var(--s-4) 0; }
+    .hero-top { grid-template-columns: 1fr; gap: 0; }
+    .hero-side { padding: var(--s-4) 0 0; }
+    .soon { width: auto; }
+    .fx-wrap { padding: var(--s-5) var(--s-4) var(--s-4); }
+    .fx-h .hint { display: none; }
+    .fx-foot { padding: var(--s-3) var(--s-4) var(--s-4); }
+    .bar { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
+    .bar .search { width: 100%; }
+    .bar .sort { margin-left: 0; justify-content: space-between; }
+    .bar .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 calc(var(--gutter) * -1); padding: 2px var(--gutter); }
+    .bar .chips::-webkit-scrollbar { display: none; }
+    .lane-g { grid-template-columns: 1fr; gap: var(--s-3); }
+    .lane-h p { margin-left: 0; margin-top: -4px; }
+    #board { gap: var(--s-6); }
+    .co-g { grid-template-columns: 1fr; gap: 4px; }
+    .co-g ul { gap: 4px 16px; }
+    .co-panel { padding: var(--s-4); }
+    #cohort { height: 210px; }
+    .fold-h { padding: var(--s-4); gap: var(--s-3); }
+    .fold-h .t { font-size: var(--fs-md); }
+    .fold-stats { padding: var(--s-4); gap: var(--s-3); }
+    .fl { --cols: minmax(0, 1fr) 112px; }
+    .fl .c-test, .fl .c-last { display: none; }
+    .fl .lrow { padding-left: var(--s-4); padding-right: var(--s-4); }
+    .fl .mg { grid-template-columns: 1fr; gap: 4px; }
+    .fl .mg span { text-align: right; }
+    .rules { grid-template-columns: 1fr; gap: var(--s-4); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fx-in .fx-link, .fx-in .fx-node .bx { animation: none; }
+  }
+</style>
+</head>
+<body>
+<header id="appbar"></header>
+
+<main class="page">
+  <!-- 首屏：标题 + 孵化漏斗 -->
+  <section class="section">
+    <div class="card card-hero">
+      <div class="hero-in">
+        <div class="hero-top">
+          <div>
+            <span class="eyebrow" id="eyebrow"></span>
+            <h1 class="headline" id="headline"></h1>
+            <p class="lede" id="lede"></p>
+          </div>
+          <div class="hero-side" id="heroSide"></div>
+        </div>
+      </div>
+      <div class="fx-wrap">
+        <div class="fx-h"><span class="title">孵化漏斗</span><span class="hint" id="fxHint">悬停看占比与名字，点击跳到对应分组</span></div>
+        <div id="funnel"></div>
+      </div>
+      <div class="fx-foot" id="fxFoot"></div>
+    </div>
+  </section>
+
+  <!-- 分组看板 -->
+  <section class="section" id="boardSec">
+    <div class="sec-h">
+      <div><span class="eyebrow">蛙卵 · 考核中</span><h2 id="boardTitle">谁离孵化最近</h2><p>每张卡是一个人：三项进度、剩余天数，只差一项的给一句照做就能孵化的话</p></div>
+    </div>
+    <div class="bar">
+      <label class="search">
+        <svg class="ic" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="text" placeholder="筛选账号" aria-label="筛选账号" autocomplete="off" spellcheck="false" data-focus-fallback><kbd class="only-kbd">/</kbd>
+      </label>
+      <div class="chips" id="chips" role="group" aria-label="筛选"></div>
+      <div class="sort"><span class="label">排序</span><div id="sortSeg" aria-label="排序方式"></div></div>
+    </div>
+    <div class="res" id="res" role="status" hidden></div>
+    <div id="board"></div>
+  </section>
+
+  <!-- 批次孵化率 -->
+  <section class="section">
+    <div class="sec-h">
+      <div><span class="eyebrow">按首次贡献周分批</span><h2>每一批新人孵化了多少</h2><p id="coSub"></p></div>
+    </div>
+    <div class="card card-pad">
+      <div class="co-head">
+        <div class="legend" id="coLegend"></div>
+        <div id="coSeg" aria-label="度量"></div>
+      </div>
+      <div id="cohort"></div>
+      <div class="panel co-panel" id="coPanel" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- 未孵化 -->
+  <section class="section">
+    <div class="card fold" id="fold" data-open="false">
+      <button type="button" class="fold-h" id="foldBtn" aria-expanded="false" aria-controls="foldBody"></button>
+      <div class="fold-b" id="foldBody" role="region" aria-labelledby="foldBtn"><div id="foldIn" inert></div></div>
+    </div>
+  </section>
+
+  <!-- 口径 -->
+  <section class="section">
+    <div class="sec-h">
+      <div><span class="eyebrow">口径</span><h2>孵化怎么算</h2></div>
+    </div>
+    <div class="card card-pad">
+      <div class="rules" id="rules"></div>
+    </div>
+  </section>
+</main>
+
+<script type="text/x-nw-page">
+(function () {
+  const K = NWK, { esc, icon, mag, fmt } = K;
+  const $ = (s, r = document) => r.querySelector(s);
+  const R = NW.RULES, NB = R.newbie;
+  K.appHeader($('#appbar'), { active: 'c4' });
+
+  // ───────── 数据（全部来自 NW） ─────────
+  const P = NW.people;
+  const TOTAL = P.length;
+  const hatched = P.filter((p) => p.level !== null);
+  const passed = hatched.filter((p) => p.newbie.status === 'passed');
+  const magicHatched = hatched.filter((p) => p.newbie.status !== 'passed'); // 没通过考核、靠魔力 ≥50 孵化
+  const eggs = P.filter((p) => p.newbie.status === 'pending' && p.level === null);
+  const failed = P.filter((p) => p.newbie.status === 'failed' && p.level === null);
+  const DUE = 10;
+  const W0 = NW.W[NW.last];
+
+  const H = new Map(eggs.map((p) => [p.login, K.hatchHint(p)]));
+  const groupOf = (p) => (H.get(p.login).oneLeft ? 'one' : p.newbie.daysLeft <= DUE ? 'due' : 'prog');
+  // 离孵化的完成度：考核两项的平均完成度与「魔力 / 50」取大
+  const done = (p) => Math.max(Math.min(1, p.bonus / R.hatchBonus), (Math.min(p.newbie.merged, NB.merged) / NB.merged + Math.min(p.newbie.activeWeeks, NB.activeWeeks) / NB.activeWeeks) / 2);
+  const isNewThisWeek = (p) => p.firstAt >= W0;
+  const activeNow = (p) => p.tw > 0;
+  const G = {
+    one: eggs.filter((p) => groupOf(p) === 'one'),
+    due: eggs.filter((p) => groupOf(p) === 'due'),
+    prog: eggs.filter((p) => groupOf(p) === 'prog'),
+  };
+  const failedActive = failed.filter((p) => !p.dormant);
+  const failedSleep = failed.filter((p) => p.dormant);
+  const pct = (a, b) => (b ? fmt.pct(a / b) : '—');
+
+  // ───────── 首屏文案 ─────────
+  $('#eyebrow').innerHTML = `${icon('egg', 12)}孵化台 · ${K.week.asOf()}`;
+  $('#headline').innerHTML = `${eggs.length} 人在孵化，<mark>${G.one.length} 人只差一项</mark>`;
+  const newEggs = eggs.filter(isNewThisWeek);
+  $('#lede').innerHTML = `${TOTAL} 位贡献者里 <span class="n">${hatched.length}</span> 人已孵化（${passed.length} 人通过考核，${magicHatched.length} 人靠魔力）。`
+    + `<span class="n">${eggs.length}</span> 人还在考核期，其中 <span class="n">${G.due.length}</span> 人两项都还差且 ${DUE} 天内到期${newEggs.length ? `，${newEggs.length} 人本周刚来` : ''}；另有 ${failed.length} 人考核期满未孵化。`;
+  const minD = Math.min(...eggs.map((p) => p.newbie.daysLeft));
+  const soon = eggs.filter((p) => p.newbie.daysLeft === minD).sort((a, b) => a.login.localeCompare(b.login));
+  $('#heroSide').innerHTML = `<div class="panel soon"><div class="label">${icon('hourglass', 13)}最先到期</div>`
+    + `<div class="soon-m"><span class="av-stack">${soon.slice(0, 4).map((p) => `<span data-person="${esc(p.login)}" tabindex="0" role="button" aria-label="${esc(p.login)}，查看档案">${K.avatar(p.login, 28)}</span>`).join('')}</span>`
+    + `<span><b class="num">${soon.length}</b> 人剩 <b class="num">${minD}</b> 天</span></div>`
+    + `<div class="soon-s">${soon.slice(0, 3).map((p) => K.pname(p.login, { avatar: false })).join('、')}${soon.length > 3 ? ` 等 ${soon.length} 人` : ''}<br>${fmt.md(soon[0].newbie.end)}考核截止</div>`
+    + `<button type="button" class="link" id="soonGo">看 ${DUE} 天内到期的 ${G.due.length} 人${icon('arrow-right', 14)}</button></div>`;
+  $('#fxFoot').innerHTML = `<span>新手考核：首次贡献起 <b>${NB.days}</b> 天内合入 ≥<b>${NB.merged}</b> 且活跃周 ≥<b>${NB.activeWeeks}</b></span><span>或魔力 ≥<b>${R.hatchBonus}</b> 直接孵化</span><span id="fxRate"></span>`;
+
+  // ───────── 孵化漏斗（桑基；手机端重排为三段条） ─────────
+  const C = {
+    all: 'var(--ink-3)', hatched: 'var(--leaf)', egg: 'var(--yolk-deep)', failed: 'var(--ink-4)',
+    passed: 'var(--leaf)', magic: 'var(--water)', one: 'var(--yolk-deep)', due: 'var(--rust)', prog: 'color-mix(in srgb, var(--yolk-deep) 42%, var(--bg-sunken))',
+    fAct: 'var(--ink-3)', fSleep: 'var(--ink-4)',
+  };
+  const SOFT = { hatched: 'var(--leaf-soft)', egg: 'var(--yolk-soft)', failed: 'var(--surface-2)' };
+  const L1 = [
+    { id: 'hatched', name: '已孵化', list: hatched, kids: [
+      { id: 'passed', name: '考核通过', list: passed, go: 'c5' },
+      { id: 'magic', name: '魔力补孵化', list: magicHatched, go: 'c5' }] },
+    { id: 'egg', name: '蛙卵 · 考核中', short: '蛙卵', list: eggs, kids: [
+      { id: 'one', name: '只差一项', list: G.one, go: 'one' },
+      { id: 'due', name: `${DUE} 天内到期`, list: G.due, go: 'due' },
+      { id: 'prog', name: '进行中', list: G.prog, go: 'prog' }] },
+    { id: 'failed', name: '未孵化', list: failed, kids: [
+      { id: 'fAct', name: '仍在贡献', list: failedActive, go: 'fold' },
+      { id: 'fSleep', name: '冬眠', list: failedSleep, go: 'fold' }] },
+  ];
+  const DESC = {
+    hatched: '通过新手考核，或魔力 ≥50', egg: '首次贡献 30 天内，还在考核', failed: '考核期满，魔力也不到 50',
+    passed: '30 天内合入 ≥3 且活跃周 ≥2', magic: '没通过考核，魔力攒到 50 孵化', one: '考核两项只差一项',
+    due: `剩余 ≤${DUE} 天，两项都还差`, prog: `剩余 >${DUE} 天，两项都还差`, fAct: '近 40 天有动作，仍可补孵化', fSleep: '40 天无动作',
+  };
+  const nodeTip = (n, parent) => {
+    const names = n.list.slice().sort((a, b) => b.bonus - a.bonus).map((p) => p.login);
+    return `<div class="t-h">${esc(n.short || n.name)}</div>`
+      + `<div class="t-row"><span class="t-key box" style="--k:${C[n.id] || C.all}"></span><span class="t-v">${n.list.length} 人</span><span class="t-l">${parent ? `占${esc(parent.short || parent.name)} ${pct(n.list.length, parent.list.length)} · ` : ''}占全部 ${pct(n.list.length, TOTAL)}</span></div>`
+      + (DESC[n.id] ? `<div class="t-l" style="margin-top:4px">${esc(DESC[n.id])}</div>` : '')
+      + (names.length ? `<div class="t-l" style="margin-top:4px;max-width:260px;white-space:normal">${esc(names.slice(0, 5).join('、'))}${names.length > 5 ? ` 等 ${names.length} 人` : ''}</div>` : '');
+  };
+  let fxDrawn = false;
+  function drawFunnel() {
+    const host = $('#funnel');
+    const Wd = host.clientWidth;
+    if (!Wd) return;
+    if (Wd < 600) { drawFunnelMobile(host); return; }
+    const Hh = 300, gapP = 16, gapK = 5, kidsN = L1.reduce((s, g) => s + g.kids.length, 0);
+    const k = (Hh - gapP * (L1.length - 1) - gapK * (kidsN - L1.length)) / TOTAL;
+    const w0 = 132, w1 = 156, w2 = 9, lab2 = 176;
+    const x2 = Wd - lab2 - w2, x0 = 0;
+    const x1 = Math.round((w0 + x2) / 2 - w1 / 2);
+    // 第二列的块与第三列的子块对齐
+    let y = 0;
+    const g1 = [];
+    L1.forEach((g) => {
+      const kids = g.kids.map((c) => { const h = Math.max(c.list.length * k, c.list.length ? 3 : 0); const r = { ...c, y, h }; y += h + gapK; return r; });
+      y += gapP - gapK;
+      const blockTop = kids[0].y, blockH = kids[kids.length - 1].y + kids[kids.length - 1].h - blockTop;
+      const h = g.list.length * k;
+      g1.push({ ...g, y: blockTop + (blockH - h) / 2, h, kidsL: kids });
+    });
+    const total = y - gapP;
+    const h0 = TOTAL * k, y0 = (total - h0) / 2;
+    const band = (xa, ya, ha, xb, yb, hb) => {
+      const m = (xa + xb) / 2;
+      return `M${xa} ${ya}C${m} ${ya} ${m} ${yb} ${xb} ${yb}L${xb} ${yb + hb}C${m} ${yb + hb} ${m} ${ya + ha} ${xa} ${ya + ha}Z`;
+    };
+    let links = '', nodes = '';
+    let off0 = y0;
+    g1.forEach((g, gi) => {
+      const hh = g.list.length * k;
+      links += `<path class="fx-link" data-a="all" data-b="${g.id}" d="${band(x0 + w0, off0, hh, x1, g.y, g.h)}" style="fill:${C[g.id]};animation-delay:${80 + gi * 70}ms"/>`;
+      off0 += hh;
+      let off1 = g.y;
+      g.kidsL.forEach((c, ci) => {
+        const ch = c.list.length * k;
+        if (ch > 0) links += `<path class="fx-link" data-a="${g.id}" data-b="${c.id}" d="${band(x1 + w1, off1, ch, x2, c.y, c.h)}" style="fill:${C[c.id]};animation-delay:${260 + gi * 70 + ci * 40}ms"/>`;
+        off1 += ch;
+      });
+    });
+    // 根节点
+    nodes += `<g class="fx-node" data-id="all" tabindex="0" role="button" aria-label="${TOTAL} 位贡献者">`
+      + `<rect class="bx" x="${x0}" y="${y0}" width="${w0}" height="${h0}" rx="10" style="fill:var(--surface-2);stroke:var(--line);stroke-width:1"/>`
+      + `<rect class="ring-f" x="${x0 - 3}" y="${y0 - 3}" width="${w0 + 6}" height="${h0 + 6}" rx="12"/>`
+      + `<text class="fx-big" x="${x0 + 18}" y="${y0 + h0 / 2 + 4}">${TOTAL}</text><text class="fx-t2" x="${x0 + 18}" y="${y0 + h0 / 2 + 26}">位贡献者</text>`
+      + '</g>';
+    g1.forEach((g, gi) => {
+      const two = g.h >= 44;
+      const ty = two ? g.y + g.h / 2 - 3 : g.y + g.h / 2 + 5;
+      nodes += `<g class="fx-node" data-id="${g.id}" tabindex="0" role="button" aria-label="${esc(g.name)} ${g.list.length} 人，占 ${pct(g.list.length, TOTAL)}">`
+        + `<rect class="bx" x="${x1}" y="${g.y}" width="${w1}" height="${g.h}" rx="8" style="fill:${SOFT[g.id]};animation-delay:${120 + gi * 70}ms"/>`
+        + `<rect class="bx" x="${x1}" y="${g.y}" width="4" height="${g.h}" rx="2" style="fill:${C[g.id]};animation-delay:${120 + gi * 70}ms"/>`
+        + `<rect class="ring-f" x="${x1 - 3}" y="${g.y - 3}" width="${w1 + 6}" height="${g.h + 6}" rx="10"/>`
+        + `<text class="fx-t1" x="${x1 + 16}" y="${ty}">${esc(g.name)}</text>`
+        + (two ? `<text x="${x1 + 16}" y="${ty + 20}"><tspan class="fx-num">${g.list.length}</tspan><tspan class="fx-t2" dx="5">人 · ${pct(g.list.length, TOTAL)}</tspan></text>`
+          : `<text class="fx-num" x="${x1 + w1 - 14}" y="${ty}" text-anchor="end">${g.list.length}</text>`)
+        + '</g>';
+      g.kidsL.forEach((c, ci) => {
+        nodes += `<g class="fx-node" data-id="${c.id}" data-parent="${g.id}" tabindex="0" role="button" aria-label="${esc(c.name)} ${c.list.length} 人，占${esc(g.short || g.name)} ${pct(c.list.length, g.list.length)}">`
+          + `<rect class="bx" x="${x2}" y="${c.y}" width="${w2}" height="${Math.max(c.h, 2)}" rx="2.5" style="fill:${C[c.id]};animation-delay:${300 + gi * 70 + ci * 40}ms"/>`
+          + `<rect x="${x2 - 4}" y="${c.y - 4}" width="${lab2 + w2 + 4}" height="${Math.max(c.h, 2) + 8}" fill="transparent"/>`
+          + `<rect class="ring-f" x="${x2 - 3}" y="${c.y - 3}" width="${lab2 + w2 + 2}" height="${Math.max(c.h, 2) + 6}" rx="6"/>`
+          + `<text class="fx-l2" x="${x2 + w2 + 10}" y="${c.y + c.h / 2 + 4.5}">${esc(c.name)}<tspan class="n" dx="6">${c.list.length}</tspan><tspan class="p" dx="5">${pct(c.list.length, g.list.length)}</tspan></text></g>`;
+      });
+    });
+    host.innerHTML = `<svg width="${Wd}" height="${total}" viewBox="0 0 ${Wd} ${total}" class="${fxDrawn ? '' : 'fx-in'}" role="group" aria-label="孵化漏斗">${links}${nodes}</svg>`;
+    fxDrawn = true;
+    wireFunnel(host.querySelector('svg'));
+  }
+  // 节点 → 高亮路径（祖先与子孙）
+  const PARENT = { all: null };
+  L1.forEach((g) => { PARENT[g.id] = 'all'; g.kids.forEach((c) => { PARENT[c.id] = g.id; }); });
+  const FIND = (id) => { if (id === 'all') return { id: 'all', name: '全部贡献者', list: P }; for (const g of L1) { if (g.id === id) return g; for (const c of g.kids) if (c.id === id) return c; } return null; };
+  function wireFunnel(svg) {
+    const lit = (id) => {
+      if (!id) { svg.classList.remove('fx-dim'); svg.querySelectorAll('.on').forEach((e) => e.classList.remove('on')); return; }
+      const on = new Set([id]);
+      let a = id; while (PARENT[a]) { on.add(PARENT[a]); a = PARENT[a]; }
+      if (id === 'all') L1.forEach((g) => { on.add(g.id); });
+      L1.forEach((g) => { if (g.id === id) g.kids.forEach((c) => on.add(c.id)); });
+      svg.classList.add('fx-dim');
+      svg.querySelectorAll('.fx-node').forEach((n) => n.classList.toggle('on', on.has(n.dataset.id)));
+      svg.querySelectorAll('.fx-link').forEach((l) => l.classList.toggle('on', on.has(l.dataset.a) && on.has(l.dataset.b)));
+    };
+    svg.querySelectorAll('.fx-node').forEach((n) => {
+      const id = n.dataset.id;
+      const show = () => { lit(id); const nd = FIND(id); K.tip.show(nodeTip(nd, PARENT[id] && PARENT[id] !== 'all' ? FIND(PARENT[id]) : PARENT[id] === 'all' ? { name: '全部', list: P } : null), n.querySelector('.bx') || n); };
+      n.addEventListener('pointerenter', show);
+      n.addEventListener('pointerleave', () => { lit(null); K.tip.hide(); });
+      n.addEventListener('focus', show);
+      n.addEventListener('blur', () => { lit(null); K.tip.hide(); });
+      n.addEventListener('click', () => goNode(id));
+      n.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goNode(id); } });
+    });
+    svg.querySelectorAll('.fx-link').forEach((l) => {
+      l.addEventListener('pointerenter', () => { lit(l.dataset.b); K.tip.show(nodeTip(FIND(l.dataset.b), FIND(l.dataset.a)), { getBoundingClientRect: () => { const r = l.getBoundingClientRect(); return { left: r.left, width: r.width, top: r.top + r.height / 2 - 2, bottom: r.top + r.height / 2, height: 2 }; } }); });
+      l.addEventListener('pointerleave', () => { lit(null); K.tip.hide(); });
+    });
+  }
+  function drawFunnelMobile(host) {
+    const seg = (g) => `<i style="flex:${g.list.length};background:${C[g.id]}"></i>`;
+    host.innerHTML = `<div class="fm">`
+      + `<div><div class="fm-gh"><span>${TOTAL} 位贡献者</span><span class="n"></span></div><div class="fm-bar" style="margin-top:8px" role="img" aria-label="${L1.map((g) => `${g.name} ${g.list.length} 人`).join('，')}">${L1.map(seg).join('')}</div></div>`
+      + L1.map((g) => `<div class="fm-g"><div class="fm-gh"><span class="key" style="--k:${C[g.id]}">${esc(g.name)}</span><span class="n">${g.list.length}</span><span class="pc">${pct(g.list.length, TOTAL)}</span></div>`
+        + g.kids.map((c) => `<button type="button" class="fm-sub" data-go="${c.go}" aria-label="${esc(c.name)} ${c.list.length} 人"><span>${esc(c.name)}</span><span class="meter"><i style="width:${g.list.length ? (c.list.length / g.list.length * 100).toFixed(1) : 0}%;background:${C[c.id]}"></i></span><b>${c.list.length}</b></button>`).join('')
+        + '</div>').join('')
+      + '</div>';
+    host.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => goNode(FIND_BY_GO(b.dataset.go))));
+  }
+  const FIND_BY_GO = (go) => { for (const g of L1) for (const c of g.kids) if (c.go === go) return c.id; return null; };
+  function goNode(id) {
+    K.tip.hide();
+    const nd = FIND(id);
+    const go = nd && nd.go;
+    if (id === 'egg' || id === 'all') { scrollToEl($('#boardSec')); return; }
+    if (id === 'hatched' || go === 'c5') { K.navigate('c5'); return; }
+    if (id === 'failed' || go === 'fold') { const was = $('#fold').dataset.open === 'true'; setFold(true); setTimeout(() => scrollToEl($('#fold')), was || K.reduced() ? 0 : 320); return; }
+    if (['one', 'due', 'prog'].includes(go)) {
+      if (filtersActive()) clearFilters();
+      if (go === 'prog') { expanded = true; renderBoard(false); }
+      const lane = $(`#lane-${go}`);
+      scrollToEl(lane);
+      setTimeout(() => lane.querySelectorAll('.egg').forEach((c, i) => { c.classList.remove('is-flash'); void c.offsetWidth; if (i < 8) c.classList.add('is-flash'); }), K.reduced() ? 0 : 380);
+    }
+  }
+  const scrollToEl = (el) => { const y = el.getBoundingClientRect().top + scrollY - 76; scrollTo({ top: y, behavior: K.reduced() ? 'auto' : 'smooth' }); };
+
+  // ───────── 看板 ─────────
+  const state = { q: '', member: false, out: false, active: false, nomerge: false, sort: 'near' };
+  let expanded = false;
+  const FILTERS = [
+    { k: 'member', label: '组织成员', test: (p) => p.member },
+    { k: 'out', label: '组织外', test: (p) => !p.member },
+    { k: 'sep' },
+    { k: 'active', label: '本周有动作', test: activeNow },
+    { k: 'nomerge', label: '还没有合入', test: (p) => p.newbie.merged === 0 },
+  ];
+  const filtersActive = () => state.q || state.member || state.out || state.active || state.nomerge;
+  // skip：计算某个 chip 的计数时跳过它所在的维度（组织成员 / 组织外同属一维），计数随其他筛选联动
+  function pass(p, skip) {
+    if (state.q && !p.login.toLowerCase().includes(state.q.toLowerCase())) return false;
+    if (skip !== 'org' && state.member !== state.out && (state.member ? !p.member : p.member)) return false;
+    if (skip !== 'active' && state.active && !activeNow(p)) return false;
+    if (skip !== 'nomerge' && state.nomerge && p.newbie.merged !== 0) return false;
+    return true;
+  }
+  const DIM = { member: 'org', out: 'org', active: 'active', nomerge: 'nomerge' };
+  function updateChipCounts() {
+    FILTERS.forEach((f) => {
+      if (f.k === 'sep') return;
+      const n = eggs.filter((p) => pass(p, DIM[f.k]) && f.test(p)).length;
+      const b = $(`#chips .chip[data-k="${f.k}"]`);
+      b.querySelector('.n').textContent = n;
+      b.classList.toggle('is-zero', n === 0 && !state[f.k]);
+    });
+  }
+  const SORTS = {
+    near: (a, b) => done(b) - done(a) || a.newbie.daysLeft - b.newbie.daysLeft || b.bonus - a.bonus || a.login.localeCompare(b.login),
+    due: (a, b) => a.newbie.daysLeft - b.newbie.daysLeft || done(b) - done(a) || a.login.localeCompare(b.login),
+    magic: (a, b) => b.bonus - a.bonus || a.login.localeCompare(b.login),
+    recent: (a, b) => b.firstAt - a.firstAt || a.login.localeCompare(b.login),
+  };
+  function renderChips() {
+    $('#chips').innerHTML = FILTERS.map((f) => f.k === 'sep' ? '<span class="chip-sep" aria-hidden="true"></span>'
+      : `<button type="button" class="chip" data-k="${f.k}" aria-pressed="${state[f.k]}"><span class="chk">${icon('check', 13)}</span>${f.label}<span class="n">${eggs.filter(f.test).length}</span></button>`).join('');
+  }
+  $('#chips').addEventListener('click', (e) => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    state[b.dataset.k] = !state[b.dataset.k];
+    b.setAttribute('aria-pressed', String(state[b.dataset.k]));
+    renderBoard();
+  });
+  const sortSeg = K.segmented($('#sortSeg'), [
+    { value: 'near', label: '离孵化最近' }, { value: 'due', label: '剩余天数' }, { value: 'magic', label: '魔力' }, { value: 'recent', label: '最近加入' },
+  ], (v) => { state.sort = v; renderBoard(); }, { size: 'sm', value: state.sort });
+  let qT = 0;
+  $('#q').addEventListener('input', (e) => { clearTimeout(qT); qT = setTimeout(() => { state.q = e.target.value.trim(); renderBoard(); }, 90); });
+  $('#q').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.target.value = ''; state.q = ''; renderBoard(); e.target.blur(); } });
+  function clearFilters() {
+    Object.assign(state, { q: '', member: false, out: false, active: false, nomerge: false });
+    $('#q').value = '';
+    renderChips();
+    renderBoard(false);
+  }
+
+  // 可执行提示：在 kit.hatchHint 的判断上按日历给出确切窗口。
+  // 活跃周 = 有合入或协作的不同自然周；本周已有动作（tw>0）时本周已算一周，再补一周只能落在 W1（下周一）之后。
+  const W1 = W0 + NW.WEEK;
+  function hintText(p) {
+    const h = H.get(p.login), nb = p.newbie;
+    if (!h.missing.length) return h.text;
+    const { needM, needW } = h;
+    const by = '截止前'; // 截止日期与时刻在卡片底栏，提示里不重复
+    if (needW === 0) return `${by}再合入 ${needM} 个 PR，就能孵化`;
+    if (needW === 1 && !activeNow(p)) return needM ? `${by}合入 ${needM} 个 PR，就能同时补齐两项` : `${by}有一次合入或协作，就能孵化`;
+    if (needW === 1) {
+      if (nb.end <= W1) return `本周已算一个活跃周，考核期内来不及再补一周；魔力攒到 50 也能孵化（还差 ${mag(h.toMagic)}）`;
+      const win = nb.end < W1 + NW.WEEK ? `${fmt.md(W1)} ${fmt.hm(W1)}–${fmt.hm(nb.end)} 之间` : `${fmt.md(W1)}起`;
+      if (needM === 0) return `${win}再有一次合入或协作，就能孵化`;
+      if (needM === 1) return `${win}合入 1 个 PR，就能同时补齐两项`;
+      return `再合入 ${needM} 个 PR，且 ${win}至少有一次合入或协作，就能孵化`;
+    }
+    return `${needM ? `还差合入 ${needM} 个 PR，并` : ''}在两个不同的自然周各有一次合入或协作`;
+  }
+  const pips = (n, of, miss) => `<div class="pips${miss ? ' miss' : ''}" aria-hidden="true">${Array.from({ length: of }, (_, k) => `<i class="${k < n ? 'on' : ''}"></i>`).join('')}</div>`;
+  const okV = (v, of) => (v >= of ? `${icon('check', 12)}<b>${v}</b>/${of}` : `<b>${v}</b>/${of}`);
+  function card(p, lane) {
+    const nb = p.newbie;
+    const h = H.get(p.login);
+    const needM = h.needM > 0, needW = h.needW > 0;
+    const tags = isNewThisWeek(p) ? '<span class="tag tag-new" title="本周首次贡献">新</span>' : '';
+    const sub = `${p.member ? '组织成员' : '组织外'} · ${fmt.md(p.firstAt)}首次贡献`;
+    const txt = hintText(p);
+    const hint = lane === 'one'
+      ? `<div class="callout leaf">${icon('target', 14)}<span>${esc(txt)}</span></div>`
+      : `<p class="egg-hint">${icon(lane === 'due' ? 'hourglass' : 'info', 13)}<span>${esc(txt)}</span></p>`;
+    return `<article class="card egg" data-key="${esc(p.login)}" aria-label="${esc(`${p.login}：合入 ${nb.merged}/${NB.merged}，活跃周 ${nb.activeWeeks}/${NB.activeWeeks}，魔力 ${mag(p.bonus)}/50，剩 ${nb.daysLeft} 天`)}">`
+      + `<div class="egg-top">${K.who(p, { size: 34, sub, tags })}${K.countdown(nb.daysLeft, { size: 46 })}</div>`
+      + `<div class="egg-req">`
+      + `<div class="rq"><span class="l">合入 PR</span>${pips(Math.min(nb.merged, NB.merged), NB.merged, lane === 'one' && needM)}<span class="v">${okV(nb.merged, NB.merged)}</span></div>`
+      + `<div class="rq"><span class="l" tabindex="0" data-tip="活跃周 = 有合入或协作的不同自然周（周一到周日）">活跃周</span>${pips(Math.min(nb.activeWeeks, NB.activeWeeks), NB.activeWeeks, lane === 'one' && needW)}<span class="v">${okV(nb.activeWeeks, NB.activeWeeks)}</span></div>`
+      + `<div class="rq or"><span class="l" tabindex="0" data-tip="魔力 ≥50 不看考核，直接孵化"><em>或</em>魔力</span><div class="meter water" aria-hidden="true"><i style="width:${Math.min(100, p.bonus / R.hatchBonus * 100).toFixed(1)}%"></i></div><span class="v"><b>${mag(p.bonus)}</b>/50</span></div>`
+      + `</div>${hint}`
+      + `<div class="egg-foot"><span class="${nb.daysLeft <= DUE ? 'due' : ''}">${fmt.md(nb.end)}${nb.daysLeft <= DUE ? ` ${fmt.hm(nb.end)}` : ''} 截止</span><span class="spacer"></span>${activeNow(p) ? `<span class="act">${icon('activity', 11)}本周 +${mag(p.tw)}</span>` : '<span>本周还没有动作</span>'}</div>`
+      + '</article>';
+  }
+  const LANES = [
+    { id: 'one', icon: 'target', cls: 'yolk', title: '只差一项', desc: '合入与活跃周已满足一项，照提示补上另一项就能孵化' },
+    { id: 'due', icon: 'hourglass', cls: 'rust', title: `${DUE} 天内到期`, desc: `两项都还差，考核期剩余 ≤${DUE} 天` },
+    { id: 'prog', icon: 'clock', cls: '', title: '进行中', desc: `两项都还差，考核期剩余超过 ${DUE} 天` },
+  ];
+  function renderBoard(anim = true) {
+    const host = $('#board');
+    const cmp = SORTS[state.sort];
+    const mutate = () => {
+      const mobile = matchMedia('(max-width: 720px)').matches;
+      host.innerHTML = LANES.map((L) => {
+        const all = G[L.id];
+        const list = all.filter(pass).sort(cmp);
+        const cap = L.id === 'prog' && mobile && !expanded && !filtersActive() ? 4 : Infinity;
+        const shown = list.slice(0, cap);
+        const cnt = list.length === all.length ? `${all.length} 人` : `${list.length} / ${all.length} 人`;
+        let body = shown.map((p, i) => {
+          let c = card(p, L.id);
+          if (L.id === 'one' && i === 0) c = c.replace('<div class="egg-req">', '<div class="egg-req">')
+            .replace('<div class="callout leaf">', `<div class="callout leaf">`);
+          return c;
+        }).join('');
+        if (!list.length) body = `<div class="lane-empty">${icon('filter', 15)}<span>${all.length ? '这一组没有符合筛选的人' : '这一组现在没有人'}</span></div>`;
+        if (list.length > shown.length) body += `<button type="button" class="btn lane-more" data-more>${icon('chevron-down', 14)}展开其余 ${list.length - shown.length} 人</button>`;
+        return `<div class="lane" id="lane-${L.id}"><div class="lane-h"><span class="card-icon ${L.cls}">${icon(L.icon, 16)}</span><h3>${L.title}</h3><span class="cnt">${cnt}</span><p>${L.desc}</p></div>`
+          + `<div class="lane-g">${body}</div></div>`;
+      }).join('');
+      const n = eggs.filter(pass).length;
+      $('#res').innerHTML = filtersActive() ? `<span>筛选后 <b class="num">${n}</b> / ${eggs.length} 人</span><button type="button" class="link" data-clear>${icon('x', 13)}清空筛选</button>` : '';
+      $('#res').hidden = !filtersActive();
+      updateChipCounts();
+      if (filtersActive() && !n) {
+        // 给出最近的出路：只取消其中一个条件就有结果的那个
+        const opts = FILTERS.filter((f) => f.k !== 'sep' && state[f.k]).map((f) => ({ f, n: eggs.filter((p) => pass(p, DIM[f.k])).length })).filter((o) => o.n).sort((a, b) => b.n - a.n);
+        const body = opts.length ? `取消「${opts[0].f.label}」能看到 ${opts[0].n} 人。` : state.q ? `没有账号包含「${esc(state.q)}」。` : '换个筛选条件再看看。';
+        const act = (opts.length ? `<button type="button" class="btn btn-sm" data-drop="${opts[0].f.k}">取消「${opts[0].f.label}」</button>` : '') + '<button type="button" class="btn btn-sm btn-ghost" data-clear>清空筛选</button>';
+        host.innerHTML = `<div class="card" data-key="__empty">${K.empty({ art: 'egg', title: '没有符合条件的蛙卵', body, action: `<span class="row" style="gap:8px;justify-content:center">${act}</span>` })}</div>`;
+      }
+    };
+    if (anim) K.flip(host, mutate, { selector: '.egg[data-key]' }); else mutate();
+  }
+  $('#board').addEventListener('click', (e) => {
+    if (e.target.closest('[data-more]')) { expanded = true; renderBoard(); return; }
+    if (e.target.closest('[data-clear]')) { clearFilters(); return; }
+    const dr = e.target.closest('[data-drop]');
+    if (dr) { state[dr.dataset.drop] = false; $(`#chips .chip[data-k="${dr.dataset.drop}"]`).setAttribute('aria-pressed', 'false'); renderBoard(); return; }
+    const c = e.target.closest('.egg');
+    if (c && !e.target.closest('[data-person],[data-tip],a,button')) K.openPerson(c.dataset.key);
+  });
+  matchMedia('(max-width: 720px)').addEventListener('change', () => renderBoard(false));
+  $('#res').addEventListener('click', (e) => { if (e.target.closest('[data-clear]')) clearFilters(); });
+
+  // ───────── 批次孵化率 ─────────
+  const CO = NW.W.map((w, i) => {
+    const c = P.filter((p) => p.firstAt >= w && p.firstAt < w + NW.WEEK);
+    return {
+      i, w, list: c,
+      h: c.filter((p) => p.level !== null), e: c.filter((p) => p.level === null && p.newbie.status === 'pending'), f: c.filter((p) => p.level === null && p.newbie.status !== 'pending'),
+    };
+  });
+  const firstCo = CO.findIndex((c) => c.list.length);
+  const eggCos = CO.filter((c) => c.e.length);
+  const doneCos = CO.filter((c) => c.list.length && !c.e.length);
+  const doneN = doneCos.reduce((s, c) => s + c.list.length, 0), doneH = doneCos.reduce((s, c) => s + c.h.length, 0);
+  // 孵化率只按「整批都已出结果」的批次算：还在考核的批次里先通过的人已计入、会失败的人还没计入，混进来会虚高
+  $('#coSub').textContent = `${CO.filter((c) => c.list.length).length} 批新人。整批考核已结束的 ${doneCos.length} 批共 ${doneN} 人，孵化 ${doneH} 人（${pct(doneH, doneN)}）；最近 ${eggCos.length} 批还有人在考核`;
+  $('#fxRate').innerHTML = `整批考核已结束的新人孵化率 <b>${pct(doneH, doneN)}</b>（${doneH}/${doneN}）`;
+  const SER = [
+    { k: 'h', label: '已孵化', color: 'var(--leaf)' },
+    { k: 'e', label: '蛙卵 · 考核中', color: 'var(--yolk-deep)' },
+    { k: 'f', label: '未孵化', color: 'var(--ink-4)' },
+  ];
+  const coLegend = () => { $('#coLegend').innerHTML = SER.map((s) => `<span class="key" style="--k:${s.color}">${s.label}</span>`).join('') + (coMode === 'pct' ? '<span class="co-note">柱顶数字是这一批的人数</span>' : ''); };
+  // 默认选中：还有人在考核的批次里人数最多的一批（三种状态最可能同时出现）
+  let coMode = 'n', coSel = (eggCos.slice().sort((a, b) => b.list.length - a.list.length || b.i - a.i)[0] || CO[NW.last]).i, coHov = -1, coG = null;
+  K.segmented($('#coSeg'), [{ value: 'n', label: '人数' }, { value: 'pct', label: '占比' }], (v) => { coMode = v; coLegend(); drawCohort(); }, { size: 'sm', value: 'n' });
+  coLegend();
+  const coTip = (c) => {
+    const mH = c.h.filter((p) => p.newbie.status !== 'passed').length;
+    return `<div class="t-h">${esc(K.week.range(c.i))} 首次贡献</div>`
+      + (c.list.length ? SER.filter((s) => c[s.k].length).map((s) => `<div class="t-row"><span class="t-key box" style="--k:${s.color}"></span><span class="t-v">${c[s.k].length}</span><span class="t-l">${s.label}${s.k === 'h' && mH ? `（其中魔力补孵化 ${mH}）` : ''}</span></div>`).join('')
+        + `<div class="t-row" style="margin-top:4px"><span class="t-v">${pct(c.h.length, c.list.length)}</span><span class="t-l">孵化率 · 共 ${c.list.length} 人${c.e.length ? '，还有人在考核' : ''}</span></div>`
+        : '<div class="t-l">这一周没有新人</div>');
+  };
+  function drawCohort() {
+    const host = $('#cohort');
+    const Wd = host.clientWidth; if (!Wd) return;
+    const Hh = host.clientHeight;
+    const padL = coMode === 'pct' ? 38 : 28, padR = 6, padT = 34, padB = 22;
+    const n = CO.length, iw = Wd - padL - padR, ih = Hh - padT - padB;
+    const band = iw / n, bw = Math.min(24, Math.max(4, band * 0.6));
+    const maxN = Math.max(...CO.map((c) => c.list.length));
+    const top = coMode === 'pct' ? 1 : Math.ceil(maxN / 5) * 5;
+    const step = coMode === 'pct' ? 0.25 : (top <= 10 ? 2 : top <= 20 ? 5 : 10);
+    const y = (v) => padT + ih - (v / top) * ih;
+    const cx = (k) => padL + k * band + band / 2;
+    coG = { band, padL, cx, y, n };
+    let s = `<svg width="${Wd}" height="${Hh}" viewBox="0 0 ${Wd} ${Hh}" aria-hidden="true">`;
+    for (let t = 0; t <= top + 1e-9; t += step) {
+      const yy = Math.round(y(t)) + 0.5;
+      s += `<line class="${t === 0 ? 'bl' : 'gl'}" x1="${padL}" x2="${Wd - padR}" y1="${yy}" y2="${yy}"/><text class="ax" x="${padL - 8}" y="${yy + 3.5}" text-anchor="end">${coMode === 'pct' ? fmt.pct(t) : t}</text>`;
+    }
+    s += `<rect class="band sel" x="${padL + coSel * band}" y="${padT - 26}" width="${band}" height="${ih + 26}" rx="6"/>`;
+    s += `<rect class="band hov" x="0" y="${padT - 26}" width="${band}" height="${ih + 26}" rx="6"/>`;
+    CO.forEach((c, k) => {
+      const x = cx(k) - bw / 2;
+      const tot = c.list.length;
+      if (!tot) { s += `<rect x="${x.toFixed(2)}" y="${(y(0) - 1.5).toFixed(2)}" width="${bw.toFixed(2)}" height="1.5" rx=".75" style="fill:var(--viz-muted)"/>`; return; }
+      let base = y(0);
+      const segs = SER.map((sr) => ({ ...sr, v: c[sr.k].length })).filter((sr) => sr.v > 0);
+      segs.forEach((sr, j) => {
+        const v = coMode === 'pct' ? sr.v / tot : sr.v;
+        const hgt = (v / top) * ih;
+        const isTop = j === segs.length - 1;
+        const y1 = base - hgt + (j > 0 ? 2 : 0);
+        const hh = Math.max(1, base - y1);
+        const r = isTop ? Math.min(4, bw / 2, hh) : 0;
+        s += `<path class="co-seg" d="M${x.toFixed(2)} ${base.toFixed(2)}V${(y1 + r).toFixed(2)}Q${x.toFixed(2)} ${y1.toFixed(2)} ${(x + r).toFixed(2)} ${y1.toFixed(2)}H${(x + bw - r).toFixed(2)}Q${(x + bw).toFixed(2)} ${y1.toFixed(2)} ${(x + bw).toFixed(2)} ${(y1 + r).toFixed(2)}V${base.toFixed(2)}Z" style="fill:${sr.color}"/>`;
+        base = base - hgt;
+      });
+      if (coMode === 'pct' && band >= 16) s += `<text class="n-l" x="${cx(k)}" y="${(y(1) - 5).toFixed(1)}" text-anchor="middle">${tot}</text>`;
+    });
+    // 选中批的数值标签
+    const sc = CO[coSel];
+    if (sc.list.length && coMode === 'n') s += `<text class="val-l" x="${cx(coSel)}" y="${(y(sc.list.length) - 6).toFixed(1)}" text-anchor="middle">${sc.list.length}</text>`;
+    if (sc.list.length && coMode === 'pct') s += `<text class="val-l" x="${Math.min(Wd - padR - 14, cx(coSel))}" y="${(y(1) - (band >= 16 ? 19 : 6)).toFixed(1)}" text-anchor="middle">${pct(sc.h.length, sc.list.length)}</text>`;
+    // x 轴：每月第一周标「N月」
+    // 选中批在轴上标 MM-DD，与它挤在一起的月份标签让位
+    const selX = cx(coSel), selW = 34;
+    let lastM = -1, lastX = -99;
+    CO.forEach((c, k) => {
+      const m = new Date(c.w + 8 * 3600000).getUTCMonth();
+      if (m !== lastM) { lastM = m; if (cx(k) - lastX > 30 && Math.abs(cx(k) - selX) > selW) { s += `<text class="ax" x="${cx(k)}" y="${Hh - 5}" text-anchor="middle">${m + 1}月</text>`; lastX = cx(k); } }
+    });
+    s += `<text class="ax sel" x="${Math.min(Math.max(selX, padL + 14), Wd - padR - 14)}" y="${Hh - 5}" text-anchor="middle">${K.week.short(coSel)}</text>`;
+    // 图上标注（≤2 处，事实来自数据）：仍在考核的批次括号 + 最大一批已结束批次的引线
+    const tw = (t) => [...t].reduce((a, ch) => a + (/[　-鿿＀-￯]/.test(ch) ? 11 : 6.2), 0);
+    if (eggCos.length && coMode === 'n') {
+      const a = eggCos[0].i, b = eggCos[eggCos.length - 1].i;
+      const x1 = cx(a) - bw / 2, x2 = cx(b) + bw / 2;
+      let m = 0; for (let k = a; k <= b; k++) m = Math.max(m, CO[k].list.length);
+      const yy = y(m) - (coSel >= a && coSel <= b ? 26 : 14);
+      const txt = Wd > 520 ? `这 ${b - a + 1} 周来的人里，${eggs.length} 人还在考核` : `${eggs.length} 人还在考核`;
+      const mid = Math.min(Math.max((x1 + x2) / 2, padL + tw(txt) / 2), Wd - padR - tw(txt) / 2);
+      s += `<path class="anno-ln" d="M${x1} ${yy + 5}V${yy}H${x2}V${yy + 5}"/><text class="anno-tx" x="${mid}" y="${yy - 5}" text-anchor="middle">${esc(txt)}</text>`;
+    }
+    const big = doneCos.slice().sort((a, b) => b.list.length - a.list.length)[0];
+    if (big && coMode === 'n' && Wd > 520) {
+      const px = cx(big.i), py = y(big.list.length) - 3;
+      const txt = `${K.week.short(big.i)} 这一批 ${big.list.length} 人，孵化 ${big.h.length} 人`;
+      const ty = Math.max(12, py - 24), tx = px - 16;
+      const ax = Math.max(padL + tw(txt), tx);
+      s += `<path class="anno-ln" d="M${px} ${py - 2}L${px} ${ty + 4}L${ax + 4} ${ty + 4}"/><circle class="anno-dot" cx="${px}" cy="${py - 2}" r="2"/><text class="anno-tx" x="${ax}" y="${ty + 8}" text-anchor="end" dx="-2">${esc(txt)}</text>`;
+    }
+    s += '</svg>';
+    host.innerHTML = s;
+    if (coHov >= 0) coHover(coHov, false);
+  }
+  function coHover(k, withTip = true) {
+    const svg = $('#cohort svg'); if (!svg || !coG) return;
+    coHov = k;
+    const b = svg.querySelector('.band.hov');
+    if (k < 0) { b.style.opacity = 0; K.tip.hide(); return; }
+    b.setAttribute('x', coG.padL + k * coG.band); b.style.opacity = k === coSel ? 0 : 1;
+    if (!withTip) return;
+    const c = CO[k];
+    const r = $('#cohort').getBoundingClientRect();
+    const v = coMode === 'pct' ? (c.list.length ? 1 : 0) : c.list.length;
+    const yt = coG.y(v);
+    K.tip.show(coTip(c), { getBoundingClientRect: () => ({ left: r.left + coG.cx(k) - 1, width: 2, top: r.top + yt - 6, bottom: r.top + yt - 2, height: 4 }) });
+  }
+  function coSelect(k) {
+    if (k === coSel) return;
+    coSel = k;
+    drawCohort();
+    renderCoPanel(true);
+  }
+  function renderCoPanel(anim) {
+    const c = CO[coSel];
+    const el = $('#coPanel');
+    const sortP = (a, b) => b.bonus - a.bonus;
+    const grp = (s) => {
+      const L = c[s.k].slice().sort(sortP);
+      return `<div class="co-g"><h5><span class="key" style="--k:${s.color}">${s.label}</span><span class="n">${L.length}</span></h5>`
+        + (L.length ? `<ul>${L.map((p) => `<li>${K.who(p, { size: 22 })}${s.k === 'h' ? K.levelBadge(p, { size: 16 }) : s.k === 'e' ? `<span class="meta">剩 ${p.newbie.daysLeft} 天</span>` : `<span class="meta">魔力 ${mag(p.bonus)}/50</span>`}</li>`).join('')}</ul>` : `<span class="none">${s.k === 'e' ? '这一批都已结束考核' : '无'}</span>`)
+        + '</div>';
+    };
+    el.innerHTML = `<div class="co-panel-h"><b>${esc(K.week.range(coSel))}</b><span>首次贡献 ${c.list.length} 人${!c.list.length ? '' : c.e.length ? ` · 已孵化 <b class="num">${c.h.length}</b>，${c.e.length === c.list.length ? '全部' : `${c.e.length} 人`}还在考核` : ` · 孵化率 <b class="num">${pct(c.h.length, c.list.length)}</b>`}</span><span class="r only-kbd">点柱子换一批，或聚焦图表后按 <kbd>←</kbd><kbd>→</kbd></span></div>`
+      + (c.list.length ? `<div class="co-groups">${SER.filter((s) => c[s.k].length).map(grp).join('')}</div>` : `<div class="lane-empty" style="margin-top:12px">${icon('calendar', 15)}<span>这一周没有新人首次贡献</span></div>`);
+    if (anim && !K.reduced()) { el.classList.remove('swap-in'); void el.offsetWidth; el.classList.add('swap-in'); }
+  }
+  (function wireCohort() {
+    const host = $('#cohort');
+    host.classList.add('chart');
+    host.tabIndex = 0;
+    host.setAttribute('role', 'img');
+    host.setAttribute('aria-label', `按首次贡献周的批次孵化情况：${CO.filter((c) => c.list.length).map((c) => `${K.week.short(c.i)} ${c.list.length} 人，孵化 ${c.h.length}，蛙卵 ${c.e.length}，未孵化 ${c.f.length}`).join('；')}`);
+    const idx = (x) => { const r = host.getBoundingClientRect(); return Math.max(0, Math.min(CO.length - 1, Math.floor((x - r.left - coG.padL) / coG.band))); };
+    host.addEventListener('pointermove', (e) => { if (!coG) return; const k = idx(e.clientX); if (k !== coHov || !document.querySelector('.tip.on')) coHover(k); });
+    host.addEventListener('pointerleave', () => coHover(-1));
+    host.addEventListener('click', (e) => { if (!coG) return; const k = idx(e.clientX); if (CO[k].list.length) { coSelect(k); coHover(k); } });
+    host.addEventListener('keydown', (e) => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+      e.preventDefault(); e.stopPropagation();
+      const nz = CO.filter((c) => c.list.length).map((c) => c.i);
+      let j = nz.indexOf(coSel);
+      if (e.key === 'ArrowLeft') j = Math.max(0, j - 1);
+      if (e.key === 'ArrowRight') j = Math.min(nz.length - 1, j + 1);
+      if (e.key === 'Home') j = 0;
+      if (e.key === 'End') j = nz.length - 1;
+      coSelect(nz[j]);
+      coHover(nz[j]);
+    });
+    host.addEventListener('blur', () => coHover(-1));
+    new ResizeObserver(() => drawCohort()).observe(host);
+  })();
+
+  // ───────── 未孵化（折叠） ─────────
+  const fNear = failed.filter((p) => p.bonus >= R.hatchBonus / 2);
+  const fTop = failed.slice().sort((a, b) => b.bonus - a.bonus)[0];
+  const fMergeOk = failed.filter((p) => p.newbie.merged >= NB.merged);
+  $('#foldBtn').innerHTML = `${K.frog('unhatched', 36)}<span><span class="t" style="display:block">考核期满未孵化 · ${failed.length} 人</span>`
+    + `<span class="s" style="display:block">${failedActive.length} 人近 40 天仍有动作；${fTop ? `魔力最高的 ${esc(fTop.login)} 已有 ${mag(fTop.bonus)}，再攒 ${mag(R.hatchBonus - fTop.bonus)} 就能孵化` : '魔力攒到 50 就能孵化'}</span></span>`
+    + `<span class="row" style="gap:10px"><span class="label hide-sm" id="foldLbl">展开</span>${icon('chevron-down', 18, 'chev')}</span>`;
+  const sumStat = (k, v, unit, d) => `<div class="fs"><div class="k">${k}</div><div class="v">${v}<small>${unit}</small></div><div class="d">${d}</div></div>`;
+  const failRows = failed.slice().sort((a, b) => b.bonus - a.bonus).map((p) => {
+    const nb = p.newbie, nx = K.nextInfo(p);
+    const x = (ok) => (ok ? 'ok' : '');
+    return `<div class="lrow" data-key="${esc(p.login)}">`
+      + `${K.who(p, { size: 28, sub: `${p.member ? '组织成员' : '组织外'} · ${fmt.md(p.firstAt)}首次贡献`, tags: p.dormant ? '<span class="tag tag-sleep">冬眠</span>' : '' })}`
+      + `<span class="tst c-test">合入 <b class="${x(nb.merged >= NB.merged)}">${nb.merged}/${NB.merged}</b> · 活跃周 <b class="${x(nb.activeWeeks >= NB.activeWeeks)}">${nb.activeWeeks}/${NB.activeWeeks}</b></span>`
+      + `<div class="mg"><div class="meter water" aria-hidden="true"><i style="width:${Math.min(100, p.bonus / R.hatchBonus * 100).toFixed(1)}%"></i></div><span><b>${mag(p.bonus)}</b>/50</span></div>`
+      + `<span class="sm c-last">${p.dormant ? `${p.daysSinceLast} 天无动作` : `${fmt.ago(p.daysSinceLast)}有动作`}</span>`
+      + `<span class="sm c-eta r">${nx && p.pace > 0 ? `${etaShort(nx.eta)}到 50` : '近 4 周没有新魔力'}</span></div>`;
+  }).join('');
+  function etaShort(eta) { return eta > 52 ? '一年以上才' : K.etaText(eta); }
+  $('#foldIn').innerHTML = `<div class="fold-stats">`
+    + sumStat('未孵化', failed.length, '人', `占全部贡献者 ${pct(failed.length, TOTAL)}`)
+    + sumStat('近 40 天仍有动作', failedActive.length, '人', `另 ${failedSleep.length} 人冬眠`)
+    + sumStat('魔力过半（≥25）', fNear.length, '人', fNear.length ? `最近的是 ${esc(fTop.login)}` : '暂无')
+    + sumStat('合入已够 3 个', fMergeOk.length, '人', '卡在活跃周')
+    + `</div><div class="fl"><div class="lrow lrow-head" aria-hidden="true"><span>贡献者</span><span class="c-test">考核结果</span><span>魔力 · 到 50 补孵化</span><span class="c-last">最近动作</span><span class="c-eta r">按近 4 周均速</span></div><div class="rows">${failRows}</div></div>`;
+  function setFold(open) {
+    const f = $('#fold');
+    f.dataset.open = String(open);
+    $('#foldBtn').setAttribute('aria-expanded', String(open));
+    $('#foldLbl').textContent = open ? '收起' : '展开';
+    $('#foldIn').inert = !open;
+  }
+  $('#foldBtn').addEventListener('click', () => setFold($('#fold').dataset.open !== 'true'));
+
+  // ───────── 口径 ─────────
+  $('#rules').innerHTML = [
+    ['calendar', '考核窗口', `从首次贡献那一刻起 ${NB.days} 天。卡片上的合入、活跃周都只数窗口内的；剩余天数到 0 还没达标就转为未孵化。`],
+    ['activity', '活跃周', '有合入或协作的不同自然周（周一到周日）。同一周里做多少次都只算一周，所以要跨两周各做一次。'],
+    ['zap', '魔力补孵化', `魔力 ≥${R.hatchBonus} 不看考核直接孵化，考核期过了也有效。魔力只增不减，形态不降级。`],
+  ].map(([ic, t, d]) => `<div><h4>${icon(ic, 15)}${t}</h4><p>${d}</p></div>`).join('');
+
+  // ───────── 键盘与命令面板 ─────────
+  const sortKeys = ['near', 'due', 'magic', 'recent'];
+  K.keys.add([
+    { key: '/', label: '筛选账号', group: '孵化台', handler: () => { $('#q').focus(); $('#q').select(); } },
+    { key: 's', display: 'S', label: '切换排序', group: '孵化台', handler: () => { sortSeg.set(sortKeys[(sortKeys.indexOf(state.sort) + 1) % sortKeys.length]); } },
+    { key: 'u', display: 'U', label: '展开 / 收起未孵化', group: '孵化台', handler: () => setFold($('#fold').dataset.open !== 'true') },
+  ]);
+  K.cmdk.add([
+    { label: '只差一项的蛙卵', icon: 'target', run: () => goNode('one') },
+    { label: `${DUE} 天内到期的蛙卵`, icon: 'hourglass', run: () => goNode('due') },
+    { label: '按剩余天数排序', icon: 'clock', run: () => sortSeg.set('due') },
+    { label: '展开未孵化名单', icon: 'egg', kbd: 'U', run: () => goNode('failed') },
+  ]);
+
+  // ───────── 首次渲染 ─────────
+  renderChips();
+  renderBoard(false);
+  renderCoPanel(false);
+  new ResizeObserver(() => drawFunnel()).observe($('#funnel'));
+  drawFunnel();
+  document.addEventListener('nwk:theme', () => { drawFunnel(); drawCohort(); });
+  if (location.hash === '#failed') setFold(true);
+  $('#soonGo').addEventListener('click', () => goNode('due'));
+})();
+</script>
+</body>
+</html>

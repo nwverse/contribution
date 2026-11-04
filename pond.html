@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>形态池 · 奶蛙宇宙</title>
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="assets/tokens.css">
+<!-- 读取 data/board.json 后加载 engine.js、assets/derive.js、icons.js、kit.js，再执行下方 type="text/x-nw-page" 的页面脚本 -->
+<script src="assets/boot.js"></script>
+<style>
+  /* 本页布局。颜色、字号、圆角、时长一律用令牌 */
+  :root {
+    /* 形态序列（定义在根上：tooltip 挂在 body 下也要读到）：同一色相由浅到深表示「更高的形态」；蛙卵沿用系统里蛙卵的黄，未孵化用中性色 */
+    --f0: var(--viz-dim);
+    --f1: color-mix(in srgb, var(--leaf) 50%, var(--viz-dim));
+    --f2: var(--leaf-lo);
+    --f3: var(--amber);
+    --f4: var(--violet);
+    --f-egg: color-mix(in srgb, var(--yolk-deep) 52%, var(--surface));
+    --f-un: var(--ink-4);
+  }
+  /* 暗色：高形态更亮；dataviz 校验相邻对 ΔE ≥ 12（亮色 ≥ 14.8），另有 2px 分隔、图例数值与表格兜底 */
+  :root[data-theme="dark"] { --f1: var(--leaf); --f2: var(--leaf-ink); --f-egg: color-mix(in srgb, var(--yolk-deep) 60%, var(--surface)); }
+
+  /* ── 导语 ── */
+  .intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-6); align-items: end; }
+  .intro .headline { margin-top: var(--s-3); }
+  .intro .lede { max-width: 50em; }
+
+  /* ── 舞台：进化阶梯 ── */
+  .filters { display: flex; align-items: center; gap: var(--s-2) var(--s-5); flex-wrap: wrap; padding-right: var(--s-5); }
+  .switch .n { color: var(--ink-3); font-variant-numeric: tabular-nums; font-size: var(--fs-xs); }
+
+  .pond.stage { padding: var(--s-4) var(--s-5) 0; border-radius: var(--r-xl); }
+  .stage-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; min-height: 32px; }
+  .stepper { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: var(--r-md); background: color-mix(in srgb, var(--surface) 70%, transparent); box-shadow: inset 0 0 0 1px var(--line-soft); }
+  .stepper .wk { min-width: 92px; text-align: center; font-size: var(--fs-xs); font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .stepper .btn-icon { --btn-h: 26px; }
+  .stepper .sep { width: 1px; height: 16px; background: var(--line); margin: 0 2px; }
+
+  /* 每一级自下而上：台阶（形态徽记 + 名称 + 人数）→ 荷叶台面 → 站在台面上的人。台阶逐级抬高 26px，奶蛙逐级变大 */
+  .ladder { position: relative; display: grid; grid-template-columns: minmax(0, .72fr) repeat(2, minmax(0, 1.75fr)) repeat(3, minmax(0, 1fr)); column-gap: var(--s-3); align-items: end; margin-top: var(--s-4); }
+  .lv { position: relative; display: flex; flex-direction: column; min-width: 0; border-radius: var(--r-lg) var(--r-lg) 0 0; transition: background-color var(--dur-3) var(--ease-out); }
+  .lv.is-focus { animation: lv-focus 2.6s var(--ease-out) both; }
+  @keyframes lv-focus { 0%, 55% { background-color: var(--yolk-wash); } 100% { background-color: transparent; } }
+
+  .lv-pad { position: relative; z-index: 1; display: block; width: 94%; height: 14px; margin: 0 auto -7px; flex: none; }
+  .lv-pad path.v { vector-effect: non-scaling-stroke; }
+  .lv-step { position: relative; display: flex; flex-direction: column; align-items: center; height: calc(132px + var(--lift)); margin: 0 7%; padding-top: var(--s-4); text-align: center; border-radius: var(--r-md) var(--r-md) 0 0; background: linear-gradient(180deg, color-mix(in srgb, var(--pad-lo) 26%, transparent), color-mix(in srgb, var(--pad-lo) 6%, transparent)); }
+  :root[data-theme="dark"] .lv-step { background: linear-gradient(180deg, color-mix(in srgb, var(--pad-lo) 50%, transparent), color-mix(in srgb, var(--pad-lo) 12%, transparent)); }
+  .lv-fig { display: grid; place-items: end center; height: 58px; }
+  .lv-nm { margin-top: 6px; font-size: var(--fs-sm); font-weight: 650; color: var(--ink); white-space: nowrap; }
+  .lv-th { margin-top: 1px; font-size: var(--fs-2xs); color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .lv-cnt { position: relative; display: inline-flex; align-items: baseline; gap: 3px; margin-top: 2px; font-family: var(--font-display); font-size: var(--fs-2xl); font-weight: 720; letter-spacing: -0.02em; line-height: 1.1; color: var(--ink); }
+  .lv-cnt small { font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0; color: var(--ink-2); }
+  .arr-host { position: absolute; left: calc(100% + 4px); top: -1px; }
+  .lv-arr { height: 18px; padding: 0 6px; font-weight: 750; letter-spacing: 0; transform-origin: left bottom; animation: pop var(--dur-5) var(--ease-spring) both; }
+  .lv.is-vacant .lv-cnt { color: var(--ink-3); }
+  .lv.is-vacant .lv-step { background: transparent; border: 1px dashed color-mix(in srgb, var(--pad-lo) 40%, transparent); border-bottom: 0; }
+  .lv.is-vacant .lv-pad ellipse.l { fill: none; stroke: color-mix(in srgb, var(--pad-lo) 55%, transparent); stroke-dasharray: 3 3; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+  .lv.is-vacant .lv-pad path.v { display: none; }
+
+  /* 每个人：带进度环的头像 + 名字 */
+  .crowd { display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-end; gap: var(--s-2) 0; padding: 0 2px var(--s-3); min-height: 0; }
+  .pc { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; width: 60px; padding: 3px 0 2px; border-radius: var(--r-md); transition: background-color var(--dur-1); -webkit-tap-highlight-color: transparent; }
+  .pc:hover { background: color-mix(in srgb, var(--surface) 72%, transparent); }
+  :root[data-theme="dark"] .pc:hover { background: var(--leaf-wash); }
+  .pc .avr .pg { transition: stroke-dashoffset var(--dur-5) var(--ease-out), stroke var(--dur-3); }
+  .pc-nm { max-width: 58px; font-size: var(--fs-2xs); line-height: 1.25; color: var(--ink-2); font-weight: 520; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pc:hover .pc-nm { color: var(--leaf-ink); }
+  .pc.is-sleep .pc-nm { color: var(--ink-3); }
+  .pc.is-new .avr::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; box-shadow: 0 0 0 2px var(--yolk); animation: new-ring 1.6s var(--ease-out) both; }
+  .pc.is-new .avr::before { content: ""; position: absolute; right: 0; top: 0; z-index: 1; width: 9px; height: 9px; border-radius: 50%; background: var(--yolk); box-shadow: 0 0 0 2px var(--surface); }
+  @keyframes new-ring { 0% { box-shadow: 0 0 0 0 var(--yolk); } 40% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--yolk) 30%, transparent); } 100% { box-shadow: 0 0 0 2px var(--yolk); } }
+
+  /* 空等级：虚位以待 + 最近的挑战者 */
+  .vac { margin: 0 var(--s-1) var(--s-3); padding: var(--s-3); border-radius: var(--r-lg); border: 1px dashed var(--line-strong); background: color-mix(in srgb, var(--surface) 62%, transparent); }
+  :root[data-theme="dark"] .vac { background: color-mix(in srgb, var(--surface) 55%, transparent); }
+  .vac-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .vac .st-vac { display: inline-block; }
+  .vac-l { font-size: var(--fs-2xs); color: var(--ink-3); font-weight: 600; }
+  .vac-list { display: grid; gap: var(--s-3); margin-top: var(--s-3); }
+  .vac { min-width: 0; overflow: hidden; }
+  .ch { min-width: 0; }
+  .ch .who { display: flex; width: 100%; }
+  .ch .who .nm { font-size: var(--fs-sm); }
+  .ch .who .sub { white-space: normal; line-height: 1.35; }
+  .ch .who .sub > span { display: block; }
+  .ch .meter { margin-top: 6px; }
+  .vac-none { margin-top: var(--s-2); font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.5; }
+
+  /* 蛙卵窝：只出人数，点进孵化台；站在池边地面上，与最低一级台阶底边对齐 */
+  .nest { display: flex; flex-direction: column; align-items: center; gap: var(--s-2); margin-bottom: var(--s-4); padding: var(--s-4) var(--s-2) var(--s-3); border-radius: var(--r-lg); text-align: center; border: 1px dashed color-mix(in srgb, var(--yolk-deep) 45%, transparent); background: color-mix(in srgb, var(--yolk) 7%, transparent); transition: background-color var(--dur-2), transform var(--dur-3) var(--ease-spring); }
+  .nest:hover { background: color-mix(in srgb, var(--yolk) 14%, transparent); }
+  .nest:active { transform: scale(.98); }
+  .nest-figs { display: flex; align-items: flex-end; gap: 4px; height: 44px; }
+  .nest-row { display: grid; gap: 1px; }
+  .nest-row b { font-family: var(--font-display); font-size: var(--fs-2xl); font-weight: 720; letter-spacing: -0.02em; line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .nest-row b small { font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0; color: var(--ink-3); margin-left: 3px; }
+  .nest-row span { font-size: var(--fs-xs); font-weight: 650; color: var(--yolk-ink); }
+  .nest-row.un b { font-size: var(--fs-lg); }
+  .nest-row.un span { color: var(--ink-2); }
+  .nest-row em { font-style: normal; font-size: var(--fs-2xs); color: var(--ink-3); white-space: nowrap; }
+  .nest-hr { width: 60%; height: 1px; background: color-mix(in srgb, var(--yolk-deep) 25%, transparent); }
+  .nest .link { margin-top: 2px; font-size: var(--fs-xs); }
+
+  .stage-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2) var(--s-5); flex-wrap: wrap; padding: var(--s-3) var(--s-1) var(--s-4); border-top: 1px dashed color-mix(in srgb, var(--water) 26%, transparent); }
+  .keyset { display: flex; align-items: center; gap: var(--s-2) var(--s-5); flex-wrap: wrap; font-size: var(--fs-xs); color: var(--ink-2); }
+  .keyset > span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .kdot { position: relative; width: 14px; height: 14px; border-radius: 50%; flex: none; }
+  .keyset .ring { flex: none; }
+  .kdot.sleep { background: var(--ink-4); opacity: .6; }
+  .kdot.new { background: var(--yolk); }
+
+  /* ── 回放：形态人数随周变化 ── */
+  .replay-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
+  .replay-ctl { display: flex; align-items: center; gap: var(--s-2); }
+  .replay-ctl .wk { min-width: 76px; font-size: var(--fs-sm); font-weight: 650; font-variant-numeric: tabular-nums; text-align: right; }
+  .legend.vals { margin: var(--s-4) 0 var(--s-2); }
+  .legend.vals .key.is-zero { color: var(--ink-3); }
+  .legend.vals .key.is-zero b { color: var(--ink-3); font-weight: 550; }
+  .legend.vals .tot::before { display: none; }
+  #chart { height: 216px; cursor: pointer; touch-action: pan-y; }
+  #chart .ar { transition: opacity var(--dur-2); }
+  #chart .sep { fill: none; stroke: var(--surface); stroke-width: 1.5; stroke-linejoin: round; }
+  #chart .hov { fill: var(--ink); opacity: 0; transition: opacity var(--dur-1); }
+  :root[data-theme="dark"] #chart .hov { fill: var(--ink); }
+  #chart .sel { stroke: var(--ink); stroke-width: 1.5; shape-rendering: crispEdges; }
+  #chart .sel-dot { fill: var(--leaf); stroke: var(--surface); stroke-width: 2; }
+  #chart .sel-tx { font-size: var(--fs-2xs); font-weight: 700; fill: var(--ink); font-variant-numeric: tabular-nums; }
+  #chart .sel-bg { fill: var(--surface); }
+  #chart .anno-tx { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+  #chart .sel-frog { transition: transform var(--dur-5) var(--ease-spring); }
+  .scrub-wrap { position: relative; margin-top: var(--s-2); }
+  .scrub { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 24px; margin: 0; background: transparent; cursor: pointer; }
+  .scrub:focus { outline: none; }
+  .scrub::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--leaf) 0 var(--p, 100%), var(--bg-sunken) var(--p, 100%)); }
+  .scrub::-moz-range-track { height: 4px; border-radius: 2px; background: var(--bg-sunken); }
+  .scrub::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--leaf); }
+  :root[data-theme="dark"] .scrub::-webkit-slider-runnable-track { background: linear-gradient(90deg, var(--leaf) 0 var(--p, 100%), var(--line-strong) var(--p, 100%)); }
+  .scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -7px; border-radius: 50%; background: var(--surface-raised); box-shadow: 0 0 0 2px var(--leaf), var(--sh-2); transition: transform var(--dur-3) var(--ease-spring); }
+  .scrub::-moz-range-thumb { width: 18px; height: 18px; border: 0; border-radius: 50%; background: var(--surface-raised); box-shadow: 0 0 0 2px var(--leaf), var(--sh-2); }
+  .scrub:active::-webkit-slider-thumb { transform: scale(1.12); }
+  .scrub:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--leaf), 0 0 0 5px color-mix(in srgb, var(--focus) 35%, transparent); }
+  .scrub-ends { display: flex; justify-content: space-between; margin-top: 2px; font-size: var(--fs-2xs); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .card-pad > .footnote { margin-top: var(--s-3); }
+
+  /* ── 平板 ── */
+  @media (max-width: 1100px) {
+    .intro { grid-template-columns: 1fr; }
+    .ladder { grid-template-columns: minmax(0, .8fr) repeat(2, minmax(0, 1.75fr)) repeat(3, minmax(0, 1fr)); column-gap: var(--s-2); }
+    .pc { width: 50px; }
+    .pc-nm { max-width: 48px; }
+    .vac { padding: var(--s-2) var(--s-2) var(--s-3); margin-left: 0; margin-right: 0; }
+    .lv-step { margin: 0 4%; }
+    .ch .who > .av { display: none; }
+    .ch .who .nm { font-size: var(--fs-xs); }
+  }
+
+  /* ── 手机：重新排版为自下而上的竖梯（最高形态在上），左列是形态，右列是人 ── */
+  @media (max-width: 720px) {
+    .pond.stage { padding: var(--s-3) var(--s-3) 0; }
+    .stage-bar { gap: var(--s-3); }
+    .filters { gap: var(--s-2) var(--s-4); }
+    .stepper { margin-left: auto; }
+    .stepper .wk { min-width: 76px; }
+    .ladder { display: flex; flex-direction: column-reverse; align-items: stretch; margin-top: var(--s-2); }
+    .lv { display: grid; grid-template-columns: 72px minmax(0, 1fr); grid-template-areas: "step body"; align-items: start; column-gap: var(--s-2); padding: var(--s-3) 0; border-radius: var(--r-lg); }
+    .lv + .lv { border-bottom: 1px dashed color-mix(in srgb, var(--water) 22%, transparent); }
+    .lv-pad { display: none; }
+    .lv-step, :root[data-theme="dark"] .lv-step { grid-area: step; height: auto; margin: 0; padding: 0; background: none; border-radius: 0; }
+    .ch .who > .av { display: inline-grid; }
+    .ch .who .nm { font-size: var(--fs-sm); }
+    .lv.is-vacant .lv-step { border: 0; }
+    .lv-fig { height: 44px; }
+    .lv-fig .frog { transform: scale(.78); transform-origin: 50% 100%; }
+    .lv-nm { margin-top: 2px; font-size: var(--fs-xs); }
+    .lv-cnt { font-size: var(--fs-xl); margin-top: 0; }
+    .arr-host { left: auto; right: -30px; top: -4px; }
+    .lv-th { display: none; }
+    .crowd { grid-area: body; justify-content: flex-start; align-content: flex-start; padding: 0; gap: var(--s-2) 0; }
+    .crowd:empty { display: none; }
+    .pc { width: 25%; }
+    .pc-nm { max-width: calc(100% - 4px); }
+    .vac { grid-area: body; margin: 0; }
+    .nest-wrap { grid-column: 1 / -1; }
+    .nest { flex-direction: row; justify-content: flex-start; flex-wrap: wrap; gap: var(--s-2) var(--s-4); margin: 0; padding: var(--s-3); text-align: left; }
+    .nest-figs { height: 34px; }
+    .nest-hr { width: 1px; height: 28px; }
+    .nest .link { margin-left: auto; }
+    .stage-foot { padding: var(--s-3) 0; }
+    .keyset { gap: var(--s-2) var(--s-4); }
+    #chart { height: 184px; }
+    .replay-ctl .wk { min-width: 0; }
+    .legend.vals { gap: 6px 12px; }
+    .legend.vals .tot { margin-left: 0 !important; flex-basis: 100%; }
+  }
+</style>
+</head>
+<body>
+<header id="appbar"></header>
+
+<main class="page c5">
+  <section class="intro">
+    <div>
+      <div class="dateline" id="dateline"></div>
+      <h1 class="headline" id="headline"></h1>
+      <p class="lede" id="lede"></p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sec-h">
+      <div><span class="eyebrow">形态池</span><h2>每一级都是谁</h2><p>台阶越高形态越高；外圈是到下一级的进度，悬停看人物卡，点击进档案</p></div>
+    </div>
+
+    <div class="pond stage" id="stage">
+      <svg class="pond-ripples" viewBox="0 0 260 200" aria-hidden="true"><circle cx="200" cy="170" r="30"/><circle cx="200" cy="170" r="56" opacity=".55"/><circle cx="200" cy="170" r="84" opacity=".28"/></svg>
+      <div class="stage-bar">
+        <div class="filters" id="filters" role="group" aria-label="筛选">
+          <label class="switch"><input type="checkbox" id="swMember"><span class="track"></span>只看组织成员 <span class="n" id="nMember"></span></label>
+          <label class="switch"><input type="checkbox" id="swSleep" checked><span class="track"></span>显示冬眠 <span class="n" id="nSleep"></span></label>
+        </div>
+        <div class="stepper" role="group" aria-label="切换周">
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" id="stPrev" aria-label="前一周" data-tip="前一周（←）"></button>
+          <span class="wk" id="stWk" aria-live="polite"></span>
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" id="stNext" aria-label="后一周" data-tip="后一周（→）"></button>
+          <span class="sep" aria-hidden="true"></span>
+          <button type="button" class="btn btn-ghost btn-sm" id="stPlay" aria-label="回放形态变化"></button>
+        </div>
+      </div>
+      <div class="ladder" id="ladder"></div>
+      <div class="stage-foot">
+        <div class="keyset" aria-label="图例">
+          <span id="kRing">外圈 = 到下一级进度</span>
+          <span><i class="kdot sleep" aria-hidden="true"></i>灰 = 冬眠（40 天无动作）</span>
+          <span><i class="kdot new" aria-hidden="true"></i><span id="kNew">黄点 = 本周新到这一级</span></span>
+        </div>
+        <span class="footnote" id="stageNote"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="card card-pad" id="replayCard">
+      <div class="replay-head">
+        <div>
+          <div class="card-title"><span class="card-icon leaf" id="rpIcon"></span>形态人数随周变化</div>
+          <div class="card-sub">每周结束时各形态的人数，叠起来就是当时池塘里的总人数</div>
+        </div>
+        <div class="replay-ctl">
+          <span class="wk" id="rpWk"></span>
+          <button type="button" class="btn btn-sm" id="rpPlay"></button>
+        </div>
+      </div>
+      <div class="legend vals" id="legend"></div>
+      <div id="chart" class="chart"></div>
+      <div class="scrub-wrap" id="scrubWrap">
+        <input type="range" class="scrub" id="scrub" min="0" step="1" aria-label="选择周">
+        <div class="scrub-ends"><span id="scrubA"></span><span id="scrubB"></span></div>
+      </div>
+      <div class="sr-only"><table id="srTable"></table></div>
+    </div>
+  </section>
+</main>
+
+<script type="text/x-nw-page">
+(() => {
+  const K = NWK;
+  const $ = (s) => document.querySelector(s);
+  K.appHeader($('#appbar'), { active: 'c5' });
+
+  const LAST = NW.last;
+  const LV = NW.LV;
+  const NL = LV.length;
+  const NUM = ['', '一', '两', '三', '四', '五'];
+  const LIFT = [0, 26, 52, 78, 104];
+  const FIG = [36, 40, 46, 52, 58];
+  const W_KEY = ['f0', 'f1', 'f2', 'f3', 'f4'];
+  const state = { i: K.week.fromURL(), member: false, sleep: true, playing: false, timer: 0, celebrated: new Set() };
+
+  // ───────── 数据 ─────────
+  const pool = () => NW.people.filter((p) => (!state.member || p.member) && (state.sleep || !p.dormant));
+  const paceAt = (p, i) => { let s = 0; for (let k = Math.max(0, i - 3); k <= i; k++) s += p.wk.get(NW.W[k]) || 0; return s / 4; };
+  function progAt(p, i) {
+    if (i === LAST) return p.progress;
+    const L = p.levels[i];
+    if (L === null) return Math.min(1, p.cum[i] / NW.RULES.hatchBonus);
+    if (L + 1 >= NL) return 1;
+    return (p.cum[i] - LV[L].bonus) / (LV[L + 1].bonus - LV[L].bonus);
+  }
+  function snap(i, list = pool()) {
+    const ppl = list.filter((p) => p.started[i]);
+    const lv = LV.map(() => []);
+    const eggs = [], un = [];
+    for (const p of ppl) {
+      const L = p.levels[i];
+      if (L !== null) lv[L].push(p);
+      else (K.formOf(p, i).egg ? eggs : un).push(p);
+    }
+    lv.forEach((a) => a.sort((x, y) => y.cum[i] - x.cum[i] || x.login.localeCompare(y.login)));
+    const prevL = (p) => (i > 0 ? p.levels[i - 1] : null);
+    const arrivals = lv.map((a, k) => a.filter((p) => prevL(p) !== k));
+    const hatchedNow = ppl.filter((p) => p.levels[i] !== null && prevL(p) === null);
+    const upgraded = ppl.filter((p) => p.levels[i] !== null && prevL(p) !== null && p.levels[i] > prevL(p));
+    const hatched = lv.reduce((n, a) => n + a.length, 0);
+    let vacTop = 0;
+    for (let k = NL - 1; k >= 0 && !lv[k].length; k--) vacTop++;
+    return { i, ppl, lv, eggs, un, arrivals, hatchedNow, upgraded, hatched, vacTop, total: ppl.length };
+  }
+  // 离空等级 k 最近的人：第 i 周末魔力低于门槛者按魔力降序
+  function challengers(s, k, n) {
+    const T = LV[k].bonus;
+    return s.ppl.filter((p) => p.cum[s.i] < T).sort((a, b) => b.cum[s.i] - a.cum[s.i]).slice(0, n).map((p) => {
+      const gap = T - p.cum[s.i];
+      const pace = paceAt(p, s.i);
+      return { p, gap, pace, eta: pace > 0 ? Math.ceil(gap / pace) : null, pr: p.cum[s.i] / T };
+    });
+  }
+  const wkName = (i) => K.week.name(i);
+  // 超过一年的 ETA 没有参考意义（如「约 1623 周」），统一写成「一年以上」
+  const eta = (e) => (e !== null && e > 52 ? '超过 1 年' : K.etaText(e));
+
+  // ───────── 计数 ─────────
+  $('#nMember').textContent = `${NW.people.filter((p) => p.member).length} 人`;
+  $('#nSleep').textContent = `${NW.people.filter((p) => p.dormant).length} 人`;
+
+  // ───────── 舞台骨架（一次性生成，之后只更新） ─────────
+  const ladder = $('#ladder');
+  const PAD = '<svg class="pad lv-pad" viewBox="0 0 52 15" preserveAspectRatio="none" aria-hidden="true"><ellipse class="s" cx="26" cy="9.5" rx="26" ry="5.5"/><ellipse class="l" cx="26" cy="7.5" rx="23" ry="6"/><path class="v" d="M26 7.5 L26 1.8 M26 7.5 L14.5 5.2 M26 7.5 L37.5 5.2 M26 7.5 L17.5 11.8 M26 7.5 L34.5 11.8"/></svg>';
+  ladder.innerHTML = `<div class="lv lv-egg" data-lv="egg">
+      <div class="nest-wrap"><a class="nest hop-host" id="nest" href="hatchery.html" data-screen="c4" aria-label="进入孵化台"></a></div></div>`
+    + LV.map((L, k) => `<div class="lv" data-lv="${k}" id="lv-${k}" style="--lift:${LIFT[k]}px"${k === 3 ? `` : ''}>
+        <div class="crowd" role="list" aria-label="${L.name}"${k === 1 ? `` : ''}></div>
+        <div class="vac" hidden></div>
+        ${PAD}
+        <div class="lv-step hop-host">
+          <div class="lv-fig">${K.frog(L.icon, FIG[k])}</div>
+          <div class="lv-nm">${L.name}</div>
+          <div class="lv-cnt"><span class="num cnt">0</span><small>人</small><span class="arr-host"></span></div>
+          <div class="lv-th">${k ? `魔力 ≥ ${L.bonus.toLocaleString('zh-CN')}` : '孵化即得'}</div>
+        </div>
+      </div>`).join('');
+  const cols = LV.map((_, k) => $(`#lv-${k}`));
+
+  // 每个人一个持久节点：换周时只移动、只改进度，头像不重新加载
+  const cells = new Map();
+  function cell(p) {
+    let el = cells.get(p.login);
+    if (!el) {
+      el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'pc';
+      el.setAttribute('role', 'listitem');
+      el.dataset.key = p.login;
+      el.dataset.person = p.login;
+      el.innerHTML = K.avatar(p.login, 30, { progress: 0 }) + `<span class="pc-nm">${K.esc(p.login)}</span>`;
+      cells.set(p.login, el);
+    }
+    return el;
+  }
+  function paintCell(el, p, s, isNew) {
+    const i = s.i;
+    const pr = Math.max(0, Math.min(1, progAt(p, i)));
+    const c = el.querySelector('.pg');
+    const C = parseFloat(c.getAttribute('stroke-dasharray'));
+    c.setAttribute('stroke-dashoffset', (C * (1 - pr)).toFixed(2));
+    const dim = p.dormant && i === LAST;
+    el.querySelector('.avr').classList.toggle('dim', dim);
+    el.querySelector('.av').classList.toggle('dim', dim);
+    el.classList.toggle('is-sleep', dim);
+    el.classList.toggle('is-new', isNew);
+    const L = p.levels[i];
+    const nx = L + 1 < NL ? `，到${LV[L + 1].name} ${Math.round(pr * 100)}%` : '，已是最高形态';
+    el.setAttribute('aria-label', `${p.login}，${LV[L].name}，魔力 ${K.mag(p.cum[i])}${nx}${dim ? '，冬眠' : ''}${isNew ? `，${wkName(i)}新到这一级` : ''}`);
+    el.querySelector('.avr').setAttribute('aria-label', `到下一级进度 ${Math.round(pr * 100)}%`);
+  }
+
+  function vacHTML(s, k) {
+    const L = LV[k];
+    const lowest = !s.lv.slice(k).some((a) => a.length) && (k === 0 || s.lv[k - 1].length > 0 || k === s.lv.findIndex((a, j) => j >= 1 && !a.length));
+    const head = `<div class="vac-top"><span class="st-vac">虚位以待</span></div>`;
+    if (k === 0) return `${head}<div class="vac-none">${s.total ? '这时还没有人通过新手考核' : '这时池塘里还没有人'}</div>`;
+    const list = challengers(s, k, lowest ? 3 : 1);
+    if (!list.length) return head;
+    return `${head}<div class="vac-list"><div class="vac-l">${list.length > 1 ? '离它最近的人' : '离它最近'}</div>${list.map((c) => `<div class="ch">${K.who(c.p, { size: 22, sub: `<span class="nowrap">差 ${K.mag(c.gap)} 魔力</span><span>${eta(c.eta)}</span>` })}<div class="meter sm" role="img" aria-label="到${L.name}进度 ${Math.round(c.pr * 100)}%"><i style="width:${(c.pr * 100).toFixed(1)}%"></i></div></div>`).join('')}</div>`;
+  }
+
+  function nestHTML(s) {
+    return `<span class="nest-figs">${K.frog('egg', 34)}${K.frog('unhatched', 24)}</span>`
+      + `<span class="nest-row"><b class="num">${s.eggs.length}<small>人</small></b><span>蛙卵</span><em>考核期内</em></span>`
+      + '<span class="nest-hr" aria-hidden="true"></span>'
+      + `<span class="nest-row un"><b class="num">${s.un.length}<small>人</small></b><span>未孵化</span><em>考核期满未达标</em></span>`
+      + `<span class="link">去孵化台${K.icon('arrow-right', 14)}</span>`;
+  }
+
+  // ───────── 渲染舞台 ─────────
+  let prevSnap = null;
+  function renderStage(s, { animate = true } = {}) {
+    const mutate = () => {
+      s.lv.forEach((list, k) => {
+        const col = cols[k];
+        const arrSet = new Set(s.arrivals[k].map((p) => p.login));
+        const nodes = list.map((p) => { const el = cell(p); paintCell(el, p, s, s.i > 0 && arrSet.has(p.login)); return el; });
+        col.querySelector('.crowd').replaceChildren(...nodes);
+      });
+    };
+    if (animate) K.flip(ladder, mutate, { selector: '.pc[data-key]', duration: 620 });
+    else mutate();
+    s.lv.forEach((list, k) => {
+      const col = cols[k];
+      const vacant = list.length === 0;
+      col.classList.toggle('is-vacant', vacant);
+      col.querySelector('.lv-fig .frog').classList.toggle('ghost', vacant);
+      const vac = col.querySelector('.vac');
+      vac.hidden = !vacant;
+      if (vacant) vac.innerHTML = vacHTML(s, k);
+      K.countUp(col.querySelector('.cnt'), list.length, { dur: animate ? 500 : 0 });
+      const arr = s.i > 0 ? s.arrivals[k].length : 0;
+      const host = col.querySelector('.arr-host');
+      const want = arr ? `+${arr}` : '';
+      if (host.dataset.v !== `${s.i}:${want}`) {
+        host.dataset.v = `${s.i}:${want}`;
+        host.innerHTML = arr ? `<span class="lv-arr tag tag-new" data-tip="${wkName(s.i)}新到${LV[k].name} ${arr} 人（${k ? '进化' : '孵化'}${k ? '或直接孵化' : ''}而来）">+${arr}</span>` : '';
+      }
+      // 某一级第一次有人：撒花（只在向前回放时）
+      if (animate && prevSnap && s.i === prevSnap.i + 1 && k >= 1 && list.length && !prevSnap.lv[k].length && !state.celebrated.has(k)) {
+        state.celebrated.add(k);
+        setTimeout(() => K.confetti(col.querySelector('.lv-fig'), null, { count: 22, power: 0.8 }), 260);
+      }
+    });
+    $('#nest').innerHTML = nestHTML(s);
+    prevSnap = s;
+  }
+
+  // ───────── 导语 ─────────
+  function renderIntro(s, { animate = true } = {}) {
+    const i = s.i;
+    $('#dateline').innerHTML = `${K.week.status(i)}<span class="range">${K.week.range(i)}</span><span class="asof">${i === LAST ? K.week.asOf() : '这一周结束时的形态'}</span>${state.member ? '<span class="tag tag-member">只看组织成员</span>' : ''}${state.sleep ? '' : '<span class="tag tag-sleep">已隐藏冬眠</span>'}`;
+    let h;
+    if (!s.total) h = `池塘里<mark>还没有人</mark>`;
+    else if (!s.hatched) h = `池塘里<mark>还没有人孵化</mark>`;
+    else if (s.vacTop) h = `${s.hatched} 人已孵化，<mark>最高${NUM[s.vacTop]}级还空着</mark>`;
+    else h = `${s.hatched} 人已孵化，<mark>五级都有人了</mark>`;
+    const nz = s.lv.map((a, k) => (a.length ? `${LV[k].name} <span class="n">${a.length}</span> 人` : null)).filter(Boolean);
+    let t = s.hatched ? `${nz.join('、')}。` : s.total ? '' : `${state.member || !state.sleep ? '按当前筛选，' : ''}这一周结束时还没有贡献者。`;
+    const lowK = s.hatched ? (s.vacTop ? NL - s.vacTop : -1) : -1;
+    if (lowK > 0) {
+      const c = challengers(s, lowK, 1)[0];
+      if (c) t += `离${LV[lowK].name}最近的是 ${K.pname(c.p.login)}，<span class="nowrap">还差 <span class="n">${K.mag(c.gap)}</span> 魔力</span>，<span class="nowrap">${c.eta === null ? '近 4 周没有新魔力' : c.eta > 52 ? '按近 4 周均速要超过 1 年' : `按近 4 周均速${K.etaText(c.eta)}`}</span>。`;
+    }
+    const ev = [];
+    if (s.hatchedNow.length) ev.push(`<span class="n">${s.hatchedNow.length}</span> 人孵化`);
+    if (s.upgraded.length) ev.push(`<span class="n">${s.upgraded.length}</span> 人进化`);
+    if (i > 0 && ev.length) t += `<span class="nowrap">${wkName(i)}</span>有 ${ev.map((e) => `<span class="nowrap">${e}</span>`).join('、')}，台阶上用黄点标出。`;
+    const side = [s.eggs.length ? `<span class="nowrap">蛙卵 <b>${s.eggs.length}</b> 人</span>` : '', s.un.length ? `<span class="nowrap">未孵化 <b>${s.un.length}</b> 人</span>` : ''].filter(Boolean).join('、');
+    if (side) t += s.hatched ? `池边还有${side}。` : `${s.total === 1 ? '唯一的贡献者' : `${s.total} 位贡献者`}都在池边：${side}。`;
+    const hd = $('#headline'), ld = $('#lede');
+    if (hd.innerHTML !== h) {
+      hd.innerHTML = h;
+      hd.classList.remove('is-in', 'swap-in'); void hd.offsetWidth;
+      if (animate) hd.classList.add('swap-in'); hd.classList.add('is-in');
+    }
+    if (ld.innerHTML !== t) { ld.innerHTML = t; ld.classList.remove('swap-in'); void ld.offsetWidth; if (animate) ld.classList.add('swap-in'); }
+  }
+
+  // ───────── 周控制 ─────────
+  const playHTML = (on, full) => `${K.icon(on ? 'pause' : 'play', 14)}<span${full ? '' : ' class="hide-sm"'}>${on ? '暂停' : '回放'}</span>`;
+  function renderControls() {
+    const i = state.i;
+    const label = i === LAST ? '本周' : i === LAST - 1 ? '上周' : K.week.short(i);
+    $('#stWk').textContent = `${K.week.short(i)}${i >= LAST - 1 ? ` · ${label}` : ''}`;
+    $('#rpWk').textContent = `${K.week.short(i)}${i >= LAST - 1 ? ` · ${label}` : ''}`;
+    $('#stPrev').disabled = i <= 0;
+    $('#stNext').disabled = i >= LAST;
+    $('#stPlay').innerHTML = playHTML(state.playing, false);
+    $('#rpPlay').innerHTML = playHTML(state.playing, true);
+    $('#stPlay').setAttribute('aria-pressed', String(state.playing));
+    $('#rpPlay').setAttribute('aria-pressed', String(state.playing));
+    $('#rpPlay').setAttribute('aria-label', state.playing ? '暂停回放' : '回放形态变化');
+    const sc = $('#scrub');
+    sc.value = i;
+    sc.style.setProperty('--p', `${(i / LAST) * 100}%`);
+    sc.setAttribute('aria-valuetext', `${K.week.short(i)} ${K.week.name(i)}`);
+    $('#kNew').textContent = `黄点 = ${i === LAST ? '本周' : '这一周'}新到这一级`;
+    $('#stageNote').textContent = i === LAST ? '本周还没结束，形态会继续变化；形态只升不降。' : '历史周按当时的魔力与考核状态还原；冬眠只标记当下。';
+  }
+
+  function setWeek(i, { animate = true, fromPlay = false } = {}) {
+    i = Math.max(0, Math.min(LAST, i));
+    if (!fromPlay && state.playing) stop();
+    const changed = i !== state.i;
+    state.i = i;
+    K.week.toURL(i);
+    const s = snap(i);
+    renderStage(s, { animate: animate && changed });
+    renderIntro(s, { animate: animate && changed });
+    renderControls();
+    chart.draw();
+  }
+
+  // 回放：从第一次有人孵化的前一周开始
+  const firstHatch = NW.weeks.findIndex((_, i) => NW.people.some((p) => p.started[i] && p.levels[i] !== null));
+  const playFrom = Math.max(0, firstHatch - 1);
+  function play() {
+    if (state.playing) return;
+    state.playing = true;
+    if (state.i >= LAST) { state.celebrated.clear(); setWeek(playFrom, { fromPlay: true }); }
+    renderControls();
+    state.timer = setInterval(() => {
+      if (state.i >= LAST) { stop(); return; }
+      setWeek(state.i + 1, { fromPlay: true });
+      if (state.i >= LAST) stop();
+    }, K.reduced() ? 900 : 760);
+  }
+  function stop() { state.playing = false; clearInterval(state.timer); renderControls(); }
+  const toggle = () => (state.playing ? stop() : play());
+
+  $('#rpIcon').innerHTML = K.icon('layers', 15);
+  $('#kRing').insertAdjacentHTML('afterbegin', `<span aria-hidden="true">${K.ring(0.65, { size: 14, stroke: 2.5 })}</span>`);
+  $('#stPrev').innerHTML = K.icon('chevron-left', 16);
+  $('#stNext').innerHTML = K.icon('chevron-right', 16);
+  $('#stPrev').addEventListener('click', () => setWeek(state.i - 1));
+  $('#stNext').addEventListener('click', () => setWeek(state.i + 1));
+  $('#stPlay').addEventListener('click', toggle);
+  $('#rpPlay').addEventListener('click', toggle);
+  $('#scrub').max = LAST;
+  $('#scrub').addEventListener('input', (e) => setWeek(+e.target.value));
+  $('#scrubA').textContent = K.week.short(0);
+  $('#scrubB').textContent = `${K.week.short(LAST)} 本周`;
+
+  function setFilter() {
+    state.member = $('#swMember').checked;
+    state.sleep = $('#swSleep').checked;
+    const s = snap(state.i);
+    renderStage(s, { animate: true });
+    renderIntro(s, { animate: true });
+    chart.draw();
+  }
+  $('#swMember').addEventListener('change', setFilter);
+  $('#swSleep').addEventListener('change', setFilter);
+
+  // ───────── 图：形态人数随周（堆叠面积） ─────────
+  const LAYERS = [
+    ...LV.map((L, k) => ({ key: k, name: L.name, c: `var(--${W_KEY[k]})` })),
+    { key: 'egg', name: '蛙卵', c: 'var(--f-egg)' },
+    { key: 'un', name: '未孵化', c: 'var(--f-un)' },
+  ];
+  const chart = (() => {
+    const host = $('#chart');
+    host.tabIndex = 0;
+    host.setAttribute('role', 'img');
+    let G = null, hov = -1, series = null;
+    const tw = (s) => [...String(s)].reduce((n, c) => n + (/[　-鿿＀-￯]/.test(c) ? 11 : 6.2), 0);
+    function compute() {
+      const list = pool();
+      return NW.weeks.map((_, i) => {
+        const s = snap(i, list);
+        return { i, v: [...s.lv.map((a) => a.length), s.eggs.length, s.un.length], hatched: s.hatched, total: s.total, lv: s.lv };
+      });
+    }
+    function draw() {
+      series = compute();
+      const sm = matchMedia('(max-width: 720px)').matches;
+      const Wd = host.clientWidth || 600, H = host.clientHeight || 216;
+      const padL = sm ? 26 : 32, padR = sm ? 10 : 14, padT = 26, padB = 22;
+      const n = series.length, iw = Wd - padL - padR, ih = H - padT - padB;
+      const maxV = Math.max(1, ...series.map((d) => d.total));
+      const p10 = Math.pow(10, Math.floor(Math.log10(maxV / 4)));
+      const m = (maxV / 4) / p10;
+      const step = (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p10;
+      const top = Math.ceil(maxV / step) * step;
+      const x = (i) => padL + (i / (n - 1)) * iw;
+      const y = (v) => padT + ih - (v / top) * ih;
+      G = { x, y, n, padL, padR, padT, ih, iw, Wd, H };
+      let svg = `<svg width="${Wd}" height="${H}" viewBox="0 0 ${Wd} ${H}" aria-hidden="true">`;
+      for (let t = 0; t <= top + 1e-9; t += step) {
+        const yy = Math.round(y(t)) + 0.5;
+        svg += `<line class="${t === 0 ? 'bl' : 'gl'}" x1="${padL}" x2="${Wd - padR}" y1="${yy}" y2="${yy}"/><text class="ax" x="${padL - 8}" y="${yy + 3.5}" text-anchor="end">${Math.round(t)}</text>`;
+      }
+      // 悬停色带
+      const bw = iw / (n - 1);
+      svg += `<rect class="hov" id="hovBand" x="0" y="${padT - 8}" width="${bw}" height="${ih + 8}" rx="4" style="opacity:0"/>`;
+      // 堆叠面积：自下而上 蝌蚪 → 宇宙奶蛙 → 蛙卵 → 未孵化
+      const base = series.map(() => 0);
+      const seps = [];
+      LAYERS.forEach((Lr, li) => {
+        const vals = series.map((d) => d.v[li]);
+        if (!vals.some((v) => v > 0)) return;
+        const lo = base.slice();
+        const hi = base.map((b, i) => b + vals[i]);
+        const up = hi.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join('');
+        const dn = lo.map((v, i) => `L${x(i).toFixed(1)} ${y(v).toFixed(1)}`).reverse().join('');
+        svg += `<path class="ar" fill="${Lr.c}" d="${up}${dn}Z"/>`;
+        seps.push(up);
+        hi.forEach((v, i) => { base[i] = v; });
+      });
+      seps.slice(0, -1).forEach((d) => { svg += `<path class="sep" d="${d}"/>`; });
+      // x 轴：每月第一周标「N月」
+      let lastM = -1, lastX = -99;
+      NW.W.forEach((t, i) => {
+        const dt = new Date(t + 8 * 3600000), mo = dt.getUTCMonth();
+        if (mo === lastM) return;
+        lastM = mo;
+        if (dt.getUTCDate() > 7) return; // 序列从月中开始时不标这个月，免得把 05-18 标成「5月」
+        const lab = `${mo + 1}月`;
+        if (x(i) - lastX > tw(lab) + 8) { svg += `<text class="ax" x="${x(i)}" y="${H - 5}" text-anchor="middle">${lab}</text>`; lastX = x(i); }
+      });
+      // 选中周：竖线 + 已孵化总数直接标注
+      const si = state.i, sx = x(si), sd = series[si];
+      const hy = y(sd.hatched);
+      svg += `<line class="sel" x1="${Math.round(sx) + 0.5}" x2="${Math.round(sx) + 0.5}" y1="${padT - 6}" y2="${y(0)}"/>`;
+      const lab = `已孵化 ${sd.hatched} / ${sd.total}`;
+      const lw = tw(lab) + 12;
+      const right = sx + 10 + lw < Wd - padR + 6;
+      const lx = right ? sx + 8 : sx - 8 - lw;
+      const ly = Math.min(Math.max(hy - 9, padT - 6), y(0) - 20);
+      svg += `<rect class="sel-bg" x="${lx}" y="${ly}" width="${lw}" height="18" rx="5" opacity=".92"/><text class="sel-tx" x="${lx + 6}" y="${ly + 12.5}">${lab}</text>`;
+      if (sd.hatched > 0) svg += `<circle class="sel-dot" cx="${sx}" cy="${hy}" r="4.5"/>`;
+      // 图上标注（从数据算出），画在选中线之上，文字带表面色描边，竖线穿过时不糊：第一次有人孵化 / 第一批奶蛙
+      const notes = [];
+      const fh = series.findIndex((d) => d.hatched > 0);
+      if (fh >= 0) notes.push({ at: fh, v: series[fh].total, text: `${K.week.short(fh)} 第一次有人孵化`, side: 'left' });
+      const ff = series.findIndex((d) => d.lv[2].length > 0);
+      if (ff >= 0 && !sm) notes.push({ at: ff, v: series[ff].total, text: `${K.week.short(ff)} 出现第一批奶蛙（${series[ff].lv[2].length} 人）`, side: 'left' });
+      notes.forEach((a) => {
+        const px = x(a.at), py = y(a.v);
+        const ty = Math.max(padT - 14, py - 22);
+        const w = tw(a.text);
+        const tx = Math.max(padL + w + 4, px - 14);
+        svg += `<path class="anno-ln" d="M${px} ${py - 3}L${px} ${ty + 4}L${tx + 4} ${ty + 4}"/><circle class="anno-dot" cx="${px}" cy="${py - 3}" r="2"/><text class="anno-tx" x="${tx}" y="${ty + 8}" text-anchor="end" dx="-2">${K.esc(a.text)}</text>`;
+      });
+      svg += `<line class="xh" id="xh" x1="0" x2="0" y1="${padT - 6}" y2="${y(0)}"/></svg>`;
+      host.innerHTML = svg;
+      host.setAttribute('aria-label', `形态人数随周变化：${K.week.short(si)} 已孵化 ${sd.hatched} 人，共 ${sd.total} 人。用方向键切换周。`);
+      // 滑块与图的 x 轴对齐：拇指中心正好落在每周的点上
+      const wrap = $('#scrubWrap');
+      wrap.style.marginLeft = `${padL - 9}px`;
+      wrap.style.marginRight = `${padR - 9}px`;
+      renderLegend();
+      renderTable();
+      if (hov >= 0) hover(hov, false);
+    }
+    function renderLegend() {
+      const d = series[state.i];
+      $('#legend').innerHTML = LAYERS.map((Lr, li) => `<span class="key${d.v[li] ? '' : ' is-zero'}" style="--k:${Lr.c}">${Lr.name} <b class="num">${d.v[li]}</b></span>`).join('')
+        + `<span class="key tot" style="--k:transparent;margin-left:auto">${K.week.short(state.i)} 合计 <b class="num">${d.total}</b></span>`;
+    }
+    function renderTable() {
+      $('#srTable').innerHTML = `<caption>每周末各形态人数</caption><tr><th>周</th>${LAYERS.map((l) => `<th>${l.name}</th>`).join('')}</tr>`
+        + series.map((d) => `<tr><td>${K.week.short(d.i)}</td>${d.v.map((v) => `<td>${v}</td>`).join('')}</tr>`).join('');
+    }
+    function hover(k, withTip = true) {
+      if (!G) return;
+      hov = k;
+      const band = host.querySelector('#hovBand'), xh = host.querySelector('#xh');
+      if (k < 0) { band.style.opacity = 0; xh.style.opacity = 0; K.tip.hide(); return; }
+      const bw = G.iw / (G.n - 1);
+      band.setAttribute('x', G.x(k) - bw / 2);
+      band.style.opacity = 0.05;
+      xh.setAttribute('x1', G.x(k)); xh.setAttribute('x2', G.x(k));
+      xh.style.opacity = 0.5;
+      if (!withTip) return;
+      const d = series[k];
+      const rows = LAYERS.map((Lr, li) => ({ Lr, v: d.v[li] })).filter((r) => r.v > 0).reverse();
+      const html = `<div class="t-h">${K.week.short(k)} ${k === LAST ? '本周 · 截至此刻' : '这一周结束时'}</div>`
+        + (rows.length ? rows.map((r) => `<div class="t-row"><span class="t-key box" style="--k:${r.Lr.c}"></span><span class="t-v">${r.v}</span><span class="t-l">${r.Lr.name}</span></div>`).join('') : '<div class="t-l">还没有贡献者</div>')
+        + `<div class="t-row" style="margin-top:4px"><span class="t-l">已孵化 ${d.hatched} / ${d.total} 人 · 点击查看这一周</span></div>`;
+      const r = host.getBoundingClientRect();
+      const yt = G.y(d.total);
+      K.tip.show(html, { getBoundingClientRect: () => ({ left: r.left + G.x(k) - 1, width: 2, top: r.top + yt - 6, bottom: r.top + yt, height: 6, right: r.left + G.x(k) + 1 }) });
+    }
+    const idxAt = (cx) => { const r = host.getBoundingClientRect(); return Math.max(0, Math.min(G.n - 1, Math.round(((cx - r.left - G.padL) / G.iw) * (G.n - 1)))); };
+    let drag = false;
+    host.addEventListener('pointermove', (e) => {
+      if (!G) return;
+      const k = idxAt(e.clientX);
+      if (drag) { if (k !== state.i) setWeek(k); hover(k, false); return; }
+      if (e.pointerType === 'mouse' && (k !== hov || !document.querySelector('.tip.on'))) hover(k);
+    });
+    host.addEventListener('pointerleave', () => { if (!drag) hover(-1); });
+    host.addEventListener('pointerdown', (e) => { if (!G) return; drag = e.pointerType === 'mouse'; if (drag) host.setPointerCapture(e.pointerId); setWeek(idxAt(e.clientX)); });
+    host.addEventListener('pointerup', () => { drag = false; });
+    host.addEventListener('pointercancel', () => { drag = false; });
+    host.addEventListener('focus', () => { if (host.matches(':focus-visible')) hover(state.i); });
+    host.addEventListener('blur', () => hover(-1));
+    new ResizeObserver(() => draw()).observe(host);
+    return { draw, hover, get hov() { return hov; } };
+  })();
+
+  // ───────── 快捷键与命令面板 ─────────
+  const after = (fn) => () => { fn(); if (document.activeElement === $('#chart')) chart.hover(state.i); };
+  K.keys.add([
+    { key: 'ArrowLeft', label: '前一周', group: '形态池', handler: after(() => setWeek(state.i - 1)) },
+    { key: 'ArrowRight', label: '后一周', group: '形态池', handler: after(() => setWeek(state.i + 1)) },
+    { key: ' ', display: 'Space', label: '回放 / 暂停', group: '形态池', handler: (e) => { if (e.target.closest && e.target.closest('button, a, [role="button"]')) return false; toggle(); } },
+    { key: 't', display: 'T', label: '回到本周', group: '形态池', handler: () => setWeek(LAST) },
+    { key: 'm', display: 'M', label: '只看组织成员', group: '形态池', handler: () => { $('#swMember').click(); } },
+    { key: 'h', display: 'H', label: '显示 / 隐藏冬眠', group: '形态池', handler: () => { $('#swSleep').click(); } },
+  ]);
+  K.cmdk.add({ label: '回放形态变化', icon: 'play', run: () => play(), kbd: 'Space' });
+  K.cmdk.add({ label: '回到本周', icon: 'rotate-ccw', run: () => setWeek(LAST), kbd: 'T' });
+  K.cmdk.add({ label: '只看组织成员（开 / 关）', icon: 'filter', run: () => $('#swMember').click(), kbd: 'M' });
+  K.cmdk.add({ label: '显示 / 隐藏冬眠', icon: 'moon-z', run: () => $('#swSleep').click(), kbd: 'H' });
+  K.cmdk.add({ label: '去孵化台', icon: 'egg', run: () => K.navigate('c4') });
+
+  // ───────── #lv=k：从首屏池塘点进来时高亮那一级 ─────────
+  function focusHash() {
+    const m = location.hash.match(/lv=(\d)/);
+    if (!m) return;
+    const col = cols[+m[1]];
+    if (!col) return;
+    col.classList.remove('is-focus'); void col.offsetWidth; col.classList.add('is-focus');
+    col.scrollIntoView({ block: 'center', behavior: K.reduced() ? 'auto' : 'smooth' });
+  }
+  addEventListener('hashchange', focusHash);
+
+  // ───────── 初始化 ─────────
+  const s0 = snap(state.i);
+  renderStage(s0, { animate: false });
+  renderIntro(s0, { animate: false });
+  $('#headline').classList.add('is-in');
+  renderControls();
+  chart.draw();
+  K.ready(() => setTimeout(focusHash, 120));
+})();
+</script>
+</body>
+</html>

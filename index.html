@@ -2,1053 +2,889 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>奶蛙宇宙贡献度看板</title>
+<meta name="referrer" content="no-referrer">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="assets/tokens.css">
+<!-- 读取 data/board.json 后加载 engine.js、assets/derive.js、icons.js、kit.js，再执行下方 type="text/x-nw-page" 的页面脚本 -->
+<script src="assets/boot.js"></script>
 <style>
-:root {
-  color-scheme: light;
-  --page: #f9f9f7;
-  --surface: #fcfcfb;
-  --ink: #0b0b0b;
-  --ink-2: #52514e;
-  --muted: #898781;
-  --grid: #e1e0d9;
-  --axis: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.10);
-  --s1: #2a78d6;
-  --s2: #eb6834;
-  --s3: #1baf7a;
-  --track: #cde2fb;
-  --hover: rgba(42, 120, 214, 0.08);
-  --good: #0ca30c;
-  --warning: #fab219;
-  --serious: #ec835a;
-  --critical: #d03b3b;
-  --neutral: #898781;
-  --lv0: #86b6ef;
-  --lv1: #5598e7;
-  --lv2: #2a78d6;
-  --lv3: #1c5cab;
-  --lv4: #184f95;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --page: #0d0d0d;
-    --surface: #1a1a19;
-    --ink: #f0efec;
-    --ink-2: #c3c2b7;
-    --grid: #2c2c2a;
-    --axis: #383835;
-    --border: rgba(255, 255, 255, 0.10);
-    --s1: #3987e5;
-    --s2: #d95926;
-    --s3: #199e70;
-    --track: #0d366b;
-    --hover: rgba(57, 135, 229, 0.12);
+  /* 本页布局；颜色、字号、圆角、动效一律用令牌 */
+
+  /* ── 首屏大卡：桌面两栏，手机重排（周选择器提到导语之前） ── */
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) 440px; column-gap: var(--s-10);
+    grid-template-areas: "date pond" "story pond" "kpis kpis" "sel sel" "foot foot"; }
+  .hero-date { grid-area: date; padding: var(--s-6) 0 0 28px; }
+  .hero-story { grid-area: story; padding: var(--s-4) 0 0 28px; min-width: 0; }
+  .hero-pond { grid-area: pond; padding: var(--s-6) 28px 0 0; align-self: start; }
+  .hero-kpis { grid-area: kpis; margin: var(--s-6) 28px 0; padding-top: var(--s-5); border-top: 1px solid var(--line-soft); }
+  .hero-sel { grid-area: sel; margin: var(--s-6) 28px 0; padding-top: var(--s-5); border-top: 1px solid var(--line-soft); min-width: 0; }
+  .hero-foot { grid-area: foot; padding: var(--s-3) 28px var(--s-5); }
+  .hero .dateline { gap: var(--s-2) 10px; }
+  .hero .stepper { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+  .hero .back-now[hidden] { display: none; }
+  .hero .lede { min-height: calc(1.85em * 3); }
+  .hero .headline .pname { font-weight: inherit; }
+
+  /* ── 周选择器：上下两个面板（合入 / 活跃），各自一根基线 ── */
+  .wk-h { display: flex; align-items: center; gap: var(--s-3) var(--s-4); flex-wrap: wrap; margin-bottom: var(--s-2); }
+  .wk-h .title { font-size: var(--fs-sm); font-weight: 650; color: var(--ink-2); }
+  .wk-h .hint { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-xs); color: var(--ink-3); white-space: nowrap; }
+  .wk { position: relative; touch-action: pan-y; cursor: pointer; user-select: none; -webkit-user-select: none; border-radius: var(--r-md); }
+  .wk.is-drag { cursor: grabbing; }
+  .wk.is-static .sel-band, .wk.is-static .wk-pill { transition: none; }
+  .wk:focus-visible { outline-offset: 6px; }
+  .wk svg { display: block; overflow: visible; }
+  .wk .pl { font-size: var(--fs-2xs); font-weight: 650; fill: var(--ink-3); }
+  .wk .pv { font-size: 10px; fill: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .wk .b-m { fill: var(--viz-dim); transition: fill var(--dur-3) var(--ease-out); }
+  .wk .b-a { fill: var(--viz-dim-2); transition: fill var(--dur-3) var(--ease-out); }
+  .wk .b-m.on { fill: var(--leaf); }
+  .wk .b-a.on { fill: var(--water); }
+  .wk .z { fill: var(--viz-muted); }
+  .wk .sel-band { fill: var(--leaf-wash); transition: transform var(--dur-4) var(--ease-spring); }
+  .wk .hov-band { fill: var(--surface-hover); opacity: 0; transition: opacity var(--dur-1); }
+  :root[data-theme="dark"] .wk .hov-band { fill: var(--surface-hover); }
+  .wk .mo { font-size: 10.5px; fill: var(--ink-3); transition: opacity var(--dur-2); }
+  .wk-frog { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform; z-index: 2; }
+  .wk-frog .frog { filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.12)); }
+  .wk-pill { position: absolute; left: 0; top: 0; height: 20px; padding: 0 8px; border-radius: var(--r-pill); display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-2xs); font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; background: var(--leaf); color: var(--on-leaf); pointer-events: none; transition: transform var(--dur-4) var(--ease-spring), background-color var(--dur-2); }
+  .wk-pill.is-live { background: var(--yolk); color: var(--yolk-ink); }
+  :root[data-theme="dark"] .wk-pill.is-live { color: var(--ink-inverse); }
+  .wk-pill .live-dot { width: 6px; height: 6px; background: var(--yolk-deep); }
+  :root[data-theme="dark"] .wk-pill .live-dot { background: var(--ink-inverse); }
+  .wk-flag { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 6px; border-radius: var(--r-pill); font-size: 10px; font-weight: 700; color: var(--yolk-ink); background: var(--yolk-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yolk-deep) 40%, transparent); white-space: nowrap; pointer-events: none; transition: opacity var(--dur-2); }
+  .wk-flag .live-dot { width: 5px; height: 5px; background: var(--yolk-deep); }
+  .wk-flag.is-dot span { display: none; }
+  .wk-flag.is-dot { padding: 0 6px; gap: 0; }
+
+  /* ── 三张「这一周的人」卡 ── */
+  .people .card { display: flex; flex-direction: column; height: 100%; }
+  .people .card-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .people .card-head .n { margin-left: 2px; font-weight: 600; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .sub-h { display: flex; align-items: center; gap: 6px; margin: 0 0 var(--s-2); font-size: var(--fs-xs); font-weight: 650; color: var(--ink-2); }
+  .sub-h .ic { color: var(--ink-3); }
+  .sub-h .aside { margin-left: auto; font-weight: 500; color: var(--ink-3); white-space: nowrap; }
+  .sub-h .cnt { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .sep { height: 1px; margin: var(--s-4) 0; background: var(--line-soft); }
+
+  /* 魔力榜 */
+  .board { margin: 0 calc(-1 * var(--s-5)); }
+  .board .lrow { --cols: 22px minmax(0, 1fr) 48px 38px; gap: 10px; --row-h: 44px; padding: 4px var(--s-5); }
+  .board .lrow .who .sub { margin-top: 1px; }
+  .board .rank { width: auto; text-align: center; } /* 通用 .rank 固定 28px 且右对齐，会溢出本页 22px 的名次列、贴住头像；名次在列内水平居中 */
+  .board .dl { justify-self: end; }
+  .board .sub .out { color: var(--water-ink); font-weight: 600; }
+  .board-more { display: none; }
+
+  /* 名次变化 */
+  .mv { display: grid; grid-template-columns: minmax(0, 1fr) minmax(64px, 96px) auto; align-items: center; gap: 10px; min-height: 40px; }
+  .mv .rk { font-size: var(--fs-xs); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+  .mv .rk b { color: var(--ink); font-weight: 650; }
+  .mv .drange { margin: 0 var(--s-1); }
+  .faces { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .face { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border-radius: var(--r-lg); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-soft); cursor: pointer; transition: background-color var(--dur-1); }
+  .face:hover { background: var(--surface-hover); }
+  .face .who-txt { line-height: 1.25; }
+  .face .nm { font-size: var(--fs-sm); }
+  .enter-row { display: flex; align-items: center; gap: 10px; margin-top: var(--s-3); padding: 8px 10px; border-radius: var(--r-lg); box-shadow: inset 0 0 0 1px var(--line-soft); font-size: var(--fs-xs); color: var(--ink-3); }
+  .enter-row > span:last-child, .hero .lede { text-wrap: pretty; }
+  .enter-row b { color: var(--ink-2); font-weight: 650; }
+  .mini-empty { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--r-lg); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-soft); font-size: var(--fs-sm); color: var(--ink-3); }
+  .mini-empty b { color: var(--ink-2); font-weight: 650; }
+
+  /* 进化 */
+  .evo-list { display: grid; gap: 6px; }
+  .ev { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 6px 10px 6px 8px; border-radius: var(--r-lg); background: color-mix(in srgb, var(--yolk-soft) 55%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yolk-deep) 18%, transparent); cursor: pointer; }
+  :root[data-theme="dark"] .ev { background: color-mix(in srgb, var(--yolk) 7%, var(--surface)); }
+  .ev .ev-tr { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-3); }
+  .ev .ev-tr .ic { width: 12px; height: 12px; }
+  .upc { display: grid; grid-template-columns: minmax(0, 1fr) minmax(112px, 42%); align-items: center; gap: 12px; min-height: 44px; cursor: pointer; }
+  .upc .meter { height: 5px; }
+  .upc .uv { display: flex; justify-content: space-between; gap: 6px; margin-top: 5px; font-size: var(--fs-2xs); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .upc .uv b { color: var(--ink-2); font-weight: 650; }
+  .upc .eta { color: var(--leaf-ink); font-weight: 650; }
+  .upc .eta.soon { color: var(--yolk-ink); }
+
+  .card-foot .link { margin-left: auto; }
+  .card-foot .ic { vertical-align: -2px; }
+
+  /* ── 趋势 ── */
+  .trend .card-head { padding-bottom: var(--s-1); }
+  .trend .chart { margin-top: var(--s-2); }
+
+  /* ── 组织健康 ── */
+  .health-kpis { padding: var(--s-1) var(--s-5) var(--s-5); }
+  .health-kpis .kpi-v .val { font-size: var(--fs-2xl); }
+  .hgrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-3); padding: 0 var(--s-5) var(--s-5); }
+  .hc { padding: var(--s-3) var(--s-4) var(--s-4); min-width: 0; }
+  .hc-l { display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+  .hc-l .ic { color: var(--ink-3); }
+  .hc-l > span:not(.info) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .hc-l .l-short { display: none; }
+  .hc-l .info { margin-left: auto; color: var(--ink-4); cursor: help; display: inline-flex; }
+  .hc-v { margin-top: 6px; font-family: var(--font-display); font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .hc-v small { margin-left: 3px; font-size: var(--fs-sm); font-weight: 600; color: var(--ink-3); letter-spacing: 0; }
+  .hc .meter { margin-top: 10px; height: 4px; }
+  .hc-n { margin-top: 8px; font-size: var(--fs-2xs); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  .hc-n .pname { font-size: var(--fs-2xs); }
+
+  .page-foot { margin-top: var(--s-10); }
+
+  /* ── 平板 ── */
+  @media (max-width: 1100px) {
+    .hero { grid-template-columns: 1fr; grid-template-areas: "date" "story" "pond" "kpis" "sel" "foot"; }
+    .hero-date, .hero-story { padding-right: 28px; }
+    .hero-pond { padding: var(--s-5) 28px 0; }
+    .hgrid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .hgrid > .hc { grid-column: span 2; }
+    .hgrid > .hc:nth-child(n + 4) { grid-column: span 3; }
   }
-}
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "PingFang SC", sans-serif; }
-a { color: var(--s1); text-decoration: none; }
-a:hover { text-decoration: underline; }
-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
-.wrap { max-width: 1320px; margin: 0 auto; padding: 18px 20px 60px; }
-.meta { font-size: 12px; color: var(--muted); }
-
-/* 顶栏 */
-.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
-.top h1 { font-size: 20px; margin: 0; display: flex; align-items: center; gap: 8px; }
-.top #status { margin-left: auto; }
-#status.error { color: var(--critical); }
-input[type=search] { font: inherit; font-size: 13px; padding: 5px 10px; border: 1px solid var(--axis); border-radius: 6px; background: var(--surface); color: var(--ink); }
-.sk { display: grid; grid-template-columns: 30px minmax(170px, 230px) 104px minmax(140px, 1fr) 92px; gap: 10px; align-items: center; padding: 12px 4px; border-bottom: 1px solid var(--grid); }
-.sk i { display: block; height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--grid) 25%, var(--hover) 50%, var(--grid) 75%); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
-@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) { .sk i { animation: none; } }
-
-/* 布局 */
-.grid { display: grid; gap: 14px; margin-top: 14px; }
-.main { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: start; }
-.side { display: grid; gap: 14px; }
-.two { grid-template-columns: 1fr 1fr; }
-@media (max-width: 1000px) { .main, .two { grid-template-columns: 1fr; } }
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
-.card h2 { font-size: 15px; margin: 0 0 10px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
-.card h2 .meta { font-weight: 400; }
-.empty { color: var(--muted); font-size: 13px; padding: 24px 0; text-align: center; }
-
-/* KPI */
-.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 10px; margin-top: 14px; }
-.kpi .label { font-size: 12px; color: var(--ink-2); }
-.kpi .value { font-size: 24px; font-weight: 600; line-height: 1.3; }
-.kpi .note { font-size: 11.5px; color: var(--muted); }
-.meter { height: 6px; border-radius: 3px; background: var(--track); margin: 6px 0 4px; overflow: hidden; }
-.meter i { display: block; height: 100%; background: var(--s1); border-radius: 3px; min-width: 3px; }
-
-/* 筛选与标签 */
-.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
-.chip { font: inherit; font-size: 12px; padding: 2px 10px; border-radius: 12px; border: 1px solid var(--axis); background: transparent; color: var(--ink-2); cursor: pointer; }
-.chip.on { background: var(--ink); color: var(--surface); border-color: var(--ink); }
-.chip b { font-weight: 600; margin-left: 3px; }
-.tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; line-height: 16px; padding: 0 6px; border: 1px solid var(--axis); border-radius: 10px; color: var(--ink-2); white-space: nowrap; }
-.tag.st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--neutral); }
-.tag.st.good::before { background: var(--good); }
-.tag.st.warning::before { background: var(--warning); }
-.tag.st.serious::before { background: var(--serious); }
-.tag.st.critical::before { background: var(--critical); }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); align-items: center; }
-.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
-.legend svg { vertical-align: -3px; margin-right: 3px; }
-
-/* 排行榜 */
-.lb-head, .lb-row { display: grid; grid-template-columns: 30px minmax(170px, 230px) 104px minmax(140px, 1fr) 92px; gap: 10px; align-items: center; }
-.lb-head { font-size: 11.5px; color: var(--muted); padding: 2px 4px 6px; border-bottom: 1px solid var(--axis); }
-.lb-row { padding: 6px 4px; border-bottom: 1px solid var(--grid); }
-.lb-row:hover { background: var(--hover); }
-.rk { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--muted); }
-.rk.top3 { color: var(--ink); }
-.who { display: flex; gap: 8px; align-items: center; min-width: 0; }
-.who img { width: 26px; height: 26px; border-radius: 50%; background: var(--grid); flex: none; }
-.who .name { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.who .sub { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lv { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; white-space: nowrap; }
-.bar { display: flex; align-items: center; height: 16px; }
-.bar .seg { height: 14px; flex: none; }
-.bar .seg.p { background: var(--s1); }
-.bar .seg.m { background: var(--s2); }
-.bar .seg.c { background: var(--s3); }
-.bar .seg + .seg { margin-left: 2px; }
-.bar .seg:last-of-type { border-radius: 0 4px 4px 0; }
-.bar .v { margin-left: 6px; font-weight: 600; font-variant-numeric: tabular-nums; font-size: 13px; }
-.more { margin-top: 8px; text-align: center; }
-.more button { font: inherit; font-size: 12px; background: none; border: none; color: var(--s1); cursor: pointer; }
-
-/* 公式：一行主公式，下面是左右对齐的定义表 */
-.formula { padding: 14px 16px; background: var(--page); border-radius: 8px; }
-.fmain { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--grid); }
-.fmain .lhs { font-weight: 600; }
-.fmain .sum { display: inline-flex; flex-direction: column; align-items: center; line-height: 1; }
-.fmain .sum span { font-size: 22px; }
-.fmain .sum small { font-size: 10px; color: var(--muted); margin-top: 2px; }
-.fdefs { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 14px; margin: 12px 0 0; font-size: 13px; align-items: baseline; }
-.fdefs dt { display: flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
-.fdefs dd { margin: 0; font-variant-numeric: tabular-nums; }
-.fdefs .k { font-weight: 600; }
-.fdefs .note { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
-.sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
-.sw.s1 { background: var(--s1); }
-.sw.s2 { background: var(--s2); }
-.sw.s3 { background: var(--s3); }
-.sw.none { border: 1px solid var(--axis); }
-.examples { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 10px; margin: 12px 0 0; font-size: 12.5px; color: var(--ink-2); }
-.examples dt { color: var(--muted); }
-.examples dd { margin: 0; }
-.examples b { color: var(--ink); font-variant-numeric: tabular-nums; }
-.formula-ref { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
-.nw { white-space: nowrap; }
-
-/* 进化路径 */
-.cond { display: flex; flex-wrap: wrap; gap: 6px; }
-.segbar { display: flex; gap: 2px; height: 28px; margin: 10px 0 6px; }
-.segbar div { display: flex; align-items: center; gap: 4px; padding-left: 6px; border-radius: 4px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; min-width: 4px; }
-.segbar .good { background: var(--good); }
-.segbar .neutral { background: var(--neutral); }
-.segbar .critical { background: var(--critical); }
-.flow { font-size: 12px; color: var(--muted); margin: 10px 0 2px; }
-.step { cursor: pointer; }
-.step:hover path { opacity: 0.85; }
-
-/* 图表 */
-.chart svg { display: block; width: 100%; height: auto; }
-.ax { fill: var(--muted); font-size: 11px; }
-.ax-l { fill: var(--ink-2); font-size: 11px; }
-.gl { stroke: var(--grid); stroke-width: 1; }
-.bl { stroke: var(--axis); stroke-width: 1; }
-.mk { fill: var(--s1); pointer-events: none; }
-.ln { fill: none; stroke: var(--s1); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.peak { fill: var(--ink-2); font-size: 11px; font-weight: 600; pointer-events: none; }
-.cnt { fill: var(--ink); font-size: 16px; font-weight: 700; }
-.hit { fill: transparent; }
-.hit:hover { fill: var(--hover); }
-.dot { fill: var(--s1); stroke: var(--surface); stroke-width: 2; }
-.dot:hover { stroke: var(--ink); }
-.zone { fill: var(--warning); fill-opacity: 0.16; }
-.zone-line { fill: none; stroke: var(--warning); stroke-width: 1.5; }
-.zone-t { fill: var(--ink-2); font-size: 10.5px; font-weight: 600; }
-.chart-note { margin: 8px 0 0; font-size: 12px; color: var(--ink-2); line-height: 1.6; }
-.hbars { display: grid; gap: 2px; }
-.hb { display: grid; grid-template-columns: 220px 1fr 80px; gap: 8px; align-items: center; padding: 4px 2px; font-size: 13px; }
-.hb:hover { background: var(--hover); }
-.hb-b { height: 14px; }
-.hb-b i { display: block; height: 100%; background: var(--s1); border-radius: 0 4px 4px 0; min-width: 2px; }
-.hb-v { font-variant-numeric: tabular-nums; text-align: right; }
-.factors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.sub-h { font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin: 14px 0 6px; }
-.sub-h .meta { font-weight: 400; }
-.mrows { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 10px; align-items: center; }
-.mrows .fam { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
-.ex-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.ex-chips span { padding: 2px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; color: var(--ink-2); }
-.ex-chips b { color: var(--ink); font-variant-numeric: tabular-nums; }
-.factors h3 { font-size: 12.5px; font-weight: 600; margin: 0 0 4px; color: var(--ink-2); }
-@media (max-width: 700px) { .factors { grid-template-columns: 1fr; } }
-
-/* M-Team 对照 */
-.map { display: grid; grid-template-columns: 1fr 20px 1.3fr; gap: 7px 6px; align-items: center; font-size: 13px; }
-.map .from { text-align: right; color: var(--ink-2); }
-.map .arrow { text-align: center; color: var(--muted); }
-.map .to { font-weight: 600; cursor: help; }
-.map .to.off { color: var(--muted); font-weight: 400; }
-
-/* 明细表 */
-details.card > summary { cursor: pointer; font-weight: 600; font-size: 14px; }
-details.card[open] > summary { margin-bottom: 10px; }
-.table-wrap { overflow-x: auto; }
-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
-th, td { padding: 5px 8px; border-bottom: 1px solid var(--grid); text-align: left; white-space: nowrap; }
-th { color: var(--ink-2); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--surface); }
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-ul.blind { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink-2); }
-ul.blind li { margin: 4px 0; }
-dl.terms { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 12px; margin: 0; font-size: 13px; align-items: baseline; }
-dl.terms dt { font-weight: 600; }
-dl.terms dd { margin: 0; color: var(--ink-2); }
-
-#tip { position: fixed; z-index: 10; pointer-events: none; display: none; max-width: 360px; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.6; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); }
-#tip .k { color: var(--muted); }
-#tip svg { vertical-align: -4px; }
-#tip .tt-h { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 13px; }
-#tip .tt-h svg { vertical-align: 0; }
-#tip dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 10px; margin: 0; }
-#tip dt { color: var(--muted); }
-#tip dd { margin: 0; font-variant-numeric: tabular-nums; }
-#tip .tt-flag { margin-top: 6px; }
+  /* ── 手机：重新排版。选择器提到标题前，形态池塘放到 KPI 之后 ── */
+  @media (max-width: 720px) {
+    .hero { grid-template-areas: "date" "sel" "story" "kpis" "pond" "foot"; }
+    .hero-date { padding: var(--s-4) var(--s-4) 0; }
+    .hero-sel { margin: var(--s-3) var(--s-4) 0; padding-top: 0; border-top: 0; }
+    .hero-story { padding: var(--s-5) var(--s-4) 0; }
+    .hero-kpis { margin: var(--s-5) var(--s-4) 0; padding-top: var(--s-4); }
+    .hero-pond { padding: var(--s-5) var(--s-4) 0; }
+    .hero-foot { padding: var(--s-3) var(--s-4) var(--s-4); }
+    .hero .lede { min-height: 0; }
+    .hero .dateline .asof { display: none; }
+    .wk-h { margin-bottom: 4px; }
+    .wk-h .title, .wk-h .hint { display: none; }
+    .board .lrow { --cols: 22px minmax(0, 1fr) 44px 36px; }
+    .board:not(.is-open) .lrow:nth-child(n + 6) { display: none; }
+    .board-more { display: flex; justify-content: center; padding: var(--s-2) 0 0; }
+    .mv { grid-template-columns: minmax(0, 1fr) auto; }
+    .mv .drange { display: none; }
+    .hgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 var(--s-4) var(--s-4); }
+    .hgrid > .hc, .hgrid > .hc:nth-child(n + 4) { grid-column: auto; }
+    .hgrid > .hc:last-child:nth-child(odd) { grid-column: 1 / -1; }
+    .health-kpis { padding: var(--s-1) var(--s-4) var(--s-4); }
+    .health-kpis.kpis { --n: 3 !important; }
+    .health-kpis .kpi { padding: 0 0 0 var(--s-3); border-top: 0; border-left: 1px solid var(--line-soft); }
+    .health-kpis .kpi:first-child { padding-left: 0; border-left: 0; }
+    .health-kpis .kpi:last-child:nth-child(odd) { grid-column: auto; }
+    .health-kpis .kpi-s { display: block; white-space: normal; line-height: 1.5; }
+    .hc-n { white-space: normal; line-height: 1.5; }
+    .hc-l > .ic:first-child { display: none; }
+    .hc-l .l-full { display: none; }
+    .hc-l .l-short { display: inline; }
+    .health-kpis .kpi-s .dot { display: none; }
+    .health-kpis .kpi-s .nowrap { display: block; }
+    .board .lrow { gap: var(--s-2); }
+    .health-kpis .kpi-v .val { font-size: var(--fs-xl); }
+    .health-kpis .kpi-l { font-size: var(--fs-xs); }
+    .health-kpis .kpi-s { font-size: var(--fs-2xs); }
+  }
 </style>
 </head>
 <body>
-<svg id="nw-defs" width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs>
-    <radialGradient id="nw-body" cx="38%" cy="28%" r="78%"><stop offset="0" stop-color="#ffe27a"/><stop offset="0.55" stop-color="#f6c23e"/><stop offset="1" stop-color="#e1a02a"/></radialGradient>
-    <radialGradient id="nw-belly" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#fff8e8"/><stop offset="1" stop-color="#ebddbd"/></radialGradient>
-    <radialGradient id="nw-eye" cx="40%" cy="35%" r="65%"><stop offset="0" stop-color="#8fd86a"/><stop offset="1" stop-color="#3e9b35"/></radialGradient>
-    <linearGradient id="nw-shell" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffbf0"/><stop offset="1" stop-color="#e8dcc2"/></linearGradient>
-  </defs>
-</svg>
-<div class="wrap">
-  <header class="top">
-    <h1><span id="logo"></span>奶蛙宇宙贡献度看板</h1>
-    <span class="meta" id="status">正在读取数据…</span>
-  </header>
+<header id="appbar"></header>
 
-  <section class="kpis" id="kpis" hidden></section>
-
-  <div class="grid main">
-    <section class="card">
-      <h2>贡献度排行 <span class="meta" id="lb-meta">按魔力排序，悬停查看明细</span></h2>
-      <div class="chips" id="chips"></div>
-      <div class="legend" style="margin-bottom:8px">
-        <span><i style="background:var(--s1)"></i>合入 PR（含规模）</span>
-        <span><i style="background:var(--s2)"></i>模型加成</span>
-        <span><i style="background:var(--s3)"></i>协作</span>
-        <input type="search" id="search" placeholder="搜索账号" style="margin-left:auto;width:150px">
-      </div>
-      <div class="lb-head"><span>#</span><span>贡献者</span><span>形态</span><span>魔力</span><span>每周魔力</span></div>
-      <div id="leaderboard"><div class="empty">正在读取数据…</div></div>
-      <div class="more" id="more"></div>
-    </section>
-
-    <div class="side">
-      <section class="card" id="formula-card"></section>
-      <section class="card">
-        <h2>奶蛙进化路径 <span class="meta">点击分段或台阶筛选排行</span></h2>
-        <div id="path"></div>
-      </section>
-      <section class="card">
-        <h2>名词解释</h2>
-        <dl class="terms" id="terms"></dl>
-      </section>
+<main class="page">
+  <!-- 首屏：这一周发生了什么 -->
+  <section class="card card-hero hero" id="hero" aria-label="周快照">
+    <div class="hero-date"><div class="dateline" id="dateline"></div></div>
+    <div class="hero-story">
+      <h1 class="headline" id="headline" aria-live="polite"></h1>
+      <p class="lede" id="lede"></p>
     </div>
-  </div>
-
-  <div class="grid two">
-    <section class="card chart">
-      <h2>每周活跃贡献者 <span class="meta">单位：人</span></h2>
-      <div id="chart-active"><div class="empty">等待数据</div></div>
-    </section>
-    <section class="card chart">
-      <h2>每周合入 PR <span class="meta">单位：个</span></h2>
-      <div id="chart-merged"><div class="empty">等待数据</div></div>
-    </section>
-  </div>
-
-  <div class="grid two">
-    <section class="card">
-      <h2>合入 PR 的模型分布 <span class="meta">按 commit 的 Co-Authored-By 识别</span></h2>
-      <div id="chart-models"><div class="empty">等待数据</div></div>
-    </section>
-    <section class="card chart">
-      <h2>计分因子 <span class="meta">对数压缩：规模越大，边际加分越少</span></h2>
-      <div id="factors"></div>
-    </section>
-  </div>
-
-  <div class="grid two">
-    <section class="card chart">
-      <h2>合入率与警告线 <span class="meta">每个点是一个人；横轴为对数刻度</span></h2>
-      <div id="chart-rate"><div class="empty">等待数据</div></div>
-      <p class="chart-note" id="rate-note"></p>
-    </section>
-    <section class="card">
-      <h2>M-Team 规则对照 <span class="meta">悬停查看映射理由</span></h2>
-      <div id="mapping"></div>
-    </section>
-  </div>
-
-  <details class="card" style="margin-top:14px" id="detail">
-    <summary>完整明细表</summary>
-    <div class="table-wrap"><table id="table"><thead></thead><tbody></tbody></table></div>
-  </details>
-  <details class="card" style="margin-top:14px">
-    <summary>口径与盲区</summary>
-    <ul class="blind" id="blind"></ul>
-  </details>
-</div>
-<div id="tip" role="tooltip"></div>
-
-<script src="engine.js"></script>
-
-<script>
-'use strict';
-
-// ---------- 工具 ----------
-
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const pct = (x) => {
-  if (x == null) return '—';
-  // 0 与 1% 之间保留一位小数，避免把少量非零值显示成 0%
-  return x > 0 && x < 0.01 ? `${(x * 100).toFixed(1)}%` : `${Math.round(x * 100)}%`;
-};
-const fmtDate = (t) => new Date(t + RULES.tzOffsetHours * 3600000).toISOString().slice(0, 10);
-const fmtMD = (t) => fmtDate(t).slice(5);
-const fmtNum = (n) => n.toLocaleString('en-US');
-const fmt1 = (x) => (Math.round(x * 10) / 10).toFixed(1);
-// 魔力展示取整用向下取整，与门槛比较的结果一致
-const fmtBonus = (x) => fmtNum(Math.floor(x));
-const daysAgo = (t, now) => {
-  const d = Math.floor((now - t) / DAY);
-  return d <= 0 ? '今天' : `${d} 天前`;
-};
-const LEVEL_INK = ['#0b0b0b', '#0b0b0b', '#ffffff', '#ffffff', '#ffffff'];
-const STAGES = {
-  pending: { name: '蛙卵', icon: 'egg' },
-  failed: { name: '未孵化', icon: 'unhatched' },
-};
-
-// 名词解释：「名词解释」卡片、筛选按钮与标签的悬停提示共用。tag 是排行里对应标签的样式
-const TERMS = (() => {
-  const [first, ...rest] = RULES.warnLines;
-  const a = RULES.newbie.anomaly;
-  return {
-    collab: { name: '协作', text: `参与别人的 PR 或 issue：review、评论、帮人合入。同一个 PR 或 issue 只算一次；自己提的有效 issue 也算。每次 +${RULES.score.collab} 魔力。` },
-    rate: { name: '合入率', text: `合入 PR ÷ 已收尾 PR。已收尾指已合入、被别人关闭，或打开超过 ${RULES.staleOpenDays} 天还没合入。自己关闭的 PR 视为撤回，不计入。` },
-    warn: { name: '合入率警告', tag: 'tag st warning', text: `已收尾 PR 超过 ${first.resolved} 个后，合入率低于 ${pct(first.rate)} 就会被标记；超过 ${rest.map((l) => l.resolved).join(' / ')} 个时，要求依次提高到 ${rest.map((l) => pct(l.rate)).join(' / ')}。只是提醒，不扣魔力，也不影响形态。` },
-    outsider: { name: '组织外', tag: 'tag', text: '数据更新时不在 nwverse 组织成员名单里的账号，例如从 fork 提 PR 的外部贡献者、已退出的人。贡献照常计分。' },
-    anomaly: { name: '新手异常', tag: 'tag st serious', text: `孵化期内开了 ${a.opened} 个以上 PR，合入的不到 ${pct(a.rate)}。最近 ${a.graceHours} 小时内开的 PR 不计。` },
-    dormant: { name: '冬眠', tag: 'tag st', text: `超过 ${RULES.dormantDays} 天没有任何动作。只做标记；${RULES.levels[RULES.dormantExemptLevel].name}及以上不标记。` },
-  };
-})();
-const termTag = (t) => `<span class="${t.tag}" data-tip="${esc(esc(t.text))}">${esc(t.name)}</span>`;
-
-function niceStep(max) {
-  for (const step of [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]) if (max / step <= 5) return step;
-  return Math.ceil(max / 5);
-}
-
-function roundedTop(x, y, w, h, r) {
-  r = Math.min(r, w / 2, h);
-  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
-}
-
-// 奶蛙各形态的图标（64×64），按表情包形象重绘：梨形黄色身体、奶白肚皮、深灰色小手和脚，
-// 绿色鼓眼或黑豆眼；大笑版眯眼张大嘴、露出上下两排牙。渐变定义在页面顶部的隐藏 SVG（#nw-defs）中。
-const NW = { line: '#b9811b', hand: '#5e5e66', mouth: '#6b3f12', dark: '#2a1a10', pupil: '#121212', ring: '#8e7cf0', star: '#fab219' };
-// 钟形身体：头窄、下身宽，头宽约为最宽处的一半
-const NW_PEAR = 'M32 6C24 6 20.5 12 20.5 20C20.5 25 18 29 15.5 33.5C11.5 40.5 10.5 48 14.5 54C18 59 24.5 60.5 32 60.5C39.5 60.5 46 59 49.5 54C53.5 48 52.5 40.5 48.5 33.5C46 29 43.5 25 43.5 20C43.5 12 40 6 32 6Z';
-const NW_ARM_DOWN = 'M20 28.5C15.5 32 12 38 11 43C10.6 45.4 13.6 46.4 14.6 44.4C16 40 18.4 35.4 21.6 32Z';
-const NW_ARM_IN = 'M19.5 30C15 34.5 15.5 42 22 46C24 47.4 26.4 45.2 24.8 43.2C21.6 40.6 20.8 36.4 22 33Z';
-const NW_ARM_UP = 'M20.5 27C15.5 24.5 10.5 19 8.8 13.8C8.2 11.8 11 10.8 12 12.7C13.8 16.7 17.2 21 22 24.5Z';
-const nwFill = (d, sw = 1.2) => `<path d="${d}" fill="url(#nw-body)" stroke="${NW.line}" stroke-width="${sw}" stroke-linejoin="round"/>`;
-const nwBelly = (cx, cy, rx, ry) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="url(#nw-belly)"/>`;
-const nwPaw = (x, y, rx = 3, ry = 3.4, rot = 0) => `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" transform="rotate(${rot} ${x} ${y})" fill="${NW.hand}"/>`;
-const nwMirror = (svg) => `<g transform="matrix(-1 0 0 1 64 0)">${svg}</g>`;
-// 左臂与手，右侧镜像
-const nwArms = (path, hx, hy, rot = 0) => {
-  const one = `${nwFill(path, 1.1)}${nwPaw(hx, hy, 3, 3.4, rot)}`;
-  return one + nwMirror(one);
-};
-const nwFeet = `${nwPaw(24.5, 60.2, 5.2, 2.2)}${nwPaw(39.5, 60.2, 5.2, 2.2)}`;
-const nwGreenEye = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r}" fill="url(#nw-eye)" stroke="#2f6f28" stroke-width="1"/>`
-  + `<circle cx="${x + r * 0.12}" cy="${y + r * 0.12}" r="${r * 0.46}" fill="${NW.pupil}"/>`
-  + `<circle cx="${x - r * 0.3}" cy="${y - r * 0.34}" r="${r * 0.22}" fill="#fff"/>`;
-const nwDotEye = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${NW.pupil}"/><circle cx="${x - r * 0.35}" cy="${y - r * 0.38}" r="${r * 0.32}" fill="#fff"/>`;
-const nwSquint = (x, y) => `<path d="M${x - 3.4} ${y + 1.6}Q${x} ${y - 2.8} ${x + 3.4} ${y + 1.6}" fill="none" stroke="${NW.dark}" stroke-width="1.7" stroke-linecap="round"/>`;
-const nwSmile = (x1, x2, y, depth) => `<path d="M${x1} ${y}Q${(x1 + x2) / 2} ${y + depth} ${x2} ${y}" fill="none" stroke="${NW.mouth}" stroke-width="1.6" stroke-linecap="round"/>`;
-// 大笑的嘴：深色大口，上下两排白牙
-function nwLaughMouth(cx, cy, w, h) {
-  const half = w / 2;
-  const row = (y, dir) => {
-    let d = `M${cx - half * 0.78} ${y}`;
-    const n = 4;
-    for (let i = 1; i <= n; i++) {
-      const x = cx - half * 0.78 + (half * 1.56 * i) / n;
-      d += `L${x - (half * 0.78) / n} ${y + dir * 2.4}L${x} ${y}`;
-    }
-    return `<path d="${d}Z" fill="#fff"/>`;
-  };
-  return `<path d="M${cx - half} ${cy}Q${cx} ${cy + h * 1.7} ${cx + half} ${cy}Q${cx} ${cy + h * 0.2} ${cx - half} ${cy}Z" fill="${NW.dark}"/>`
-    + row(cy + h * 0.2, 1) + row(cy + h * 0.72, -1);
-}
-const nwSparkle = (x, y, r) => `<path d="M${x} ${y - r}L${x + r * 0.28} ${y - r * 0.28}L${x + r} ${y}L${x + r * 0.28} ${y + r * 0.28}L${x} ${y + r}L${x - r * 0.28} ${y + r * 0.28}L${x - r} ${y}L${x - r * 0.28} ${y - r * 0.28}Z" fill="${NW.star}"/>`;
-
-const NW_SHAPES = {
-  // 标题与 favicon：大头特写
-  face: `${nwFill('M32 5C17 5 8 16 8 31C8 47 18 59 32 59C46 59 56 47 56 31C56 16 47 5 32 5Z', 1.6)}${nwBelly(32, 50, 13, 7)}`
-    + `${nwGreenEye(21.5, 23, 8)}${nwGreenEye(42.5, 23, 8)}${nwSmile(25, 39, 36.5, 5)}`,
-  // 蛙卵：黑豆眼的小黄团从蛋壳里探出头
-  egg: `${nwFill('M32 12C23.5 12 17.5 20.5 17.5 31C17.5 38 23 43 32 43C41 43 46.5 38 46.5 31C46.5 20.5 40.5 12 32 12Z')}`
-    + `${nwDotEye(27, 26, 2.3)}${nwDotEye(37, 26, 2.3)}${nwSmile(29.5, 34.5, 32, 2)}`
-    + '<path d="M13.5 37L18.5 33L23.5 38L28.5 32.5L33.5 38L38.5 32.5L43.5 38L48.5 33L50.5 37C50.5 50 42.5 59 32 59C21.5 59 13.5 50 13.5 37Z" fill="url(#nw-shell)" stroke="#c9b48a" stroke-width="1.2" stroke-linejoin="round"/>',
-  // 未孵化：完整的灰色蛋壳，带一道裂纹
-  unhatched: '<path d="M32 6C21.5 6 14 21 14 36C14 50 22 59 32 59C42 59 50 50 50 36C50 21 42.5 6 32 6Z" fill="#d9d6ce" stroke="#9a978f" stroke-width="1.4"/>'
-    + '<path d="M15.5 33L21 29L26 34L31.5 28.5L37 34L42.5 29L48.5 33" fill="none" stroke="#8e8b83" stroke-width="1.8" stroke-linejoin="round"/>',
-  // 蝌蚪：圆滚滚的小奶蛙脑袋加一条尾巴
-  tadpole: `${nwFill('M37 36C45 29 50 40 59 32C56.5 43 47.5 47 37 43Z')}${nwFill('M27 19C17.5 19 11 26 11 34.5C11 43 18 49 27 49C36 49 43 43 43 34.5C43 26 36.5 19 27 19Z')}`
-    + `${nwBelly(27, 41.5, 10.5, 6.5)}${nwGreenEye(20.5, 25.5, 4.6)}${nwGreenEye(33.5, 25.5, 4.6)}${nwSmile(24, 30, 33.5, 2.4)}`,
-  // 小奶蛙：舞台站立版，小个子、黑豆眼、小鸟嘴
-  froglet: `<g transform="translate(6.4 11.4) scale(0.8)">${nwFill(NW_PEAR)}${nwBelly(32, 45, 15, 13.5)}`
-    + `${nwArms(NW_ARM_DOWN, 12.2, 45.4)}${nwFeet}`
-    + `${nwDotEye(27, 15.5, 2.6)}${nwDotEye(37, 15.5, 2.6)}<path d="M29.4 21Q32 19.2 34.6 21Q32 24.6 29.4 21Z" fill="#3b2a1a"/></g>`,
-  // 奶蛙：标准站立版，绿色鼓眼、微笑、灰色小手
-  frog: `${nwFill(NW_PEAR)}${nwBelly(32, 45, 15, 13.5)}`
-    + `${nwArms(NW_ARM_DOWN, 12.2, 45.4)}${nwFeet}`
-    + `${nwGreenEye(25, 13.5, 5.4)}${nwGreenEye(39, 13.5, 5.4)}${nwSmile(28.5, 35.5, 22.5, 3)}`,
-  // 大笑奶蛙：眯眼张大嘴，双手捂肚子
-  laugh: `${nwFill(NW_PEAR)}${nwBelly(32, 45, 15, 13.5)}`
-    + `${nwArms(NW_ARM_IN, 24.2, 46.4, -25)}${nwFeet}`
-    + `${nwSquint(26, 13.5)}${nwSquint(38, 13.5)}${nwLaughMouth(32, 18.5, 16, 8.5)}`,
-  // 宇宙奶蛙：双手高举大笑，外加星环和星星
-  cosmic: `<ellipse cx="32" cy="42" rx="30" ry="7.5" transform="rotate(-12 32 42)" fill="none" stroke="${NW.ring}" stroke-width="2" opacity="0.55"/>`
-    + `${nwFill(NW_PEAR)}${nwBelly(32, 45, 15, 13.5)}`
-    + `${nwArms(NW_ARM_UP, 10, 11.8, 30)}${nwFeet}`
-    + `${nwSquint(26, 13.5)}${nwSquint(38, 13.5)}${nwLaughMouth(32, 18.5, 16, 8.5)}`
-    + `<path d="M2.6 44.8A30 7.5 -12 0 0 61.4 39.2" fill="none" stroke="${NW.ring}" stroke-width="2.2" stroke-linecap="round"/>`
-    + `${nwSparkle(56, 26, 4.5)}${nwSparkle(7, 31, 3)}`,
-};
-
-function frogIcon(kind, size = 20, pos = null) {
-  const at = pos ? ` x="${pos.x}" y="${pos.y}"` : '';
-  return `<svg${at} width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true">${NW_SHAPES[kind]}</svg>`;
-}
-
-// 悬停提示：任何带 data-tip 的元素，内容是已转义的 HTML
-const tipEl = $('tip');
-function moveTip(e) {
-  const pad = 14;
-  let x = e.clientX + pad;
-  let y = e.clientY + pad;
-  if (x + tipEl.offsetWidth > innerWidth - 8) x = e.clientX - tipEl.offsetWidth - pad;
-  if (y + tipEl.offsetHeight > innerHeight - 8) y = e.clientY - tipEl.offsetHeight - pad;
-  tipEl.style.left = `${x}px`;
-  tipEl.style.top = `${y}px`;
-}
-document.addEventListener('mouseover', (e) => {
-  const t = e.target.closest?.('[data-tip]');
-  if (!t) {
-    tipEl.style.display = 'none';
-    return;
-  }
-  tipEl.innerHTML = t.dataset.tip;
-  tipEl.style.display = 'block';
-  moveTip(e);
-});
-document.addEventListener('mousemove', (e) => { if (tipEl.style.display === 'block') moveTip(e); });
-
-// ---------- 状态 ----------
-
-const state = { board: null, filter: 'all', search: '', showAll: false, sort: { key: 'rank', dir: 1 } };
-const TOP_N = 20;
-
-const FILTERS = {
-  all: { label: '全部', chip: true, fn: () => true },
-  member: { label: '组织成员', chip: true, fn: (p) => p.member },
-  outsider: { label: '组织外', chip: true, tip: TERMS.outsider.text, fn: (p) => !p.member },
-  hatched: { label: '已孵化', fn: (p) => p.level !== null },
-  pending: { label: '蛙卵（考核中）', fn: (p) => p.level === null && p.newbie.status === 'pending' },
-  failed: { label: '未孵化', chip: true, tip: `首次贡献起 ${RULES.newbie.days} 天内没有通过新手考核，魔力也还没到 ${RULES.levels[1].bonus}`, fn: (p) => p.level === null && p.newbie.status === 'failed' },
-  warn: { label: '合入率警告', chip: true, tip: TERMS.warn.text, fn: (p) => p.warn },
-  anomaly: { label: '新手异常', chip: true, tip: TERMS.anomaly.text, fn: (p) => p.newbie.anomaly },
-  dormant: { label: '冬眠', chip: true, tip: TERMS.dormant.text, fn: (p) => p.dormant },
-};
-RULES.levels.forEach((L, i) => { FILTERS[`lv${i}`] = { label: L.name, fn: (p) => p.level === i }; });
-
-function visiblePeople() {
-  const f = FILTERS[state.filter].fn;
-  const q = state.search.trim().toLowerCase();
-  return state.board.people.filter((p) => f(p) && (!q || p.login.toLowerCase().includes(q)));
-}
-
-function setFilter(key) {
-  state.filter = state.filter === key && key !== 'all' ? 'all' : key;
-  state.showAll = false;
-  renderLeaderboard();
-  renderTable();
-}
-
-// ---------- 渲染：公式与规则（不依赖数据） ----------
-
-function renderFormula() {
-  const S = RULES.score;
-  const cap = RULES.weeklyActionCap;
-  const ex = { lines: 300, commits: 3, model: modelOf('Claude Opus 5.5', RULES) };
-  const exLines = S.lines * Math.log10(1 + ex.lines);
-  const exCommits = S.commits * Math.log2(1 + ex.commits);
-  const exScore = (1 + exLines + exCommits) * ex.model.weight;
-  const top = RULES.models.reduce((m, x) => (x.weight > m.weight ? x : m));
-  const penalties = RULES.models.filter((m) => m.weight < 1).map((m) => `${esc(m.label)} ×${m.weight}`).join('、');
-  $('formula-card').innerHTML = `
-    <h2>贡献度公式 <span class="meta">贡献度 = 魔力，按魔力降序排名</span></h2>
-    <div class="formula">
-      <div class="fmain">
-        <span class="lhs">魔力</span><span>=</span>
-        <span class="sum"><span>Σ</span><small>每周</small></span>
-        <span>min(1, ${cap} ÷ 动作数) ×</span>
-        <span class="sum"><span>Σ</span><small>当周</small></span>
-        <span>动作分</span>
+    <div class="hero-pond" id="heroPond"></div>
+    <div class="hero-kpis kpis" id="heroKpis" style="--n:5"></div>
+    <div class="hero-sel">
+      <div class="wk-h">
+        <span class="title">25 周 · 选一周回看</span>
+        <span class="legend"><span class="key" style="--k:var(--leaf)">合入 PR</span><span class="key" style="--k:var(--water)">活跃贡献者</span></span>
+        <span class="hint only-kbd">点击或拖动，<kbd>←</kbd><kbd>→</kbd> 切周，<kbd>T</kbd> 回本周</span>
       </div>
-      <dl class="fdefs">
-        <dt><i class="sw s1"></i>PR 分</dt>
-        <dd><span class="nw">(1 + <span class="k">${S.lines}</span>·log₁₀(1+改动行)</span> <span class="nw">+ <span class="k">${S.commits}</span>·log₂(1+commit 数))</span> <span class="nw">× 模型系数</span></dd>
-        <dt><i class="sw s3"></i>协作分</dt>
-        <dd><span class="k">${S.collab}</span><span class="note">每参与一个他人的 PR 或 issue（review、评论、代合入），或提一个有效 issue</span></dd>
-        <dt><i class="sw s2"></i>模型系数</dt>
-        <dd>按署名的模型查表，最高 ${esc(top.label)} <span class="k">×${top.weight}</span><span class="note">一个 PR 用了多个模型时取最高；带扣分工具署名时按扣分计（${penalties}）</span></dd>
-      </dl>
+      <div class="wk" id="wk" tabindex="0" role="slider" aria-label="选择周" aria-valuemin="1"></div>
     </div>
-    <dl class="examples">
-      <dt>例 1</dt>
-      <dd>改 ${ex.lines} 行、${ex.commits} 个 commit、${esc(ex.model.label)} 的 PR：<span class="nw">(1 + ${exLines.toFixed(2)} + ${exCommits.toFixed(2)}) × ${ex.model.weight.toFixed(2)} = <b>${exScore.toFixed(2)}</b></span></dd>
-      <dt>例 2</dt>
-      <dd>一周合入 12 个 PR、协作 3 次，共 15 个动作：当周得分 × ${cap}/15</dd>
-    </dl>
-    <p class="formula-ref">各模型的系数见「计分因子」。</p>`;
-}
+    <div class="hero-foot"><p class="footnote" id="heroNote"></p></div>
+  </section>
 
-// 横轴从 0 开始的加分曲线
-function curveChart({ fn, xMax, ticks, xLabel }) {
-  const W = 240;
-  const H = 140;
-  const pad = { l: 40, r: 18, t: 10, b: 36 };
-  const top = Math.ceil(fn(xMax) * 4) / 4;
-  const sx = (v) => pad.l + ((W - pad.l - pad.r) * v) / xMax;
-  const sy = (v) => pad.t + (H - pad.t - pad.b) * (1 - v / top);
-  let s = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
-  for (const v of [0, top]) {
-    s += `<line class="${v ? 'gl' : 'bl'}" x1="${pad.l}" x2="${W - pad.r}" y1="${sy(v)}" y2="${sy(v)}"/><text class="ax" x="${pad.l - 4}" y="${sy(v) + 4}" text-anchor="end">+${v}</text>`;
-  }
-  // 按几何间隔取样，线性横轴上对数曲线开头的陡峭段也能画平滑
-  const lo = 1e-3;
-  const samples = [0];
-  for (let i = 0; i <= 80; i++) samples.push(lo * (xMax / lo) ** (i / 80));
-  const pts = samples.map((v) => `${sx(v).toFixed(1)},${sy(fn(v)).toFixed(1)}`);
-  s += `<polyline class="ln" points="${pts.join(' ')}"/>`;
-  ticks.forEach((t) => {
-    s += `<circle class="dot" cx="${sx(t)}" cy="${sy(fn(t))}" r="4" data-tip="${esc(`${xLabel} ${fmtNum(t)} → +${fn(t).toFixed(2)}`)}"/>`;
-    s += `<text class="ax" x="${sx(t)}" y="${H - pad.b + 14}" text-anchor="middle">${t >= 1000 ? `${t / 1000}k` : t}</text>`;
-  });
-  s += `<text class="ax-l" x="${W - pad.r}" y="${H - 4}" text-anchor="end">${esc(xLabel)} →</text>`;
-  return `${s}</svg>`;
-}
-
-// 按家族列出模型系数，「其他」排最后；底色随加成加深，扣分工具用红色
-function modelTable() {
-  const all = [...RULES.models, RULES.modelNone];
-  const families = [...new Set(all.map((m) => m.family))].sort((a, b) => (a === '其他') - (b === '其他'));
-  const max = Math.max(...all.map((m) => m.weight));
-  const tint = (w) => (w < 1 ? 'var(--critical) 22%' : `var(--s2) ${Math.round(((w - 1) / (max - 1 || 1)) * 44)}%`);
-  const chip = (m) => {
-    const tip = m.pattern ? `<b>${esc(m.label)}</b><br><span class="k">识别：</span>${esc(m.pattern.source)}` : '没有识别到任何 AI 署名';
-    return `<span style="background:color-mix(in srgb, ${tint(m.weight)}, transparent)" data-tip="${esc(tip)}">${esc(m.short)} <b>×${m.weight}</b></span>`;
-  };
-  return `<div class="mrows">${families.map((f) => `<span class="fam">${esc(f)}</span>
-    <div class="ex-chips">${all.filter((m) => m.family === f).sort((a, b) => b.weight - a.weight).map(chip).join('')}</div>`).join('')}</div>`;
-}
-
-function renderFactors() {
-  const S = RULES.score;
-  $('factors').innerHTML = `<div class="factors">
-    <div><h3>改动行 → 加分 <span class="meta">×10 → +${S.lines}</span></h3>${curveChart({ fn: (x) => S.lines * Math.log10(1 + x), xMax: 3000, ticks: [100, 1000, 3000], xLabel: '改动行' })}</div>
-    <div><h3>commit 数 → 加分 <span class="meta">×2 → +${S.commits}</span></h3>${curveChart({ fn: (x) => S.commits * Math.log2(1 + x), xMax: 30, ticks: [1, 3, 10, 30], xLabel: 'commit 数' })}</div>
-  </div>
-  <h3 class="sub-h">模型系数 <span class="meta">按组织偏好定档，不区分版本；悬停查看识别规则</span></h3>
-  ${modelTable()}`;
-}
-
-function renderMapping() {
-  const rows = [
-    ['注册时间', '首次贡献', '首次开 PR、review、评论或提 issue 的时间。GitHub 不向普通成员开放入组时间。'],
-    ['上传量', 'PR 分', '合入 PR 按改动行、commit 数（对数压缩）和模型系数计分。'],
-    ['下载量', '不考核', 'GitHub 上 review 和评论极少，考核协作会误伤大多数人；协作只计入魔力。', true],
-    ['分享率', '合入率', '「给出 ÷ 收到 review」对所有人都是 0/0。合入率看 PR 是否收尾，作用接近 H&R。'],
-    ['做种魔力', `魔力（每周最多计 ${RULES.weeklyActionCap} 个动作）`, '只能靠持续活跃累积，单周集中刷 PR 收益有限。'],
-    ['新手考核', `${RULES.newbie.days} 天孵化期`, `合入 PR ≥ ${RULES.newbie.merged}，活跃周 ≥ ${RULES.newbie.activeWeeks}。只考一次，没有月考、季考；没通过的人魔力达到 ${RULES.levels[1].bonus} 也直接孵化。`],
-    ['等级与降级线', '奶蛙进化（只看魔力）', 'M-Team 升级同时看注册时间、上传量和分享率；这里只看魔力，不设降级线，合入率只用于警告。'],
-    ['分享率警告期', '合入率警告线', '已收尾 PR 越多，合入率要求越高。'],
-    ['40 天不登录删号', `${RULES.dormantDays} 天无动作 → 冬眠`, `只标记不处理；${RULES.levels[RULES.dormantExemptLevel].name}及以上豁免。`],
-    ['魔力兑换、连坐', '不映射', '兑换需要保存余额，违背无状态；组织没有邀请树。', true],
-  ];
-  $('mapping').innerHTML = `<div class="map">${rows.map(([from, to, why, off]) => `
-    <span class="from">${esc(from)}</span><span class="arrow">→</span>
-    <span class="to${off ? ' off' : ''}" data-tip="${esc(esc(why))}">${esc(to)}</span>`).join('')}</div>
-    <p class="meta" style="margin:10px 0 0">来源：<a href="https://wiki.m-team.cc/zh-tw/account-rules" target="_blank" rel="noopener">M-Team 帐号规则</a>（2026-08-23 版）</p>`;
-}
-
-// limits：上传脚本拉取时的截断参数，随数据一起发布
-function renderBlind(limits) {
-  $('blind').innerHTML = [
-    '数据是上传脚本生成的快照，页面不实时拉取；更新频率取决于上传任务的执行间隔。',
-    '只展示人维度的贡献度，不展示任何仓库维度的信息；看板仓库本身的 PR 与 issue 不计入。',
-    `模型来自 commit 的 Co-Authored-By 标记，是提交者自行声明的文本，可以伪造，也可以删掉；只看每个 PR 最后 ${limits.commits} 个 commit。删掉了标记的 PR 按「无 AI 标注」计，所以 AI 占比是下限。`,
-    'Codex CLI 默认署名「Codex」、Cursor 默认署名「Cursor」，都不含型号，分别按「GPT 其他」和 ×1 计。需要按型号计分时，在工具里把署名配置成带型号的名字（如 Codex 的 commit_attribution）。TRAE CLI 默认署名「TRAE CLI」，按扣分计。',
-    '模型系数按组织偏好整体定档：Claude 强于 GPT；DeepSeek 胜在速度、Gemini 胜在成本，系数低于前两家。不区分版本，也不对应具体的基准测试分数；出现新的型号名或代号时需要更新识别规则。',
-    '直接推送到默认分支的 commit 不计入；仓库要求「所有改动走 PR」之前的贡献会被低估。',
-    'AI 生成的 PR 记在开 PR 的账号名下，账号持有人对内容负责。',
-    `每个 PR 和 issue 只读取前 ${limits.nested} 条 review 和前 ${limits.nested} 条评论。`,
-    `「首次贡献」代替入组时间；第一次贡献很早、之后长期不活跃的人，新手考核会按那次贡献起算，之后要靠魔力达到 ${RULES.levels[1].bonus} 孵化。`,
-  ].map((t) => `<li>${esc(t)}</li>`).join('');
-}
-
-// ---------- 渲染：依赖数据 ----------
-
-function renderKpis(b) {
-  const s = b.summary;
-  const ratio = (a, n) => (n ? a / n : null);
-  const top = b.people.slice(0, Math.max(1, Math.ceil(b.people.length * 0.2)));
-  const totalBonus = b.people.reduce((n, p) => n + p.bonus, 0);
-  const topShare = ratio(top.reduce((n, p) => n + p.bonus, 0), totalBonus);
-  const inflight = b.people.reduce((n, p) => n + p.inflight, 0);
-  const backlog = [...b.people].sort((x, y) => y.inflight - x.inflight)[0];
-  const kpis = [
-    { label: '贡献者', value: s.contributors, note: `组织成员 ${s.memberContributors} · 组织外 ${s.outsiders}` },
-    { label: '合入 PR', value: fmtNum(s.merged), note: `共开 ${fmtNum(s.prs)} 个 PR` },
-    { label: '有人工 review 的合入', value: pct(ratio(s.mergedReviewed, s.merged)), meter: ratio(s.mergedReviewed, s.merged), note: `${s.mergedReviewed} / ${fmtNum(s.merged)}` },
-    { label: '作者自己合入', value: pct(ratio(s.mergedSelf, s.merged)), meter: ratio(s.mergedSelf, s.merged), note: `${fmtNum(s.mergedSelf)} / ${fmtNum(s.merged)}` },
-    { label: '带 AI 共同作者的合入', value: pct(ratio(s.mergedAi, s.merged)), meter: ratio(s.mergedAi, s.merged), note: `${fmtNum(s.mergedAi)} / ${fmtNum(s.merged)}` },
-    { label: '前 20% 的人占魔力', value: pct(topShare), meter: topShare, note: `${top.length} 人` },
-    { label: '进行中 PR', value: inflight, note: backlog?.inflight ? `最多 ${backlog.login}：${backlog.inflight}` : '' },
-  ];
-  $('kpis').innerHTML = kpis.map((k) => `
-    <div class="card kpi">
-      <div class="label">${esc(k.label)}</div>
-      <div class="value">${esc(k.value)}</div>
-      ${k.meter != null ? `<div class="meter"><i style="width:${(k.meter * 100).toFixed(2)}%"></i></div>` : ''}
-      <div class="note">${esc(k.note)}</div>
-    </div>`).join('');
-  $('kpis').hidden = false;
-}
-
-function levelChip(p) {
-  if (p.level === null) {
-    const st = STAGES[p.newbie.status];
-    const text = p.newbie.status === 'pending' ? `${st.name} ${p.newbie.daysLeft} 天` : st.name;
-    return `<span class="lv">${frogIcon(st.icon, 20)}${esc(text)}</span>`;
-  }
-  const L = RULES.levels[p.level];
-  return `<span class="lv">${frogIcon(L.icon, 20)}${esc(L.name)}</span>`;
-}
-
-function flagTags(p) {
-  return [!p.member && TERMS.outsider, p.newbie.anomaly && TERMS.anomaly, p.warn && TERMS.warn, p.dormant && TERMS.dormant]
-    .filter(Boolean).map(termTag).join('');
-}
-
-function renderTerms() {
-  $('terms').innerHTML = Object.values(TERMS)
-    .map((t) => `<dt>${t.tag ? `<span class="${t.tag}">${esc(t.name)}</span>` : esc(t.name)}</dt><dd>${esc(t.text)}</dd>`).join('');
-}
-
-// 排行行里已有形态、合入数、协作数和魔力总数；悬停卡片只补充构成、进度和需要注意的事
-function personTip(p, now) {
-  const nb = RULES.newbie;
-  const n = p.newbie;
-  const stage = p.level === null ? STAGES[n.status] : RULES.levels[p.level];
-  const rows = [];
-  const add = (k, v) => rows.push(`<dt>${k}</dt><dd>${v}</dd>`);
-
-  const parts = [['PR', p.bonusPr], ['模型', p.bonusModel], ['协作', p.bonusCollab]].filter(([, v]) => Math.abs(v) >= 0.05);
-  const sum = parts.map(([k, v], i) => `${i ? (v < 0 ? ' − ' : ' + ') : ''}${k} ${fmt1(i ? Math.abs(v) : v)}`).join('');
-  add('魔力', `<b>${fmtBonus(p.bonus)}</b>${sum ? ` = ${sum}` : ''}`);
-
-  if (p.opened) {
-    const pr = [`合入 ${p.merged}`];
-    if (p.withdrawn) pr.push(`自己关闭 ${p.withdrawn}`);
-    if (p.closedUnmerged) pr.push(`被别人关闭 ${p.closedUnmerged}`);
-    if (p.stale) pr.push(`超 ${RULES.staleOpenDays} 天未合 ${p.stale}`);
-    if (p.inflight) pr.push(`进行中 ${p.inflight}`);
-    add('PR', pr.join(' · '));
-    if (p.rate != null) add('合入率', `${pct(p.rate)} <span class="k">= ${p.merged} ÷ ${p.resolved} 个已收尾</span>`);
-  }
-
-  if (p.level === null) {
-    const byBonus = `魔力 ${fmtBonus(p.bonus)}/${RULES.levels[1].bonus}`;
-    add('孵化', n.status === 'pending'
-      ? `合入 PR ${n.merged}/${nb.merged} · 活跃周 ${n.activeWeeks}/${nb.activeWeeks} <span class="k">剩 ${n.daysLeft} 天，或${byBonus}</span>`
-      : `${byBonus} <span class="k">考核未通过，魔力达标后孵化</span>`);
-  } else if (p.next) {
-    add(`距${esc(RULES.levels[p.next.level].name)}`, `魔力 ${fmtBonus(p.bonus)}/${fmtNum(p.next.bonus)}`);
-  }
-
-  const models = [...p.modelMix.values()].sort((a, b) => b.count - a.count).slice(0, 3);
-  if (models.length) add('模型', models.map((m) => `${esc(m.label)} ${m.count}`).join(' · '));
-  add('活动', `${fmtDate(p.firstAt)} 起 · 最近 ${daysAgo(p.lastAt, now)}`);
-
-  const flags = [];
-  if (p.warn) flags.push(`${termTag(TERMS.warn)} 已收尾超过 ${p.warnLine.resolved} 个，合入率需 ≥ ${pct(p.warnLine.rate)}`);
-  if (n.anomaly) flags.push(`${termTag(TERMS.anomaly)} 孵化期开 ${n.anomalyOpened} 个 PR，合入 ${n.anomalyMerged} 个`);
-  return `<div class="tt-h">${frogIcon(stage.icon, 22)}<b>${esc(p.login)}</b><span class="k">${esc(stage.name)}</span></div>`
-    + `<dl>${rows.join('')}</dl>`
-    + flags.map((f) => `<div class="tt-flag">${f}</div>`).join('');
-}
-
-function sparkline(p, weeks, max) {
-  const H = 18;
-  const bw = Math.max(3, Math.min(5, Math.floor(90 / weeks.length) - 1));
-  let svg = `<svg width="${weeks.length * (bw + 1)}" height="${H}" aria-hidden="true">`;
-  weeks.forEach((w, i) => {
-    const v = p.weekly.get(w.start) || 0;
-    const h = v ? Math.max(2, (v / max) * H) : 1;
-    svg += `<rect x="${i * (bw + 1)}" y="${H - h}" width="${bw}" height="${h}" rx="1" style="fill:var(${v ? '--s1' : '--grid'})"/>`;
-  });
-  return `${svg}</svg>`;
-}
-
-function renderChips() {
-  const b = state.board;
-  const keys = Object.keys(FILTERS).filter((k) => FILTERS[k].chip || k === state.filter);
-  $('chips').innerHTML = keys.map((k) => {
-    const n = b ? b.people.filter(FILTERS[k].fn).length : 0;
-    const extra = !FILTERS[k].chip ? ' ×' : '';
-    const tip = FILTERS[k].tip ? ` data-tip="${esc(esc(FILTERS[k].tip))}"` : '';
-    return `<button class="chip${state.filter === k ? ' on' : ''}" data-filter="${k}"${tip}>${esc(FILTERS[k].label)}<b>${b ? n : ''}</b>${extra}</button>`;
-  }).join('');
-}
-
-function renderLeaderboard() {
-  const b = state.board;
-  renderChips();
-  if (!b) return;
-  const list = visiblePeople();
-  const shown = state.showAll ? list : list.slice(0, TOP_N);
-  const max = Math.max(1, ...b.people.map((p) => p.bonus));
-  const weekMax = Math.max(1, ...b.people.flatMap((p) => [...p.weekly.values()]));
-  $('leaderboard').innerHTML = shown.length ? shown.map((p) => {
-    // 条宽按全员最高魔力缩放，右侧留 44px 给数值标签；扣分工具的负加成从 PR 段里扣除
-    const seg = (cls, v) => (v >= 0.05 ? `<i class="seg ${cls}" style="width:calc((100% - 44px) * ${(v / max).toFixed(4)})"></i>` : '');
-    return `
-    <div class="lb-row" data-tip="${esc(personTip(p, b.now))}">
-      <span class="rk${p.rank <= 3 ? ' top3' : ''}">${p.rank}</span>
-      <div class="who">
-        <img src="https://github.com/${encodeURIComponent(p.login)}.png?size=52" alt="" loading="lazy">
-        <div>
-          <div class="name"><a href="https://github.com/${encodeURIComponent(p.login)}" target="_blank" rel="noopener">${esc(p.login)}</a>${flagTags(p)}</div>
-          <div class="sub">合入 ${p.merged} · 协作 ${p.collab} · 合入率 ${pct(p.rate)}</div>
+  <!-- 这一周的人 -->
+  <section class="section">
+    <div class="sec-h">
+      <div><span class="eyebrow" id="peopleEyebrow">本周</span><h2>这一周的人</h2><p>谁拿到最多魔力、谁在总榜上冲、谁刚进化或快要进化</p></div>
+    </div>
+    <div class="grid stretch people">
+      <div class="span-4">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title"><span class="card-icon leaf" aria-hidden="true" id="icBoard"></span><span id="boardTitle">本周魔力榜</span></div><div class="card-sub" id="boardSub"></div></div></div>
+          <div class="card-body"><div class="rows board" id="board" role="list"></div><div class="board-more"><button type="button" class="btn btn-sm btn-ghost" id="boardMore"></button></div></div>
+          <div class="card-foot"><span id="boardFoot"></span><a class="link" href="ranking.html" data-screen="c2">完整排行榜<span id="icArrow1"></span></a></div>
         </div>
       </div>
-      <span>${levelChip(p)}</span>
-      <div class="bar">${seg('p', p.bonusPr + Math.min(0, p.bonusModel))}${seg('m', Math.max(0, p.bonusModel))}${seg('c', p.bonusCollab)}<span class="v">${fmtBonus(p.bonus)}</span></div>
-      <span>${sparkline(p, b.weeks, weekMax)}</span>
-    </div>`;
-  }).join('') : '<div class="empty">没有符合条件的人</div>';
-  $('more').innerHTML = list.length > TOP_N
-    ? `<button id="toggle-all">${state.showAll ? '收起' : `显示全部 ${list.length} 人`}</button>`
-    : '';
-  $('lb-meta').textContent = `${list.length} 人 · 按魔力排序，悬停查看明细`;
-}
+      <div class="span-4">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title"><span class="card-icon water" aria-hidden="true" id="icMoves"></span>名次变化</div><div class="card-sub" id="movesSub">总榜名次，与上周末相比</div></div></div>
+          <div class="card-body" id="moves"></div>
+          <div class="card-foot"><span id="movesFoot"></span></div>
+        </div>
+      </div>
+      <div class="span-4 md-span-12">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title"><span class="card-icon yolk" aria-hidden="true" id="icEvo"></span>进化动态</div><div class="card-sub">形态只看魔力，不降级</div></div></div>
+          <div class="card-body" id="evo"></div>
+          <div class="card-foot"><span>ETA = 还差的魔力 ÷ 近 4 周周均</span><a class="link" href="pond.html" data-screen="c5">形态池<span id="icArrow2"></span></a></div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-function renderPath(b) {
-  const nb = RULES.newbie;
-  const L = RULES.levels;
-  let html = `<div class="cond">
-    <span class="tag">${frogIcon('egg', 14)} 蛙卵：首次贡献起 ${nb.days} 天</span>
-    <span class="tag">合入 PR ≥ ${nb.merged}</span>
-    <span class="tag">活跃周 ≥ ${nb.activeWeeks}</span>
-    <span class="tag" data-tip="${esc(`没通过新手考核的人，魔力达到 ${L[1].bonus} 也直接孵化`)}">或魔力 ≥ ${L[1].bonus}</span>
-    <span class="tag st serious" data-tip="${esc(`考核期内开 PR ≥ ${nb.anomaly.opened} 个且合入比 &lt; ${pct(nb.anomaly.rate)}，标记「新手异常」。最近 ${nb.anomaly.graceHours} 小时内开的 PR 不计。`)}">异常线</span>
-  </div>`;
-  if (b) {
-    const s = b.summary;
-    const parts = [
-      ['hatched', '已孵化', 'good', s.hatched, L[0].icon],
-      ['pending', '蛙卵（考核中）', 'neutral', s.pending, STAGES.pending.icon],
-      ['failed', '未孵化', 'critical', s.failed, STAGES.failed.icon],
+  <!-- 25 周走势：每周活跃贡献者与每周合入 PR -->
+  <section class="section trend">
+    <div class="sec-h">
+      <div><span class="eyebrow">趋势</span><h2>25 周走势</h2><p>选中的周高亮；点任意一根柱子切到那一周</p></div>
+    </div>
+    <div class="grid">
+      <div class="card card-pad span-6">
+        <div class="card-head"><div><div class="card-title">每周活跃贡献者</div><div class="card-sub">提 PR、合入或协作的人 · 单位：人</div></div></div>
+        <div id="chartActive"></div>
+      </div>
+      <div class="card card-pad span-6">
+        <div class="card-head"><div><div class="card-title">每周合入 PR</div><div class="card-sub">当周合入的 PR 总数 · 单位：个</div></div></div>
+        <div id="chartMerged"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 组织健康（累计，不随周切换） -->
+  <section class="section">
+    <div class="sec-h">
+      <div><span class="eyebrow">累计</span><h2>组织健康</h2><p>从有记录的第一周到现在，不随上面的周切换</p></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><div class="card-title"><span class="card-icon" aria-hidden="true" id="icHealth"></span>全部时间</div><div class="card-sub" id="healthSub"></div></div></div>
+      <div class="kpis health-kpis" id="healthKpis" style="--n:3"></div>
+      <div class="hgrid" id="healthGrid"></div>
+    </div>
+  </section>
+
+  <p class="footnote page-foot" id="pageFoot"></p>
+</main>
+
+<script type="text/x-nw-page">
+(function () {
+  const K = NWK, { esc, icon, mag, fmt } = K;
+  const { W, LV, last: LAST } = NW;
+  const $ = (s) => document.querySelector(s);
+  const n = (x) => `<span class="n">${x}</span>`;
+  // 占比：小于 10% 保留一位小数；非零但不到 0.1% 时不写成 0%
+  const share = (a, b) => { const x = b ? a / b : 0; return x === 0 ? '0%' : x < 0.001 ? '不到 0.1%' : fmt.pct(x, x < 0.1 ? 1 : 0); };
+  const nw = (h) => `<span class="nowrap">${h}</span>`;
+
+  K.appHeader($('#appbar'), { active: 'c1' });
+  $('#icBoard').innerHTML = icon('zap', 15);
+  $('#icMoves').innerHTML = icon('trending-up', 15);
+  $('#icEvo').innerHTML = icon('sparkles', 15);
+  $('#icHealth').innerHTML = icon('activity', 15);
+  $('#icArrow1').innerHTML = icon('arrow-right', 13);
+  $('#icArrow2').innerHTML = icon('arrow-right', 13);
+
+  // ───────── 派生：某一周的全部事实（缓存） ─────────
+  const wkv = (p, i) => (i < 0 ? 0 : p.wk.get(W[i]) || 0);
+  const isNew = (p, i) => p.started[i] && !(i > 0 && p.started[i - 1]);
+  const cache = new Map();
+  function facts(i) {
+    if (cache.has(i)) return cache.get(i);
+    const s = NW.weekSnapshot(i);
+    const ps = i > 0 ? NW.weekSnapshot(i - 1) : null;
+    const magic = s.top.reduce((a, x) => a + x.v, 0);
+    const pmagic = ps ? ps.top.reduce((a, x) => a + x.v, 0) : 0;
+    const faces = NW.people.filter((p) => isNew(p, i));
+    const pfaces = i > 0 ? NW.people.filter((p) => isNew(p, i - 1)).length : 0;
+    const prevMax = (k) => Math.max(0, ...NW.weeks.slice(0, i).map((w) => w[k]));
+    // 记录：从第 5 周起算，避免「第 2 周 2 人也算新高」这种噪声
+    const recA = i >= 4 && s.active > 0 && s.active > prevMax('active');
+    const recM = i >= 4 && s.merged > 0 && s.merged > prevMax('merged');
+    // 这一周魔力榜：只排有魔力的人；名次变化 = 前一周同一张榜
+    const prevRank = new Map(i > 0 ? NW.people.filter((p) => wkv(p, i - 1) > 0.005).sort((a, b) => wkv(b, i - 1) - wkv(a, i - 1) || a.login.localeCompare(b.login)).map((p, k) => [p.login, k + 1]) : []);
+    const board = s.top.slice().sort((a, b) => b.v - a.v || a.p.login.localeCompare(b.p.login)).map((x, k) => ({ p: x.p, v: x.v, rank: k + 1, move: isNew(x.p, i) ? null : prevRank.has(x.p.login) ? prevRank.get(x.p.login) - (k + 1) : undefined }));
+    // 总榜名次变化：上一周末已经有魔力（有名次意义）的人才算升降
+    const R = NW.ranksAt(i), PR = i > 0 ? NW.ranksAt(i - 1) : new Map();
+    const movers = [], entered = [];
+    for (const p of NW.people) {
+      if (!p.started[i] || isNew(p, i)) continue;
+      const before = i > 0 ? p.cum[i - 1] : 0;
+      if (before <= 0.005) { if (p.cum[i] > 0.005) entered.push(p); continue; }
+      const m = PR.get(p.login) - R.get(p.login);
+      if (m > 0) movers.push({ p, from: PR.get(p.login), to: R.get(p.login), m });
+    }
+    movers.sort((a, b) => b.m - a.m || a.to - b.to);
+    // 新面孔按当周魔力排序
+    const facesR = faces.map((p) => ({ p, v: wkv(p, i), r: R.get(p.login) })).sort((a, b) => b.v - a.v || a.r - b.r);
+    // 即将进化：第 i 周末已孵化、未到最高级、近 4 周有魔力
+    const upcoming = [];
+    for (const p of NW.people) {
+      const l = p.levels[i];
+      if (!p.started[i] || l === null || l >= LV.length - 1) continue;
+      let sum = 0; for (let k = i - 3; k <= i; k++) sum += wkv(p, k);
+      const pace = sum / 4;
+      if (pace <= 0) continue;
+      const nb = LV[l + 1].bonus, gap = nb - p.cum[i];
+      upcoming.push({ p, l, gap, pace, eta: Math.ceil(gap / pace), prog: (p.cum[i] - LV[l].bonus) / (nb - LV[l].bonus) });
+    }
+    upcoming.sort((a, b) => a.eta - b.eta || a.gap - b.gap);
+    const evos = [
+      ...s.upgraded.map((p) => ({ p, from: p.levels[i - 1], to: p.levels[i], kind: 'up' })).sort((a, b) => b.to - a.to || a.p.login.localeCompare(b.p.login)),
+      ...s.newlyHatched.map((p) => ({ p, from: null, to: p.levels[i], kind: 'hatch' })),
     ];
-    const total = s.hatched + s.pending + s.failed || 1;
-    html += `<div class="segbar">${parts.filter((x) => x[3]).map(([k, label, cls, n, icon]) => `<div class="${cls}" style="flex:${n}" data-filter="${k}" data-tip="${esc(`${label} ${n} 人（${pct(n / total)}），点击筛选`)}">${n / total >= 0.1 ? `${frogIcon(icon, 18)}${n}` : ''}</div>`).join('')}</div>
-      <div class="legend">${parts.map(([, label, cls, n]) => `<span><i style="background:var(--${cls})"></i>${label} ${n}</span>`).join('')}</div>`;
+    const f = { i, s, ps, magic, pmagic, faces: facesR, pfaces, recA, recM, board, movers, entered, upcoming, evos, live: i === LAST };
+    cache.set(i, f);
+    return f;
   }
-  html += '<div class="flow">孵化后形态只看魔力：魔力达到门槛即进化，不会降级</div>';
 
-  const W = 470;
-  const labelW = 46;
-  const base = 214;
-  const stepW = (W - labelW - 4) / L.length;
-  let svg = `<svg viewBox="0 0 ${W} ${base + 30}" role="img" aria-label="奶蛙进化阶梯与魔力门槛">`;
-  svg += `<line class="bl" x1="${labelW}" x2="${W - 4}" y1="${base}" y2="${base}"/>`;
-  svg += `<text class="ax-l" x="${labelW - 6}" y="${base + 20}" text-anchor="end">魔力</text>`;
-  L.forEach((lv, i) => {
-    const x = labelW + stepW * i + 3;
-    const w = stepW - 6;
-    const h = 36 + i * 28;
-    const cx = x + w / 2;
-    const people = b ? b.people.filter((p) => p.level === i) : [];
-    const names = people.slice(0, 15).map((p) => esc(p.login)).join('、') + (people.length > 15 ? ` 等 ${people.length} 人` : '');
-    const rule = i === 0 ? `通过新手考核即孵化；没通过的人魔力达到 ${L[1].bonus} 也孵化` : `魔力 ≥ ${lv.bonus}`;
-    const tip = `${frogIcon(lv.icon, 22)} <b>${esc(lv.name)}</b>　<span class="k">${esc(lv.tagline)}</span><br>${rule}${b ? `<br><br>${people.length} 人${names ? `：${names}` : ''}` : ''}`;
-    svg += `<g class="step" data-filter="lv${i}" data-tip="${esc(tip)}">`;
-    svg += `<path d="${roundedTop(x, base - h, w, h, 4)}" style="fill:var(--lv${i})"/>`;
-    svg += `<text x="${cx}" y="${base - 10}" text-anchor="middle" style="fill:${LEVEL_INK[i]};font-size:12.5px;font-weight:600">${esc(lv.name)}</text>`;
-    svg += frogIcon(lv.icon, 32, { x: cx - 16, y: base - h - 34 });
-    if (b) svg += `<text class="cnt" x="${cx}" y="${base - h - 40}" text-anchor="middle">${people.length}</text>`;
-    svg += `<text class="ax" x="${cx}" y="${base + 20}" text-anchor="middle">${i === 0 ? '孵化即可' : `≥ ${fmtNum(lv.bonus)}`}</text>`;
-    svg += '</g>';
-  });
-  svg += '</svg>';
-  $('path').innerHTML = `${html}<div class="chart">${svg}</div>`;
-}
+  // ───────── 摘要：标题 + 导语 ─────────
+  function story(f) {
+    const { s, ps, i } = f;
+    const name = K.week.name(i), prev = K.week.prevName(i);
+    const nh = s.newlyHatched.length, nu = s.upgraded.length;
+    let title;
+    if (f.recA && f.recM) title = '活跃与合入，<mark>双双创新高</mark>';
+    else if (f.recM) title = `合入量<mark>创新高</mark>`;
+    else if (f.recA) title = `活跃人数<mark>创新高</mark>`;
+    else if (nh || nu) title = `<mark>${[nh ? `${nh} 人孵化` : '', nu ? `${nu} 人进化` : ''].filter(Boolean).join('，')}</mark>`;
+    else if (s.top.length) title = `${K.pname(s.top[0].p.login, { avatar: false })} 领跑${i === LAST ? '本周' : '这一周'}`;
+    else title = '池塘很安静';
 
-function columnChart(weeks, key) {
-  const W = 560;
-  const H = 200;
-  const pad = { l: 34, r: 6, t: 18, b: 24 };
-  const max = Math.max(1, ...weeks.map((w) => w[key]));
-  const step = niceStep(max);
-  const top = Math.ceil(max / step) * step;
-  const band = (W - pad.l - pad.r) / weeks.length;
-  const bw = Math.min(24, band * 0.62);
-  const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - v / top);
-  const every = Math.ceil(42 / band);
-  const peak = weeks.reduce((m, w, i) => (w[key] > weeks[m][key] ? i : m), 0);
-  let s = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
-  for (let v = 0; v <= top; v += step) {
-    s += `<line class="${v ? 'gl' : 'bl'}" x1="${pad.l}" x2="${W - pad.r}" y1="${y(v)}" y2="${y(v)}"/>`;
-    s += `<text class="ax" x="${pad.l - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+    const cmp = (a, b, unit) => (!ps ? '' : a === b ? `，和${prev}持平` : `，比${prev}${a > b ? '多' : '少'} ${fmt.int(Math.abs(a - b))}${unit}`);
+    let t = i === LAST ? `${K.week.asOf()}，` : '';
+    if (!s.active && !s.merged) t += `${name}没有人活跃，也没有合入。`;
+    else t += `${name} ${n(s.active)} 人活跃${cmp(s.active, ps ? ps.active : 0, ' 人')}；合入 ${n(fmt.int(s.merged))} 个 PR${cmp(s.merged, ps ? ps.merged : 0, ' 个')}。`;
+    if (s.top.length) {
+      const [a, b] = s.top;
+      t += `${K.pname(a.p.login)} 以 ${n(mag(a.v))} 魔力领跑${b ? `，比第二名多 ${n(mag(a.v - b.v))}` : ''}。`;
+    }
+    const byLv = new Map();
+    s.upgraded.forEach((p) => { const l = p.levels[i]; if (!byLv.has(l)) byLv.set(l, []); byLv.get(l).push(p); });
+    const sp = (h) => (/人$/.test(h) ? h : `${h} `);
+    const ups = [...byLv].sort((a, b) => b[0] - a[0]).map(([l, list]) => `${sp(K.people(list, { max: 2 }))}进化为${LV[l].name}`);
+    if (nh) ups.push(`${sp(K.people(s.newlyHatched, { max: 2 }))}完成孵化`);
+    if (ups.length) t += `${ups.join('，')}。`;
+    if (f.faces.length) {
+      const out = f.faces.filter((x) => !x.p.member).length;
+      const k = f.faces.length;
+      const tail = k === 1 ? (out ? '，来自组织外' : '，是组织成员') : out === k ? '，全部来自组织外' : out ? `，其中 ${out} 位来自组织外` : '';
+      t += `新面孔 ${k} 位${tail}。`;
+    }
+    return { title, lede: t };
   }
-  weeks.forEach((w, i) => {
-    const x0 = pad.l + band * i;
-    s += `<rect class="hit" x="${x0}" y="${pad.t}" width="${band}" height="${H - pad.t - pad.b}" data-tip="${esc(`<b>${fmtDate(w.start)} 当周</b><br>活跃贡献者 ${w.active} 人<br>合入 PR ${w.merged} 个`)}"/>`;
-  });
-  weeks.forEach((w, i) => {
-    const cx = pad.l + band * i + band / 2;
-    const v = w[key];
-    if (v > 0) s += `<path class="mk" d="${roundedTop(cx - bw / 2, y(v), bw, y(0) - y(v), 4)}"/>`;
-    if (i === peak && v > 0) s += `<text class="peak" x="${cx}" y="${y(v) - 5}" text-anchor="middle">${v}</text>`;
-    if (i % every === 0) s += `<text class="ax" x="${cx}" y="${H - 6}" text-anchor="middle">${fmtMD(w.start)}</text>`;
-  });
-  return `${s}</svg>`;
-}
 
-function modelChart(b) {
-  const rows = b.summary.models.filter((m) => m.count > 0).sort((x, y) => y.count - x.count);
-  if (!rows.length) return '<div class="empty">没有合入 PR</div>';
-  const max = Math.max(...rows.map((m) => m.count));
-  const total = rows.reduce((n, m) => n + m.count, 0);
-  return `<div class="hbars">${rows.map((m) => `
-    <div class="hb" data-tip="${esc(`<b>${esc(m.label)}</b><br>合入 PR ${m.count} 个，占 ${pct(m.count / total)}<br>模型系数 ×${m.weight}`)}">
-      <span>${esc(m.label)} ${m.weight !== 1 ? `<span class="meta">×${m.weight}</span>` : ''}</span>
-      <span class="hb-b"><i style="width:${(m.count / max) * 100}%"></i></span>
-      <span class="hb-v">${fmtNum(m.count)} <span class="meta">${pct(m.count / total)}</span></span>
-    </div>`).join('')}</div>`;
-}
+  // 新面孔的组织构成（§7.2 口径：1 人时写「来自组织外 / 组织成员」）
+  function facesNote(f) {
+    const k = f.faces.length, out = f.faces.filter((x) => !x.p.member).length;
+    return !k ? '' : k === 1 ? (out ? '来自组织外' : '组织成员') : out === k ? '全部来自组织外' : out ? `其中 ${out} 位来自组织外` : '全部是组织成员';
+  }
 
-function rateChart(b) {
-  const pts = b.people.filter((p) => p.resolved > 0);
-  if (!pts.length) return '<div class="empty">还没有已收尾的 PR</div>';
-  const W = 560;
-  const H = 244;
-  const pad = { l: 40, r: 10, t: 12, b: 44 };
-  const maxX = Math.max(20, ...pts.map((p) => p.resolved)) * 1.15;
-  const x = (v) => pad.l + ((W - pad.l - pad.r) * Math.log10(v)) / Math.log10(maxX);
-  const y = (r) => pad.t + (H - pad.t - pad.b) * (1 - r);
-  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="合入率与已收尾 PR 数">`;
-  [0, 0.25, 0.5, 0.75, 1].forEach((r) => {
-    s += `<line class="${r ? 'gl' : 'bl'}" x1="${pad.l}" x2="${W - pad.r}" y1="${y(r)}" y2="${y(r)}"/>`;
-    s += `<text class="ax" x="${pad.l - 6}" y="${y(r) + 4}" text-anchor="end">${r * 100}%</text>`;
-  });
-  [1, 10, 50, 100, 200, 500, 1000].filter((t) => t <= maxX).forEach((t) => {
-    s += `<text class="ax" x="${x(t)}" y="${H - pad.b + 16}" text-anchor="middle">${t}</text>`;
-  });
-  s += `<text class="ax-l" x="${W - pad.r}" y="${H - 6}" text-anchor="end">已收尾 PR 数 →</text>`;
-  const lines = RULES.warnLines.filter((l) => l.resolved < maxX);
-  if (lines.length) {
-    let d = `M${x(lines[0].resolved)},${y(0)}`;
-    let edge = '';
-    lines.forEach((l, i) => {
-      const xEnd = x(Math.min(maxX, lines[i + 1]?.resolved ?? maxX));
-      d += `V${y(l.rate)}H${xEnd}`;
-      edge += `${i ? 'V' : `M${x(l.resolved)},`}${y(l.rate)}H${xEnd}`;
+  // ───────── KPI ─────────
+  function kpiItems(f) {
+    const { s, ps } = f;
+    const prev = K.week.prevName(f.i);
+    const k = f.faces.length;
+    const facesSub = k ? facesNote(f) : `${f.live ? '本周' : '这一周'}没有新面孔`;
+    const stack = k ? `<span class="av-stack">${f.faces.slice(0, 3).map((x) => `<span data-person="${esc(x.p.login)}" tabindex="0" role="button" aria-label="${esc(x.p.login)}，查看档案">${K.avatar(x.p.login, 20)}</span>`).join('')}${k > 3 ? `<span class="av-more">+${k - 3}</span>` : ''}</span>` : '';
+    const evo = s.newlyHatched.length + s.upgraded.length;
+    const pevo = ps ? ps.newlyHatched.length + ps.upgraded.length : 0;
+    return [
+      { key: 'active', icon: 'users', label: '活跃贡献者', value: s.active, prev: ps ? ps.active : null, ref: ps ? `${prev} ${ps.active}` : null, sub: '提 PR、合入或协作的人' },
+      { key: 'merged', icon: 'git-merge', label: '合入 PR', value: s.merged, prev: ps ? ps.merged : null, ref: ps ? `${prev} ${fmt.int(ps.merged)}` : null, sub: `占 25 周合入的 <b>${share(s.merged, NW.summary.merged)}</b>` },
+      { key: 'magic', icon: 'zap', label: '产出魔力', value: f.magic, f: mag, prev: ps ? f.pmagic : null, ref: ps ? `${prev} ${mag(f.pmagic)}` : null, sub: `<b>${s.top.length}</b> 人获得魔力` },
+      { key: 'faces', icon: 'user-plus', label: '新面孔', value: k, prev: ps ? f.pfaces : null, ref: ps ? `${prev} ${f.pfaces}` : null, sub: `${stack}<span>${facesSub}</span>` },
+      { key: 'evo', icon: 'sparkles', label: '孵化与进化', value: evo, prev: ps ? pevo : null, ref: ps ? `${prev} ${pevo}` : null, sub: `<b>${s.newlyHatched.length}</b> 人孵化 · <b>${s.upgraded.length}</b> 人进化` },
+    ];
+  }
+  function renderKpis(f, first) {
+    const items = kpiItems(f);
+    const host = $('#heroKpis');
+    if (first || !host.children.length) {
+      host.innerHTML = items.map((x) => K.kpi(x)).join('');
+      [...host.querySelectorAll('.val')].forEach((v, k) => { v.classList.add('num'); v.__nwkv = items[k].value; });
+      return;
+    }
+    const fresh = document.createElement('div');
+    fresh.innerHTML = items.map((x) => K.kpi(x)).join('');
+    [...host.children].forEach((el, k) => {
+      const nx = fresh.children[k];
+      el.querySelector('.kpi-l').innerHTML = nx.querySelector('.kpi-l').innerHTML;
+      el.querySelector('.kpi-s').innerHTML = nx.querySelector('.kpi-s').innerHTML;
+      const ov = el.querySelector('.kpi-v');
+      const old = ov.querySelector('.val').__nwkv;
+      ov.innerHTML = nx.querySelector('.kpi-v').innerHTML;
+      const nv = ov.querySelector('.val');
+      nv.classList.add('num');
+      nv.__nwkv = old ?? items[k].value;
+      K.countUp(nv, items[k].value, { format: items[k].f || fmt.int, dur: 700 });
     });
-    d += `V${y(0)}Z`;
-    s += `<path class="zone" d="${d}"/><path class="zone-line" d="${edge}"/>`;
-    // 每一级的起点标出该级的合入率要求；标在线下方的警告区内，避开线上方的大多数点
-    lines.forEach((l) => {
-      s += `<text class="zone-t" x="${x(l.resolved) + 4}" y="${y(l.rate) + 13}" data-tip="${esc(`已收尾超过 ${l.resolved} 个：合入率需 ≥ ${pct(l.rate)}`)}">${pct(l.rate)}</text>`;
+  }
+
+  // ───────── 池塘：数字从旧值滚到新值 ─────────
+  let pondPrev = null;
+  // 切周时就地更新六个站（不整块重绘）：悬停中的站不会丢 tooltip，奶蛙不闪
+  function renderPond(i, first) {
+    const host = $('#heroPond');
+    const now = K.pondData(i).counts;
+    const old = host.querySelector('.pond');
+    const tmp = document.createElement('div');
+    tmp.innerHTML = K.pond(i);
+    const fresh = tmp.querySelector('.pond');
+    if (first || !old || !pondPrev) {
+      host.replaceChildren(fresh);
+      host.querySelectorAll('.cnt').forEach((c) => c.classList.add('num'));
+      host.querySelectorAll('.st').forEach((st, k) => { const c = st.querySelector('.cnt'); if (c) c.__nwkv = now[k]; });
+      pondPrev = now;
+      return;
+    }
+    old.querySelector('.pond-head').innerHTML = fresh.querySelector('.pond-head').innerHTML;
+    old.querySelector('.pond-foot').innerHTML = fresh.querySelector('.pond-foot').innerHTML;
+    const ns = fresh.querySelectorAll('.st');
+    old.querySelectorAll('.st').forEach((st, k) => {
+      const nx = ns[k];
+      st.className = nx.className;
+      ['href', 'data-tip', 'aria-label', 'data-hash'].forEach((a) => st.setAttribute(a, nx.getAttribute(a) ?? ''));
+      const on = st.querySelector('.st-n'), nn = nx.querySelector('.st-n');
+      const oc = on.querySelector('.cnt');
+      if (oc && nn.querySelector('.cnt')) {
+        on.querySelector('.st-d')?.remove();
+        const nd = nn.querySelector('.st-d');
+        if (nd) on.append(nd);
+        if (pondPrev[k] !== now[k]) K.countUp(oc, now[k], { from: pondPrev[k], dur: 600 });
+      } else {
+        on.innerHTML = nn.innerHTML;
+        const c = on.querySelector('.cnt');
+        if (c) { c.classList.add('num'); K.countUp(c, now[k], { from: 0, dur: 600 }); }
+      }
+      const of = st.querySelector('.st-fig'), nf = nx.querySelector('.st-fig');
+      if (of.innerHTML !== nf.innerHTML) of.replaceChildren(...nf.childNodes);
     });
-    s += `<text class="ax-l" x="${W - pad.r - 4}" y="${y(0) - 8}" text-anchor="end">警告区</text>`;
+    // 悬停中的站：tooltip 换成新一周的内容
+    const hv = old.querySelector('.st:hover');
+    if (hv && K.canHover()) K.tip.show(esc(hv.getAttribute('data-tip')), hv);
+    pondPrev = now;
   }
-  [...pts].sort((a, b2) => a.resolved - b2.resolved).forEach((p) => {
-    const tip = `<b>${esc(p.login)}</b><br>合入率 ${pct(p.rate)}（${p.merged} / ${p.resolved}）${p.warn ? '<br>触发合入率警告' : ''}`;
-    s += `<circle class="dot" cx="${x(p.resolved)}" cy="${y(p.rate)}" r="5" data-tip="${esc(tip)}"/>`;
+
+  // ───────── 周选择器 ─────────
+  const wk = $('#wk');
+  wk.setAttribute('aria-valuemax', String(W.length));
+  const frogEl = document.createElement('div');
+  frogEl.className = 'wk-frog';
+  frogEl.setAttribute('aria-hidden', 'true');
+  const pill = document.createElement('div');
+  pill.className = 'wk-pill';
+  pill.setAttribute('aria-hidden', 'true');
+  const flag = document.createElement('div');
+  flag.className = 'wk-flag';
+  flag.setAttribute('aria-hidden', 'true');
+  flag.innerHTML = '<i class="live-dot"></i><span>进行中</span>';
+  const maxM = Math.max(...NW.weeks.map((w) => w.merged));
+  const maxA = Math.max(...NW.weeks.map((w) => w.active));
+  let G = null;
+  function geom() {
+    const w = wk.clientWidth || 600;
+    const sm = w < 560;
+    const padL = sm ? 30 : 46;
+    const head = sm ? 30 : 38, mh = sm ? 48 : 64, gap = sm ? 10 : 12, ah = sm ? 26 : 32, lab = 26;
+    const n = W.length;
+    const band = (w - padL) / n;
+    const bw = Math.min(18, Math.max(4, band * 0.56));
+    const baseM = head + mh, topA = baseM + gap, baseA = topA + ah;
+    return { w, h: baseA + lab, sm, padL, head, mh, gap, ah, baseM, topA, baseA, band, bw, n, frog: sm ? 22 : 28,
+      cx: (i) => padL + i * band + band / 2,
+      yM: (v) => baseM - (v / maxM) * mh,
+      hA: (v) => (v / maxA) * ah };
+  }
+  const barPath = (x, y0, y1, bw, r) => `M${x.toFixed(2)} ${y0}V${(y1 + r).toFixed(2)}Q${x.toFixed(2)} ${y1.toFixed(2)} ${(x + r).toFixed(2)} ${y1.toFixed(2)}H${(x + bw - r).toFixed(2)}Q${(x + bw).toFixed(2)} ${y1.toFixed(2)} ${(x + bw).toFixed(2)} ${(y1 + r).toFixed(2)}V${y0}Z`;
+  function buildWk() {
+    G = geom();
+    wk.classList.add('is-static');
+    requestAnimationFrame(() => requestAnimationFrame(() => wk.classList.remove('is-static')));
+    const { w, h, padL, head, baseM, topA, baseA, band, bw, cx, yM, hA } = G;
+    let s = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">`;
+    s += `<rect class="hov-band" x="0" y="${head - 8}" width="${band}" height="${baseA - head + 8 + 4}" rx="7"/>`;
+    s += `<rect class="sel-band" x="0" y="${head - 8}" width="${band}" height="${baseA - head + 8 + 4}" rx="7"/>`;
+    // 面板标签与基线：上 = 合入，下 = 活跃（不共用 y 轴）
+    s += `<text class="pl" x="0" y="${head + 10}">合入</text><text class="pv" x="0" y="${head + 23}">${G.sm ? '' : `最高 ${fmt.int(maxM)}`}</text>`;
+    s += `<text class="pl" x="0" y="${topA + 10}">活跃</text><text class="pv" x="0" y="${topA + 23}">${G.sm ? '' : `最高 ${maxA}`}</text>`;
+    s += `<line class="bl" x1="${padL}" x2="${w}" y1="${baseM + 0.5}" y2="${baseM + 0.5}"/><line class="bl" x1="${padL}" x2="${w}" y1="${baseA + 0.5}" y2="${baseA + 0.5}"/>`;
+    NW.weeks.forEach((wd, i) => {
+      const x = cx(i) - bw / 2;
+      if (wd.merged > 0) { const y = Math.min(yM(wd.merged), baseM - 2); s += `<path class="b-m" data-i="${i}" d="${barPath(x, baseM, y, bw, Math.min(3, bw / 2, (baseM - y) / 2))}"/>`; }
+      else s += `<rect class="z" x="${x.toFixed(2)}" y="${baseM - 1.5}" width="${bw.toFixed(2)}" height="1.5" rx=".75"/>`;
+      if (wd.active > 0) { const hh = Math.max(2, hA(wd.active)); const y = baseA - hh; s += `<path class="b-a" data-i="${i}" d="${barPath(x, baseA, y, bw, Math.min(3, bw / 2, hh / 2))}"/>`; }
+      else s += `<rect class="z" x="${x.toFixed(2)}" y="${baseA - 1.5}" width="${bw.toFixed(2)}" height="1.5" rx=".75"/>`;
+    });
+    let lastM = -1;
+    W.forEach((t, i) => {
+      const m = new Date(t + 8 * 3600e3).getUTCMonth();
+      if (m !== lastM) { lastM = m; s += `<text class="mo" data-i="${i}" x="${cx(i)}" y="${h - 7}" text-anchor="middle">${m + 1}月</text>`; }
+    });
+    s += '</svg>';
+    wk.innerHTML = s;
+    wk.append(flag, pill, frogEl);
+    frogEl.innerHTML = K.frog('frog', G.frog);
+    if (cur >= 0) { paintWk(); placeFrog(cur, false); }
+  }
+  function paintWk() {
+    if (!G || cur < 0) return;
+    const { band, cx, h, w } = G;
+    wk.querySelectorAll('.b-m, .b-a').forEach((el) => el.classList.toggle('on', +el.dataset.i === cur));
+    wk.querySelector('.sel-band').style.transform = `translateX(${G.padL + cur * band}px)`;
+    // 选中周的标签：本周显示「进行中」（奶蛙黄 = 当前）
+    const live = cur === LAST;
+    pill.className = `wk-pill${live ? ' is-live' : ''}`;
+    pill.innerHTML = live ? '<i class="live-dot"></i>进行中' : K.week.short(cur);
+    const pw = pill.offsetWidth || 44;
+    const px = K.clamp(cx(cur) - pw / 2, G.padL - 4, w - pw);
+    pill.style.transform = `translate(${px}px, ${h - 22}px)`;
+    wk.querySelectorAll('.mo').forEach((t) => { const x = +t.getAttribute('x'); t.style.opacity = x > px - 24 && x < px + pw + 24 ? 0 : 1; });
+    // 本周旗标：选别的周时提示「进行中」在哪一列；离得太近时只留圆点
+    const fx = cx(LAST);
+    const near = Math.abs(cur - LAST) * band < 52;
+    flag.classList.toggle('is-dot', near);
+    flag.style.opacity = live ? 0 : 1;
+    const fw = near ? 17 : 52;
+    flag.style.transform = `translate(${Math.min(fx - fw / 2, w - fw)}px, ${Math.min(G.yM(NW.weeks[LAST].merged), G.baseM - 2) - 24}px)`;
+    const wd = NW.weeks[cur];
+    wk.setAttribute('aria-valuenow', String(cur + 1));
+    wk.setAttribute('aria-valuetext', `${K.week.range(cur)}${live ? '，进行中' : ''}：合入 ${wd.merged} 个，活跃 ${wd.active} 人`);
+  }
+  // 小蛙蹲在选中柱顶；切周时沿抛物线跳过去
+  let frogAt = null;
+  function frogXY(i, x) {
+    const cx = x ?? G.cx(i);
+    const v = NW.weeks[i].merged;
+    const y = v > 0 ? Math.min(G.yM(v), G.baseM - 2) : G.baseM - 2;
+    return [cx - G.frog / 2, y - G.frog + 2];
+  }
+  function placeFrog(i, hop, x) {
+    if (!G) return;
+    const [x1, y1] = frogXY(i, x);
+    const to = `translate(${x1}px, ${y1}px)`;
+    frogEl.getAnimations().forEach((a) => a.cancel());
+    if (!hop || !frogAt || K.reduced()) { frogEl.style.transform = to; frogAt = [x1, y1]; return; }
+    const [x0, y0] = frogAt;
+    const dist = Math.abs(x1 - x0);
+    const peak = Math.min(y0, y1) - 14 - Math.min(26, dist * 0.08);
+    const frames = [{ transform: `translate(${x0}px, ${y0}px) scale(1, 1)`, offset: 0 }, { transform: `translate(${x0}px, ${y0}px) scale(1.14, .84)`, offset: 0.1 }];
+    for (let k = 0; k <= 14; k++) {
+      const t = k / 14;
+      const yy = y0 + (y1 - y0) * t - 4 * (Math.min(y0, y1) - peak) * t * (1 - t);
+      frames.push({ transform: `translate(${x0 + (x1 - x0) * t}px, ${yy}px) scale(${k < 7 ? 0.94 : 1}, ${k < 7 ? 1.08 : 1})`, offset: 0.12 + t * 0.76 });
+    }
+    frames.push({ transform: `translate(${x1}px, ${y1}px) scale(1.14, .86)`, offset: 0.93 }, { transform: `translate(${x1}px, ${y1}px) scale(1, 1)`, offset: 1 });
+    frogEl.style.transform = to;
+    frogEl.animate(frames, { duration: K.clamp(380 + dist * 0.45, 420, 720), easing: 'linear' });
+    frogAt = [x1, y1];
+  }
+  function wkTip(i) {
+    const wd = NW.weeks[i], f = facts(i);
+    const r = wk.getBoundingClientRect();
+    const y = r.top + Math.min(G.yM(wd.merged), G.baseM - 2) - (i === cur ? G.frog + 4 : 6);
+    const html = `<div class="t-h">${esc(K.week.range(i))}${i === LAST ? ' · 进行中' : ''}</div>`
+      + `<div class="t-row"><span class="t-key box" style="--k:var(--leaf)"></span><span class="t-v">${fmt.int(wd.merged)}</span><span class="t-l">合入 PR</span></div>`
+      + `<div class="t-row"><span class="t-key box" style="--k:var(--water)"></span><span class="t-v">${wd.active}</span><span class="t-l">活跃贡献者</span></div>`
+      + `<div class="t-row"><span class="t-key" style="--k:var(--tip-ink-2)"></span><span class="t-v">${f.s.top.length}</span><span class="t-l">人获得魔力，共 ${mag(f.magic)}</span></div>`
+      + (i === cur ? '' : '<div class="t-l" style="margin-top:4px">点击切到这一周</div>');
+    K.tip.show(html, { getBoundingClientRect: () => ({ left: r.left + G.cx(i) - 1, width: 2, top: y - 2, bottom: y, height: 2 }) });
+  }
+  const colAt = (clientX) => K.clamp(Math.floor((clientX - wk.getBoundingClientRect().left - G.padL) / G.band), 0, G.n - 1);
+  let dragging = false, hoverI = -1, downX = 0;
+  wk.addEventListener('pointermove', (e) => {
+    if (!G) return;
+    const i = colAt(e.clientX);
+    if (dragging) {
+      const r = wk.getBoundingClientRect();
+      if (Math.abs(e.clientX - downX) > 3) wk.classList.add('is-drag');
+      if (i !== cur) setWeek(i, { hop: false, quiet: true });
+      placeFrog(i, false, K.clamp(e.clientX - r.left, G.padL + G.band / 2, G.w - G.band / 2));
+      wkTip(i);
+      return;
+    }
+    if (e.pointerType !== 'mouse') return;
+    if (i !== hoverI) {
+      hoverI = i;
+      const hb = wk.querySelector('.hov-band');
+      hb.setAttribute('x', G.padL + i * G.band);
+      hb.style.opacity = i === cur ? 0 : 1;
+      wkTip(i);
+    }
   });
-  return `${s}</svg>`;
-}
-
-const mainModel = (p) => {
-  const top = [...p.modelMix.values()].sort((a, b) => b.count - a.count)[0];
-  return top ? top.label : '—';
-};
-const stageName = (p) => (p.level === null ? STAGES[p.newbie.status].name : RULES.levels[p.level].name);
-
-const COLUMNS = [
-  { key: 'rank', label: '#', num: true, value: (p) => p.rank },
-  { key: 'login', label: '贡献者', value: (p) => p.login.toLowerCase(), cell: (p) => esc(p.login) },
-  { key: 'level', label: '形态', value: (p) => (p.level ?? -1), cell: (p) => stageName(p) },
-  { key: 'newbie', label: '新手考核', value: (p) => p.newbie.status, cell: (p) => ({ passed: '通过', pending: '考核中', failed: '未通过' }[p.newbie.status]) },
-  { key: 'bonus', label: '魔力', num: true, value: (p) => p.bonus, cell: (p) => fmtBonus(p.bonus) },
-  { key: 'bonusPr', label: 'PR 分', num: true, value: (p) => p.bonusPr, cell: (p) => fmt1(p.bonusPr) },
-  { key: 'bonusModel', label: '模型加成', num: true, value: (p) => p.bonusModel, cell: (p) => fmt1(p.bonusModel) },
-  { key: 'bonusCollab', label: '协作分', num: true, value: (p) => p.bonusCollab, cell: (p) => fmt1(p.bonusCollab) },
-  { key: 'merged', label: '合入 PR', num: true, value: (p) => p.merged },
-  { key: 'opened', label: '开 PR', num: true, value: (p) => p.opened },
-  { key: 'collab', label: '协作', num: true, value: (p) => p.collab },
-  { key: 'rate', label: '合入率', num: true, value: (p) => p.rate ?? -1, cell: (p) => pct(p.rate) },
-  { key: 'lines', label: '改动行', num: true, value: (p) => p.lines, cell: (p) => fmtNum(p.lines) },
-  { key: 'commits', label: 'commit', num: true, value: (p) => p.commits, cell: (p) => fmtNum(p.commits) },
-  { key: 'model', label: '主要模型', value: (p) => mainModel(p), cell: (p) => esc(mainModel(p)) },
-  { key: 'inflight', label: '进行中', num: true, value: (p) => p.inflight },
-  { key: 'activeWeeks', label: '活跃周', num: true, value: (p) => p.activeWeeks },
-  { key: 'firstAt', label: '首次贡献', value: (p) => p.firstAt, cell: (p) => fmtDate(p.firstAt) },
-  { key: 'lastAt', label: '最近活动', value: (p) => p.lastAt, cell: (p) => daysAgo(p.lastAt, state.board.now) },
-];
-
-function renderTable() {
-  if (!state.board) return;
-  const col = COLUMNS.find((c) => c.key === state.sort.key);
-  const rows = visiblePeople().sort((x, y) => {
-    const a = col.value(x);
-    const c = col.value(y);
-    return (a < c ? -1 : a > c ? 1 : 0) * state.sort.dir || x.rank - y.rank;
+  wk.addEventListener('pointerleave', () => { hoverI = -1; const hb = wk.querySelector('.hov-band'); if (hb) hb.style.opacity = 0; if (!dragging) K.tip.hide(); });
+  wk.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || !G) return;
+    dragging = true;
+    downX = e.clientX;
+    wk.setPointerCapture(e.pointerId);
+    const i = colAt(e.clientX);
+    // setWeek 在拖动中不挪小蛙（交给 pointermove 跟手），点击时要在这里起跳
+    if (i !== cur) { setWeek(i, { quiet: true }); placeFrog(i, true); }
+    const hb = wk.querySelector('.hov-band'); if (hb) hb.style.opacity = 0;
   });
-  $('table').querySelector('thead').innerHTML = `<tr>${COLUMNS.map((c) => `<th class="${c.num ? 'num' : ''}" data-key="${c.key}">${esc(c.label)}${c.key === state.sort.key ? (state.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr>`;
-  $('table').querySelector('tbody').innerHTML = rows.map((p) => `<tr>${COLUMNS.map((c) => `<td class="${c.num ? 'num' : ''}">${c.cell ? c.cell(p) : c.value(p)}</td>`).join('')}</tr>`).join('');
-  $('detail').querySelector('summary').textContent = `完整明细表（${rows.length} 人）`;
-}
+  const endDrag = () => {
+    if (!dragging) return;
+    const moved = wk.classList.contains('is-drag');
+    dragging = false;
+    wk.classList.remove('is-drag');
+    if (moved) {
+      placeFrog(cur, false);
+      if (!K.reduced()) frogEl.animate([{ transform: `${frogEl.style.transform} scale(1.14, .86)` }, { transform: `${frogEl.style.transform} scale(1, 1)` }], { duration: 260, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+    }
+    if (hoverI < 0) K.tip.hide();
+    settle(0);
+  };
+  wk.addEventListener('pointerup', endDrag);
+  wk.addEventListener('pointercancel', endDrag);
+  wk.addEventListener('keydown', (e) => {
+    const map = { ArrowLeft: -1, ArrowRight: 1, ArrowDown: -1, ArrowUp: 1, PageDown: -4, PageUp: 4 };
+    if (e.key in map) { e.preventDefault(); e.stopPropagation(); setWeek(cur + map[e.key]); }
+    else if (e.key === 'Home') { e.preventDefault(); e.stopPropagation(); setWeek(0); }
+    else if (e.key === 'End') { e.preventDefault(); e.stopPropagation(); setWeek(LAST); }
+  });
 
-function renderAll() {
-  const b = state.board;
-  renderKpis(b);
-  renderLeaderboard();
-  renderPath(b);
-  $('chart-active').innerHTML = columnChart(b.weeks, 'active');
-  $('chart-merged').innerHTML = columnChart(b.weeks, 'merged');
-  $('chart-models').innerHTML = modelChart(b);
-  $('chart-rate').innerHTML = rateChart(b);
-  renderTable();
-}
-
-// ---------- 加载数据 ----------
-
-// 上传脚本发布的数据快照，与页面同目录
-const DATA_URL = 'data/board.json';
-
-function setStatus(text, isError = false) {
-  $('status').textContent = text;
-  $('status').className = `meta${isError ? ' error' : ''}`;
-}
-
-function renderSkeleton() {
-  const row = '<div class="sk"><i style="width:60%"></i><i style="width:70%"></i><i style="width:60%"></i><i></i><i></i></div>';
-  $('leaderboard').innerHTML = row.repeat(8);
-}
-
-const fmtDateTime = (t) => new Date(t + RULES.tzOffsetHours * 3600000).toISOString().slice(0, 16).replace('T', ' ');
-function ago(t) {
-  const m = Math.max(0, Math.round((Date.now() - t) / 60000));
-  if (m < 60) return `${m} 分钟前`;
-  if (m < 48 * 60) return `${Math.round(m / 60)} 小时前`;
-  return `${Math.round(m / 1440)} 天前`;
-}
-
-// 上传脚本把 Map 展开成数组，这里还原成渲染层使用的结构
-function hydrate(d) {
-  for (const p of d.people) {
-    p.weekly = new Map(p.weekly);
-    p.modelMix = new Map(p.modelMix.map((m, i) => [i, m]));
+  // ───────── 三张卡 ─────────
+  const board = $('#board');
+  let boardOpen = false;
+  $('#boardMore').addEventListener('click', () => { boardOpen = !boardOpen; board.classList.toggle('is-open', boardOpen); paintBoardMore(); });
+  function paintBoardMore() { const k = board.querySelectorAll('.lrow').length; $('#boardMore').innerHTML = boardOpen ? `收起${icon('chevron-up', 14)}` : `展开前 ${k} 名${icon('chevron-down', 14)}`; $('#boardMore').parentElement.hidden = k <= 5; }
+  function nearestActive(i) {
+    for (let d = 1; d < W.length; d++) { if (i - d >= 0 && facts(i - d).s.top.length) return i - d; if (i + d <= LAST && facts(i + d).s.top.length) return i + d; }
+    return null;
   }
-  return d;
-}
+  function renderBoard(f, animate) {
+    const name = f.live ? '本周' : f.i === LAST - 1 ? '上周' : '这一周';
+    $('#boardTitle').textContent = `${name}魔力榜`;
+    $('#boardSub').innerHTML = !f.s.top.length ? `${name}没有人获得魔力` : f.i === 0 ? `${f.s.top.length} 人获得魔力 · 有记录的第一周，都是新面孔` : `${f.s.top.length} 人获得魔力 · 名次变化与${K.week.prevName(f.i)}这张榜比`;
+    const rows = f.board.slice(0, 10);
+    const paint = () => {
+      if (!rows.length) {
+        const k = nearestActive(f.i);
+        board.innerHTML = `<div data-key="empty">${K.empty({ art: 'tadpole', title: '池塘很安静', body: '这一周没有人合入或协作。', action: k !== null ? `<button type="button" class="btn btn-sm" data-goto="${k}">${icon(k < f.i ? 'chevron-left' : 'chevron-right', 14)}去 ${K.week.short(k)} 那一周</button>` : '' })}</div>`;
+        return;
+      }
+      board.innerHTML = rows.map((x) => {
+        const fo = K.formOf(x.p, f.i);
+        // 组织外写进副行：标签放在名字行会把名字挤成省略号
+        const sub = `${fo.name} · 总榜 #${NW.ranksAt(f.i).get(x.p.login)}${x.p.member ? '' : ' · <span class="out">组织外</span>'}`;
+        const tags = '';
+        return `<div class="lrow is-click" role="listitem" data-key="${esc(x.p.login)}" data-login="${esc(x.p.login)}">`
+          + `<span class="rank ${x.rank <= 3 ? 'top' : ''}" style="font-size:var(--fs-sm)">${x.rank}</span>`
+          + `<span style="min-width:0">${K.who(x.p, { size: 26, sub, tags })}</span>`
+          + `<span class="val r" style="font-size:var(--fs-sm)">${mag(x.v)}</span>`
+          + `<span class="dl">${K.delta(x.move)}</span></div>`;
+      }).join('');
+    };
+    if (animate) K.flip(board, paint, { stagger: 12 }); else paint();
+    $('#boardFoot').textContent = f.s.top.length > 10 ? `还有 ${f.s.top.length - 10} 人获得魔力` : f.s.top.length ? `获得魔力的全部 ${f.s.top.length} 人` : '每人每周最多按 10 个动作计分';
+    paintBoardMore();
+  }
+  board.addEventListener('click', (e) => {
+    const g = e.target.closest('[data-goto]');
+    if (g) { setWeek(+g.dataset.goto); return; }
+    const r = e.target.closest('.lrow');
+    if (r && !e.target.closest('[data-person], [data-tip-html]')) K.openPerson(r.dataset.login);
+  });
 
-async function loadBoard() {
-  renderSkeleton();
-  try {
-    const res = await fetch(DATA_URL, { cache: 'no-cache' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    state.board = hydrate(await res.json());
-    renderAll();
-    renderBlind(state.board.limits);
-    setStatus(`${state.board.org} · 数据更新于 ${fmtDateTime(state.board.now)}（UTC+8，${ago(state.board.now)}）`);
-  } catch (err) {
-    console.error(err);
-    $('leaderboard').innerHTML = '<div class="empty">还没有可展示的数据</div>';
-    setStatus(`读取数据失败：${err.message}`, true);
+  function swap(el, html, animate) {
+    el.innerHTML = html;
+    if (!animate || K.reduced()) return;
+    el.classList.remove('swap-in'); void el.offsetWidth; el.classList.add('swap-in');
   }
-}
+  function renderMoves(f, animate) {
+    $('#movesSub').textContent = f.i === 0 ? '有记录的第一周，没有可比较的名次' : `总榜名次，与${K.week.prevName(f.i)}末相比`;
+    const cn = f.s.contributors;
+    let h = `<div class="sub-h">${icon('trending-up', 14)}上升最快<span class="aside">${f.movers.length ? `共 ${f.movers.length} 人上升` : ''}</span></div>`;
+    h += f.movers.length
+      ? f.movers.slice(0, 5).map((x) => `<div class="mv">${K.who(x.p, { size: 24 })}${K.dotRange(x.from, x.to, { n: cn, ends: false })}<span class="rk">#${x.from} → <b>#${x.to}</b> ${K.delta(x.m)}</span></div>`).join('')
+      : `<div class="mini-empty">${K.frog('frog', 26, 'sleep')}<span>${f.i === 0 ? '第一周还没有名次可比' : '总榜名次没有人上升'}</span></div>`;
+    h += '<div class="sep"></div>';
+    const out = f.faces.filter((x) => !x.p.member).length;
+    h += `<div class="sub-h">${icon('user-plus', 14)}新面孔 <span class="cnt">${f.faces.length}</span><span class="aside">${facesNote(f)}</span></div>`;
+    const maxF = 6;
+    h += f.faces.length
+      ? `<div class="faces">${f.faces.slice(0, f.faces.length > maxF ? maxF - 1 : maxF).map((x) => `<div class="face" data-login="${esc(x.p.login)}">${K.who(x.p, { size: 26, sub: x.v > 0 ? `#${x.r} · +${mag(x.v)} 魔力` : '还没拿到魔力' })}</div>`).join('')}${f.faces.length > maxF ? `<div class="face" style="justify-content:center;cursor:default"><span class="av-stack">${f.faces.slice(maxF - 1, maxF + 2).map((x) => `<span data-person="${esc(x.p.login)}" tabindex="0" role="button" aria-label="${esc(x.p.login)}，查看档案">${K.avatar(x.p.login, 22)}</span>`).join('')}</span><span class="muted" style="font-size:var(--fs-xs)">另 ${f.faces.length - maxF + 1} 位</span></div>` : ''}</div>`
+      : `<div class="mini-empty">${K.frog('egg', 26)}<span>这一周没有新面孔</span></div>`;
+    if (f.entered.length) {
+      const few = f.entered.length <= 2;
+      const stack = few ? '' : `<span class="av-stack">${f.entered.slice(0, 4).map((p) => `<span data-person="${esc(p.login)}" tabindex="0" role="button" aria-label="${esc(p.login)}，查看档案">${K.avatar(p.login, 20)}</span>`).join('')}</span>`;
+      h += `<div class="enter-row">${K.delta(undefined)}${stack}<span>${few ? `${K.people(f.entered, { max: 2 })} ` : `<b>${f.entered.length}</b> 人`}此前 0 魔力，${f.live ? '本周' : '这一周'}第一次拿到；记作「上榜」，不算上升</span></div>`;
+    }
+    swap($('#moves'), h, animate);
+    $('#movesFoot').textContent = `总榜共 ${cn} 人，按累计魔力排名`;
+  }
+  $('#moves').addEventListener('click', (e) => { const c = e.target.closest('.face[data-login]'); if (c && !e.target.closest('[data-person]')) K.openPerson(c.dataset.login); });
 
-document.addEventListener('click', (e) => {
-  const f = e.target.closest('[data-filter]');
-  if (f && state.board) setFilter(f.dataset.filter);
-  if (e.target.id === 'toggle-all') {
-    state.showAll = !state.showAll;
-    renderLeaderboard();
+  const FROM = (x) => (x.from === null ? '蛙卵' : LV[x.from].name);
+  function renderEvo(f, animate, celebrate) {
+    const name = f.live ? '本周' : '这一周';
+    let h = `<div class="sub-h">${icon('sparkles', 14)}${name}进化与孵化 <span class="cnt">${f.evos.length}</span></div>`;
+    if (f.evos.length) {
+      const shown = f.evos.slice(0, 4);
+      h += `<div class="evo-list">${shown.map((x) => `<div class="ev" data-login="${esc(x.p.login)}">${K.who(x.p, { size: 26, sub: x.kind === 'hatch' ? '通过新手考核' : `魔力 ${mag(x.p.cum[f.i])}` })}`
+        + `<span class="ev-tr" aria-label="${FROM(x)}到${LV[x.to].name}">${K.frog(x.from === null ? 'egg' : LV[x.from].icon, 18)}${icon('arrow-right', 12)}${K.frog(LV[x.to].icon, 30, 'to')}<span class="lvl" style="margin-left:2px">${LV[x.to].name}</span></span></div>`).join('')}</div>`;
+      if (f.evos.length > 4) h += `<div class="muted" style="font-size:var(--fs-xs);margin-top:8px">另有 ${f.evos.length - 4} 人：${K.people(f.evos.slice(4).map((x) => x.p), { max: 3 })}</div>`;
+    } else {
+      const u = f.upcoming[0];
+      h += `<div class="mini-empty">${K.frog('tadpole', 26, 'sleep')}<span>这一周没有人进化或孵化${u ? `；离得最近的是 ${K.pname(u.p.login, { avatar: false })}，还差 <b>${mag(u.gap)}</b>` : ''}</span></div>`;
+    }
+    h += '<div class="sep"></div>';
+    h += `<div>`
+      + `<div class="sub-h">${icon('hourglass', 14)}即将进化<span class="aside">按${f.live ? '' : '当时'}近 4 周均速</span></div>`;
+    const up = f.upcoming.slice(0, 5);
+    h += up.length
+      ? up.map((x) => `<div class="upc" data-login="${esc(x.p.login)}">${K.who(x.p, { size: 28, sub: `${LV[x.l].name} → ${LV[x.l + 1].name}` })}`
+        + `<div data-tip="${esc(`${LV[x.l].name} → ${LV[x.l + 1].name}：还差 ${mag(x.gap)} 魔力；近 4 周均速 ${mag(x.pace)}/周，${K.etaText(x.eta)}`)}"><div class="meter"><i style="width:${(K.clamp(x.prog, 0, 1) * 100).toFixed(1)}%"></i></div>`
+        + `<div class="uv"><span>差 <b>${mag(x.gap)}</b></span><span class="eta ${x.eta <= 2 ? 'soon' : ''}">${K.etaText(x.eta)}</span></div></div></div>`).join('')
+      : `<div class="mini-empty">${K.frog('frog', 26, 'sleep')}<span>近 4 周没有人在攒魔力</span></div>`;
+    h += '</div>';
+    swap($('#evo'), h, animate);
+    if (celebrate && f.evos.length && !K.reduced()) {
+      $('#evo').querySelectorAll('.ev .to').forEach((el, k) => setTimeout(() => { el.classList.remove('hop'); void el.offsetWidth; el.classList.add('hop'); }, 260 + k * 120));
+    }
   }
-  const th = e.target.closest('#table th');
-  if (th) {
-    const key = th.dataset.key;
-    state.sort = { key, dir: state.sort.key === key ? -state.sort.dir : (key === 'rank' || key === 'login' ? 1 : -1) };
-    renderTable();
-  }
-});
-$('search').addEventListener('input', (e) => {
-  state.search = e.target.value;
-  if (state.board) {
-    renderLeaderboard();
-    renderTable();
-  }
-});
+  $('#evo').addEventListener('click', (e) => { const c = e.target.closest('[data-login]'); if (c && !e.target.closest('[data-person]')) K.openPerson(c.dataset.login); });
 
-$('logo').innerHTML = frogIcon('face', 30);
-$('rate-note').innerHTML = `<b>合入率</b>：${esc(TERMS.rate.text)}<br><b>黄色区域</b>：点落在这里会被标「合入率警告」。${esc(TERMS.warn.text)}`;
-renderTerms();
-renderFormula();
-renderFactors();
-renderMapping();
-renderPath(null);
-renderChips();
-loadBoard();
+  // ───────── 25 周走势（两张周图，联动高亮所选周） ─────────
+  const weeksData = (k) => NW.weeks.map((w, i) => ({ label: `${K.week.range(i)}${i === LAST ? ' · 进行中' : ''}`, v: w[k], t: w.start }));
+  function longestZero(k) { let run = [-1, -1], best = [-1, -1]; NW.weeks.forEach((w, i) => { if (w[k] === 0) { run = run[0] < 0 ? [i, i] : [run[0], i]; if (run[1] - run[0] > best[1] - best[0]) best = run.slice(); } else run = [-1, -1]; }); return best; }
+  function biggestJump(k) { let j = 1; for (let i = 2; i <= LAST; i++) if (NW.weeks[i][k] - NW.weeks[i - 1][k] > NW.weeks[j][k] - NW.weeks[j - 1][k]) j = i; return j; }
+  function trendTip(k, unit, color) {
+    return (d, i) => {
+      const v = NW.weeks[i][k], pv = i > 0 ? NW.weeks[i - 1][k] : null;
+      return `<div class="t-h">${esc(d.label)}</div><div class="t-row"><span class="t-key box" style="--k:${color}"></span><span class="t-v">${fmt.int(v)}</span><span class="t-l">${unit}</span></div>`
+        + (pv !== null ? `<div class="t-row"><span class="t-key" style="--k:var(--tip-ink-2)"></span><span class="t-v">${v === pv ? '持平' : `${v > pv ? '+' : '−'}${fmt.int(Math.abs(v - pv))}`}</span><span class="t-l">较前一周</span></div>` : '')
+        + (i === cur ? '' : '<div class="t-l" style="margin-top:4px">点击切到这一周</div>');
+    };
+  }
+  const zA = longestZero('active'), jA = biggestJump('active');
+  const zM = longestZero('merged'), jM = biggestJump('merged');
+  const chartA = K.columns($('#chartActive'), {
+    data: weeksData('active'), hi: LAST, color: 'var(--water)', dim: 'var(--viz-dim-2)', f: fmt.int, unit: '人', height: 188, ariaLabel: '每周活跃贡献者，按 Enter 切到这一周',
+    tip: trendTip('active', '活跃贡献者', 'var(--water)'),
+    annotations: [
+      ...(zA[0] >= 0 && zA[1] > zA[0] ? [{ type: 'bracket', from: zA[0], to: zA[1], text: `连续 ${zA[1] - zA[0] + 1} 周没有人活跃` }] : []),
+      { type: 'note', at: jA, side: 'left', dx: 14, dy: 24, text: `${K.week.short(jA)} 这一周，从 ${NW.weeks[jA - 1].active} 人跳到 ${NW.weeks[jA].active} 人` },
+    ],
+    onSelect: (i) => setWeek(i),
+  });
+  const chartM = K.columns($('#chartMerged'), {
+    data: weeksData('merged'), hi: LAST, f: fmt.int, unit: '个合入', height: 188, ariaLabel: '每周合入 PR，按 Enter 切到这一周',
+    tip: trendTip('merged', '合入 PR', 'var(--leaf)'),
+    annotations: [
+      ...(zM[0] >= 0 && zM[1] > zM[0] ? [{ type: 'bracket', from: zM[0], to: zM[1], text: `连续 ${zM[1] - zM[0] + 1} 周没有合入` }] : []),
+      { type: 'note', at: jM, side: 'left', dx: 14, dy: 24, text: `${K.week.short(jM)} 这一周，从 ${NW.weeks[jM - 1].merged} 个跳到 ${NW.weeks[jM].merged} 个` },
+    ],
+    onSelect: (i) => setWeek(i),
+  });
+
+  // ───────── 组织健康（累计） ─────────
+  (function renderHealth() {
+    const S = NW.summary;
+    const ratio = (a, b) => (b ? a / b : 0);
+    const top = NW.people.slice(0, Math.max(1, Math.ceil(NW.people.length * 0.2)));
+    const total = NW.people.reduce((a, p) => a + p.bonus, 0);
+    const topShare = ratio(top.reduce((a, p) => a + p.bonus, 0), total);
+    const inflight = NW.people.reduce((a, p) => a + p.inflight, 0);
+    const backlog = NW.people.slice().sort((a, b) => b.inflight - a.inflight)[0];
+    $('#healthSub').textContent = `${K.week.range(0).split(' – ')[0]}至今 · 截至 ${fmt.md(NW.now)} ${fmt.hm(NW.now)}`;
+    $('#healthKpis').innerHTML = [
+      K.kpi({ icon: 'users', label: '贡献者', value: S.contributors, sub: `${nw(`组织成员 <b>${S.memberContributors}</b>`)}<span class="dot"> · </span>${nw(`组织外 <b>${S.outsiders}</b>`)}` }),
+      K.kpi({ icon: 'git-merge', label: '合入 PR', value: S.merged, sub: nw(`共开 <b>${fmt.int(S.prs)}</b> 个 PR`) }),
+      K.kpi({ icon: 'egg', label: '已孵化', value: S.hatched, sub: `${nw(`蛙卵 <b>${S.pending}</b>`)}<span class="dot"> · </span>${nw(`未孵化 <b>${S.failed}</b>`)}` }),
+    ].join('');
+    const cells = [
+      { ic: 'eye', l: '人工 review 覆盖率', s: '人工 review', v: ratio(S.mergedReviewed, S.merged), note: `${fmt.int(S.mergedReviewed)} / ${fmt.int(S.merged)} 个合入有人工 review`, tip: '合入的 PR 里，有人工 review 的占比' },
+      { ic: 'git-pull-request', l: '作者自己合入', v: ratio(S.mergedSelf, S.merged), note: `${fmt.int(S.mergedSelf)} / ${fmt.int(S.merged)}`, tip: '合入的 PR 里，由作者本人点合入的占比' },
+      { ic: 'sparkle', l: '带 AI 合入', v: ratio(S.mergedAi, S.merged), note: `${fmt.int(S.mergedAi)} / ${fmt.int(S.merged)} 个带 AI 共同作者`, tip: '合入的 PR 里，带 AI 共同作者署名的占比' },
+      { ic: 'trophy', l: '前 20% 的人占魔力', s: '前 20% 占魔力', v: topShare, note: `总榜前 ${top.length} 人 · 共 ${NW.people.length} 人`, tip: `按总榜名次取前 20%（${top.length} 人），他们的魔力占全体魔力的比例` },
+      { ic: 'clock', l: '进行中 PR', count: inflight, v: ratio(inflight, S.prs), note: backlog && backlog.inflight ? `最多 ${K.pname(backlog.login, { avatar: false })}：${backlog.inflight} 个` : '没有进行中的 PR', tip: '已开、未合入、未关闭、未超 14 天的 PR；进度条是它占全部已开 PR 的比例' },
+    ];
+    $('#healthGrid').innerHTML = cells.map((c) => `<div class="panel hc"><div class="hc-l">${icon(c.ic, 14)}<span><span class="l-full">${c.l}</span><span class="l-short">${c.s || c.l}</span></span><span class="info" tabindex="0" role="img" aria-label="${esc(c.tip)}" data-tip="${esc(c.tip)}">${icon('info', 13)}</span></div>`
+      + (c.count !== undefined ? `<div class="hc-v">${fmt.int(c.count)}<small>个 · 占全部 PR ${share(c.v, 1)}</small></div>` : `<div class="hc-v">${share(c.v, 1)}</div>`)
+      + `<div class="meter"><i style="width:${(c.v * 100).toFixed(2)}%"></i></div>`
+      + `<div class="hc-n">${c.note}</div></div>`).join('');
+    $('#pageFoot').innerHTML = `${icon('info', 13)}<span>数据快照 ${esc(fmt.datetime(NW.now))}（UTC+8）。页面只展示人维度的贡献度与组织级汇总；规则口径见排行榜页的「口径与盲区」。</span>`;
+  })();
+
+  // ───────── 切周 ─────────
+  let cur = -1, settleT = 0, panelsFor = -1, lastTitle = '';
+  function renderDateline(i) {
+    const asof = i === LAST ? `${K.week.asOf()} · 与上周全周相比` : i === 0 ? '有记录的第一周' : '与前一周相比';
+    $('#dateline').innerHTML = `${K.week.status(i)}<span class="range">${K.week.range(i)}</span><span class="asof">${asof}</span>`
+      + `<span class="stepper"><button type="button" class="btn btn-sm back-now" id="backNow" ${i === LAST ? 'hidden' : ''}>${icon('rotate-ccw', 14)}回到本周</button>`
+      + `<span class="btn-group"><button type="button" class="btn btn-icon btn-sm" id="wkPrev" aria-label="前一周" ${i === 0 ? 'disabled' : ''}>${icon('chevron-left', 16)}</button><button type="button" class="btn btn-icon btn-sm" id="wkNext" aria-label="后一周" ${i === LAST ? 'disabled' : ''}>${icon('chevron-right', 16)}</button></span></span>`;
+  }
+  $('#dateline').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    const id = b.id;
+    if (id === 'wkPrev') setWeek(cur - 1); else if (id === 'wkNext') setWeek(cur + 1); else if (id === 'backNow') setWeek(LAST);
+    requestAnimationFrame(() => { const nb = document.getElementById(id); if (nb && !nb.disabled && !nb.hidden) nb.focus({ preventScroll: true }); else wk.focus({ preventScroll: true }); });
+  });
+  function renderPanels(animate, celebrate) {
+    if (panelsFor === cur) return;
+    panelsFor = cur;
+    const f = facts(cur);
+    renderBoard(f, animate);
+    renderMoves(f, animate);
+    renderEvo(f, animate, celebrate);
+  }
+  function settle(ms = 140) { clearTimeout(settleT); settleT = setTimeout(() => renderPanels(true, true), ms); }
+  function setWeek(i, { hop = true, quiet = false, first = false } = {}) {
+    i = K.clamp(i, 0, LAST);
+    if (i === cur) return;
+    const prev = cur;
+    cur = i;
+    const f = facts(i);
+    renderDateline(i);
+    const st = story(f);
+    const h = $('#headline'), l = $('#lede');
+    if (st.title !== lastTitle) {
+      h.innerHTML = st.title; lastTitle = st.title;
+      h.classList.remove('is-in'); void h.offsetWidth; h.classList.add('is-in');
+      if (!first) { h.classList.remove('swap-in'); void h.offsetWidth; h.classList.add('swap-in'); }
+    }
+    l.innerHTML = st.lede;
+    if (!first) { l.classList.remove('swap-in'); void l.offsetWidth; l.classList.add('swap-in'); }
+    renderPond(i, first);
+    renderKpis(f, first);
+    paintWk();
+    if (!dragging || first) placeFrog(i, hop && !first && prev >= 0);
+    chartA.update({ hi: i, valueLabel: NW.weeks[i].active > 0 });
+    chartM.update({ hi: i, valueLabel: NW.weeks[i].merged > 0 });
+    $('#peopleEyebrow').textContent = f.live ? `本周 · ${K.week.range(i)}` : `${K.week.name(i)} · ${K.week.range(i)}`;
+    const note = i === LAST ? K.week.note(i) : i === 0 ? '这是有记录的第一周，没有可对比的前一周。' : `「较前一周」对比的是 ${K.week.short(i - 1)} 那一周全周。`;
+    $('#heroNote').innerHTML = `${icon('info', 13)}<span>${note}活跃 = 提 PR、合入或协作的人；魔力每人每周最多按 10 个动作计分。</span>`;
+    if (!first) K.week.toURL(i);
+    if (first) renderPanels(false, false);
+    else if (quiet) settle();
+    else { clearTimeout(settleT); renderPanels(true, true); }
+    // 创纪录的周：从荧光笔处撒一小把花（只在用户主动切到这一周时）
+    if (!first && !dragging && (f.recA || f.recM) && !K.reduced()) {
+      setTimeout(() => { const m = h.querySelector('mark'); if (m) { const r = m.getBoundingClientRect(); if (r.bottom > 0 && r.top < innerHeight) K.confetti(r.left + r.width / 2, r.top + r.height / 2, { count: 22, power: 0.7 }); } }, 420);
+    }
+  }
+
+  buildWk();
+  setWeek(K.week.fromURL(), { first: true });
+  if (!K.reduced()) {
+    const [x, y] = frogXY(cur);
+    frogEl.animate([{ transform: `translate(${x}px, ${y - 48}px) scale(.9, 1.1)`, opacity: 0 }, { transform: `translate(${x}px, ${y}px) scale(1.15, .85)`, opacity: 1, offset: 0.7 }, { transform: `translate(${x}px, ${y}px) scale(1, 1)`, opacity: 1 }], { duration: 640, delay: 240, easing: 'cubic-bezier(.5,0,.6,1)', fill: 'backwards' });
+  }
+  let rw = wk.clientWidth;
+  new ResizeObserver(() => { if (Math.abs(wk.clientWidth - rw) > 1) { rw = wk.clientWidth; buildWk(); } }).observe(wk);
+
+  K.keys.add([
+    { key: 'ArrowLeft', label: '前一周', group: '本周快照', handler: () => setWeek(cur - 1) },
+    { key: 'ArrowRight', label: '后一周', group: '本周快照', handler: () => setWeek(cur + 1) },
+    { key: 't', display: 'T', label: '回到本周', group: '本周快照', handler: () => setWeek(LAST) },
+  ]);
+  K.cmdk.add({ label: '回到本周', icon: 'rotate-ccw', run: () => setWeek(LAST), kbd: 'T' });
+  K.cmdk.add({ label: `跳到合入最多的一周（${K.week.short(NW.weeks.reduce((b, w, i) => (w.merged > NW.weeks[b].merged ? i : b), 0))}）`, icon: 'git-merge', run: () => setWeek(NW.weeks.reduce((b, w, i) => (w.merged > NW.weeks[b].merged ? i : b), 0)) });
+})();
 </script>
 </body>
 </html>

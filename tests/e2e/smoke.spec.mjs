@@ -1,0 +1,46 @@
+// 六个页面都能启动：无报错、导航正确、主题参数生效、只请求本站资源。
+import { test, expect, open, PAGES } from './fixtures.mjs';
+
+for (const pg of PAGES) {
+  test(`${pg.label}页能加载 @mobile`, async ({ page, external, isMobile }) => {
+    await open(page, `/${pg.file}`);
+    await expect(page.locator('.boot-error')).toHaveCount(0);
+    await expect(page.locator('h1, h2').first()).not.toBeEmpty();
+    // 桌面看顶栏，手机看底部标签栏；当前页高亮
+    const nav = isMobile ? page.locator('.tabbar') : page.locator('#appbar .nav');
+    await expect(nav).toBeVisible();
+    await expect(nav.locator('a')).toHaveCount(PAGES.length);
+    for (const other of PAGES) await expect(nav.locator(`a[data-screen="${other.id}"]`)).toHaveAttribute('href', other.file);
+    await expect(nav.locator('[aria-current="page"]')).toHaveAttribute('data-screen', pg.id);
+    // 外部请求只允许 GitHub 头像（已被拦截）；不允许调用 GitHub API
+    expect(external.filter((u) => !/^https:\/\/github\.com\/[^/]+\.png/.test(u))).toEqual([]);
+  });
+}
+
+test('?theme=dark 切到暗色，导航时保留', async ({ page }) => {
+  await open(page, '/index.html?theme=dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.locator('#appbar .nav a[data-screen="c2"]').click();
+  await expect(page).toHaveURL(/ranking\.html\?theme=dark/);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+});
+
+test('数据读取失败时给出提示与重新加载按钮', async ({ page, errors }) => {
+  await page.route('**/data/board.json', (r) => r.fulfill({ status: 500, body: 'oops' }));
+  await page.goto('/index.html');
+  const box = page.locator('.boot-error');
+  await expect(box).toBeVisible();
+  await expect(box).toContainText('HTTP 500');
+  await expect(box.getByRole('button', { name: '重新加载' })).toBeVisible();
+  errors.length = 0; // 这个用例故意制造失败，boot.js 会 console.error
+});
+
+test('⌘K 搜索贡献者并打开档案', async ({ page }) => {
+  await open(page, '/index.html');
+  await page.keyboard.press('ControlOrMeta+k');
+  const box = page.locator('.cmdk.on input');
+  await expect(box).toBeFocused();
+  await box.fill('frog-07');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/profile\.html.*#u=frog-07/);
+});

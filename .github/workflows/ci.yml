@@ -26,3 +26,27 @@ jobs:
           node --check scripts/upload.mjs
       - name: Load the scoring engine
         run: node --input-type=module -e "await import('./engine.js')"
+      - name: Check page scripts syntax
+        run: |
+          for f in assets/*.js scripts/serve.mjs tests/fixtures/anonymize.mjs; do node --check "$f"; done
+  e2e:
+    # Browser tests use the anonymized fixture in tests/fixtures/board.json; no organization data is read.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>排行榜 · 奶蛙宇宙</title>
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="assets/tokens.css">
+<!-- 读取 data/board.json 后加载 engine.js、assets/derive.js、icons.js、kit.js，再执行下方 type="text/x-nw-page" 的页面脚本 -->
+<script src="assets/boot.js"></script>
+<style>
+  /* ── 本页布局；颜色、字号、圆角、时长一律用令牌 ── */
+  .intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-8); align-items: end; margin: var(--s-2) 0 var(--s-8); }
+  .intro .headline { margin-top: var(--s-3); max-width: 22em; }
+  .intro .lede { max-width: 44em; }
+  .intro-stats { display: flex; gap: var(--s-6); padding-bottom: 6px; }
+  .istat { min-width: 92px; }
+  .istat .label { font-size: var(--fs-2xs); letter-spacing: .02em; }
+  .istat b { display: block; margin-top: 4px; font-family: var(--font-display); font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .istat small { display: block; margin-top: 2px; font-size: var(--fs-2xs); color: var(--ink-3); white-space: nowrap; }
+
+  /* 排行榜 */
+  .lb-bar { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-4) var(--s-5) var(--s-3); flex-wrap: wrap; }
+  .lb-bar .search { width: 240px; margin-left: auto; }
+  .lb-meta { display: flex; align-items: center; gap: 8px; padding: 0 var(--s-5) var(--s-3); font-size: var(--fs-xs); color: var(--ink-3); min-height: 18px; font-variant-numeric: tabular-nums; }
+  .lb-meta b { color: var(--ink-2); font-weight: 650; }
+  .lb-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--ink-4); flex: none; }
+  .lb-filters { padding: 0 var(--s-5) var(--s-4); gap: 5px; }
+  .lb-filters .chip { padding: 0 8px; }
+  .lb-filters .chip-sep { margin: 0 3px; }
+  .chip[data-zero] { color: var(--ink-3); }
+  .chip[data-zero] .n { opacity: .7; }
+  .chip .ic { color: var(--ink-3); }
+  .chip[aria-pressed="true"] .ic { color: currentColor; }
+  .lb { --cols: 28px 46px minmax(170px, 1.35fr) 184px minmax(110px, 1fr) 78px 92px; }
+  .lb .lrow { gap: 14px; }
+  .lb .lrow-head span { white-space: nowrap; }
+  .lb .c-delta { display: flex; justify-content: center; }
+  .lb .fm { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; }
+  .lb .fm .fn { display: flex; justify-content: space-between; gap: 6px; font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; color: var(--ink); }
+  .lb .fm .fn span { font-weight: 500; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .lb .fm .meter { margin-top: 5px; height: 4px; }
+  .lb .c-val { text-align: right; justify-self: end; line-height: 1.25; }
+  .lb .c-val .val { display: block; font-size: var(--fs-md); }
+  .lb .c-val small { display: block; font-size: var(--fs-2xs); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .lb .c-spark { justify-self: end; }
+  .lb .c-spark .spark { cursor: crosshair; }
+  .lb .spark .b.cur { fill: var(--leaf); opacity: .55; }
+  .lb .spark .b.on { fill: var(--ink-2); }
+  .lb .nm mark { background: var(--yolk-soft); color: var(--ink); border-radius: 3px; padding: 0 1px; box-shadow: inset 0 -1.5px 0 color-mix(in srgb, var(--yolk-deep) 70%, transparent); }
+  .lb .rows:focus-visible { outline: none; }
+  .lb .rows:focus-visible .lrow[aria-selected="true"] { box-shadow: inset 0 0 0 2px var(--focus); }
+  .lb-foot { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; padding: 12px var(--s-5); border-top: 1px solid var(--line-soft); background: var(--surface-2); border-radius: 0 0 var(--r-xl) var(--r-xl); }
+  .lb-foot .legend { margin-left: auto; color: var(--ink-3); }
+  .lb-foot .lg { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .lb-empty { padding: var(--s-6) var(--s-5) var(--s-8); }
+  .warn-lines { display: inline-grid; grid-template-columns: repeat(4, auto); gap: 4px 14px; margin-top: 10px; font-size: var(--fs-xs); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .warn-lines b { color: var(--ink); font-weight: 650; }
+  @media (max-width: 1100px) {
+    .lb { --cols: 28px 46px minmax(150px, 1.3fr) 176px 78px 92px; }
+    .lb .c-comp { display: none; }
+    .intro { grid-template-columns: 1fr; gap: var(--s-5); }
+  }
+
+  /* 时光机 */
+  .tm-head { display: flex; align-items: flex-start; gap: var(--s-4); padding: var(--s-5) var(--s-6) 0; flex-wrap: wrap; }
+  .tm-head h2 { font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 680; letter-spacing: -0.01em; margin-top: 6px; }
+  .tm-head p { margin-top: 4px; font-size: var(--fs-sm); color: var(--ink-3); max-width: 46em; }
+  .tm-body { display: grid; grid-template-columns: minmax(0, 1fr) 272px; gap: var(--s-6); padding: var(--s-4) var(--s-6) var(--s-5); }
+  .tm-ctrl { display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-6); }
+  .tm-play { width: 40px; height: 40px; border-radius: 50%; padding: 0; justify-content: center; flex: none; }
+  .tm-when { min-width: 168px; }
+  .tm-when .range { display: block; font-size: var(--fs-md); font-weight: 680; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tm-when small { display: block; margin-top: 1px; font-size: var(--fs-2xs); color: var(--ink-3); white-space: nowrap; }
+  .tm-scrub-wrap { flex: 1; min-width: 0; padding-top: 2px; }
+  .tm-scrub { position: relative; height: 34px; touch-action: none; cursor: pointer; border-radius: var(--r-sm); outline: none; }
+  .tm-scrub:focus-visible { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus); }
+  .tm-scrub .c { position: absolute; bottom: 0; border-radius: 2px 2px 0 0; background: var(--viz-dim-2); transition: background-color var(--dur-2); }
+  .tm-scrub .c.z { height: 1.5px !important; background: var(--viz-muted); border-radius: 1px; }
+  .tm-scrub .c.on { background: var(--water); }
+  .tm-scrub .c.z.on { background: var(--water); }
+  .tm-thumb { position: absolute; top: -4px; bottom: -4px; left: 0; width: 0; pointer-events: none; will-change: transform; }
+  .tm-thumb::before { content: ""; position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; border-radius: 1px; background: var(--ink); }
+  .tm-thumb::after { content: ""; position: absolute; bottom: -6px; left: -7px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); box-shadow: inset 0 0 0 2px var(--ink), var(--sh-2); transition: transform var(--dur-2) var(--ease-spring); }
+  .tm-scrub.drag .tm-thumb::after { transform: scale(1.18); }
+  .tm-months { position: relative; height: 14px; margin-top: 8px; }
+  .tm-months span { position: absolute; transform: translateX(-50%); font-size: 10.5px; color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tm-speed { flex: none; }
+  .tm-legend { align-self: flex-end; padding-bottom: 2px; }
+
+  .tm-stage { --rh: 34px; --n: 12; --lab: 168px; --endw: 92px; position: relative; isolation: isolate; height: calc(var(--n) * var(--rh) + 26px); overflow: hidden; }
+  .tm-axis { position: absolute; left: calc(28px + var(--lab)); right: 0; top: 0; bottom: 0; pointer-events: none; }
+  .tm-axis .g { position: absolute; top: 18px; bottom: 0; width: 1px; background: var(--viz-grid); }
+  .tm-axis .g.b { background: var(--viz-axis); }
+  .tm-axis .g span { position: absolute; top: -17px; left: 0; transform: translateX(-50%); font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tm-axis .g.b span { transform: none; }
+  .tm-water { position: absolute; right: 4px; bottom: 6px; text-align: right; pointer-events: none; font-family: var(--font-display); font-weight: 720; letter-spacing: -0.03em; line-height: 1; color: var(--ink-4); opacity: .55; }
+  .tm-water b { display: block; font-size: 40px; font-variant-numeric: tabular-nums; }
+  .tm-water small { display: block; margin-top: 6px; font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0; color: var(--ink-3); opacity: .9; }
+  .tm-rk, .tm-nm { align-self: stretch; display: flex; align-items: center; background: var(--surface); }
+  .tm-rk { justify-content: flex-end; }
+  .tm-row { position: absolute; left: 0; right: 0; top: 24px; height: var(--rh); display: grid; grid-template-columns: 28px var(--lab) minmax(0, 1fr); align-items: center; will-change: transform, opacity; }
+  .tm-rk { text-align: right; padding-right: 10px; font-size: var(--fs-sm); font-weight: 700; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .tm-rk.top { color: var(--yolk-ink); }
+  .tm-nm { display: flex; align-items: center; gap: 6px; min-width: 0; padding-right: 10px; font-size: var(--fs-sm); font-weight: 560; color: var(--ink); cursor: pointer; }
+  .tm-nm .ellipsis { flex: 1; }
+  .tm-nm:hover .ellipsis { color: var(--leaf-ink); }
+  .tm-track { position: relative; height: 100%; }
+  .tm-bar { position: absolute; left: 0; top: 7px; bottom: 7px; background: var(--leaf); border-radius: 0 4px 4px 0; transition: opacity var(--dur-2), background-color var(--dur-3); }
+  .tm-bar.idle { background: var(--viz-dim); }
+  .tm-bar.zero { width: 1.5px !important; background: var(--viz-muted); }
+  .tm-end { position: absolute; left: 0; top: 50%; display: flex; align-items: center; gap: 6px; padding-right: 6px; border-radius: var(--r-pill); background: var(--surface); white-space: nowrap; will-change: transform; }
+  .tm-end .av { box-shadow: 0 0 0 2px var(--surface); }
+  .tm-end .v { font-size: var(--fs-xs); font-weight: 680; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .tm-end .pop { display: inline-flex; }
+  .tm-end.in .pop { position: absolute; right: calc(100% + 4px); top: 50%; transform: translateY(-50%); }
+  .tm-pop.tag { height: 20px; gap: 4px; padding: 0 7px 0 3px; white-space: nowrap; box-shadow: 0 0 0 2px var(--surface); animation: tm-pop 1800ms var(--ease-out) both; }
+  @keyframes tm-pop { 0% { opacity: 0; transform: translateX(-6px) scale(.6); } 12% { opacity: 1; transform: none; } 80% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-3px); } }
+  .tm-row.up .tm-bar { background: var(--yolk-deep); }
+  /* 被超过的行：文字先隐去、柱子压暗，从超车行底下滑过，不会出现半截名字或数字 */
+  .tm-rk, .tm-nm, .tm-end { transition: opacity var(--dur-2) var(--ease-out); }
+  .tm-row.sink { z-index: 0 !important; }
+  .tm-row.sink .tm-rk, .tm-row.sink .tm-nm, .tm-row.sink .tm-end { opacity: 0; transition-duration: 60ms; }
+  .tm-row.sink .tm-bar { opacity: .3; }
+  .tm-stage.hov .tm-row:not(.hl) .tm-bar { opacity: .35; }
+  .tm-stage.hov .tm-row:not(.hl) .tm-end { opacity: .5; }
+  .tm-few { position: absolute; left: calc(40px + var(--lab)); top: 24px; font-size: var(--fs-xs); color: var(--ink-3); pointer-events: none; transition: opacity var(--dur-3); }
+
+  .tm-side { display: flex; flex-direction: column; gap: var(--s-4); padding-left: var(--s-6); border-left: 1px solid var(--line-soft); min-width: 0; }
+  .tm-side .dateline { min-height: 24px; }
+  .tm-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .tm-fact .label { font-size: var(--fs-2xs); }
+  .tm-fact b { display: block; margin-top: 2px; font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .tm-list { display: flex; flex-direction: column; gap: 8px; }
+  .tm-list .it { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: var(--fs-sm); }
+  .tm-list .it .k { font-size: var(--fs-xs); color: var(--ink-3); font-weight: 650; font-variant-numeric: tabular-nums; text-align: right; }
+  .tm-list .it .who { font-size: var(--fs-sm); }
+  .tm-ev { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+  .tm-ev .tag { flex: none; }
+  .tm-ev .ek { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--ink-3); white-space: nowrap; }
+  .tm-side h4 { font-size: var(--fs-xs); font-weight: 650; color: var(--ink-3); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .tm-side .none { font-size: var(--fs-xs); color: var(--ink-3); }
+
+  /* 公式 */
+  .fx-main { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; padding: 14px 16px; border-radius: var(--r-lg); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-soft); font-size: var(--fs-md); color: var(--ink-2); }
+  .fx-main .lhs { font-weight: 700; color: var(--ink); }
+  .fx-main .sig { display: inline-flex; flex-direction: column; align-items: center; line-height: 1; }
+  .fx-main .sig b { font-size: 20px; font-weight: 500; color: var(--ink); }
+  .fx-main .sig small { font-size: 10px; color: var(--ink-3); margin-top: 2px; }
+  .fx-main .par { font-size: 20px; font-weight: 300; color: var(--ink-3); line-height: 1; }
+  .fx-main .tm { padding: 2px 8px; border-radius: var(--r-sm); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .fx-grid { display: grid; grid-template-columns: minmax(0, 1fr) 236px; gap: var(--s-6); margin-top: var(--s-5); }
+  .fx-ctl + .fx-ctl { margin-top: var(--s-4); }
+  .fx-ctl .hd { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: var(--fs-sm); color: var(--ink-2); font-weight: 600; }
+  .fx-ctl .hd b { font-weight: 680; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .fx-ctl .hd small { font-weight: 500; color: var(--ink-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+  .rng { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; cursor: pointer; --p: 50%; }
+  .rng:focus { outline: none; }
+  .rng::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--leaf) 0 var(--p), var(--bg-sunken) var(--p) 100%); box-shadow: inset 0 0 0 1px var(--line-soft); }
+  .rng::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--leaf) 0 var(--p), var(--bg-sunken) var(--p) 100%); }
+  .rng::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -6px; border-radius: 50%; background: var(--surface); box-shadow: inset 0 0 0 2px var(--leaf), var(--sh-2); transition: transform var(--dur-2) var(--ease-spring); }
+  .rng::-moz-range-thumb { width: 18px; height: 18px; border: 0; border-radius: 50%; background: var(--surface); box-shadow: inset 0 0 0 2px var(--leaf), var(--sh-2); }
+  .rng:active::-webkit-slider-thumb { transform: scale(1.15); }
+  .rng:focus-visible::-webkit-slider-thumb { box-shadow: inset 0 0 0 2px var(--leaf), 0 0 0 3px var(--surface), 0 0 0 5px var(--focus); }
+  .rng-ticks { position: relative; height: 14px; margin-top: 2px; font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .rng-ticks span { position: absolute; top: 0; left: calc(9px + var(--x) * (100% - 18px)); transform: translateX(-50%); white-space: nowrap; }
+  .rng-ticks span:first-child { transform: translateX(-9px); }
+  .rng-ticks span:last-child { transform: translateX(calc(-100% + 9px)); }
+  .fx-models { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fx-models .chip b { font-weight: 650; font-variant-numeric: tabular-nums; }
+  .fx-models .chip.neg b { color: var(--rust); }
+  .fx-out { display: flex; flex-direction: column; justify-content: space-between; gap: var(--s-4); padding: var(--s-4); border-radius: var(--r-lg); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-soft); }
+  .fx-out .label { font-size: var(--fs-xs); }
+  .fx-big { font-family: var(--font-display); font-size: var(--fs-5xl); font-weight: 700; letter-spacing: -0.03em; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .fx-big small { margin-left: 4px; font-size: var(--fs-sm); font-weight: 600; letter-spacing: 0; color: var(--ink-3); }
+  .fx-eq { font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.6; font-variant-numeric: tabular-nums; }
+  .fx-eq b { color: var(--ink-2); font-weight: 650; }
+  .fx-bars { display: grid; gap: 6px; }
+  .fx-b { display: grid; grid-template-columns: 52px minmax(0, 1fr) 36px; align-items: center; gap: 8px; font-size: var(--fs-2xs); color: var(--ink-3); }
+  .fx-b .tr { position: relative; height: 10px; background: linear-gradient(90deg, var(--viz-grid) 1px, transparent 1px) 0 0 / 25% 100%; }
+  .fx-b .tr i { position: absolute; top: 0; bottom: 0; border-radius: 0 3px 3px 0; background: var(--series-pr); transition: transform var(--dur-3) var(--ease-out), left var(--dur-3) var(--ease-out), width var(--dur-3) var(--ease-out); }
+  .fx-b .tr i.m { background: var(--series-model); }
+  .fx-b .tr i.m.neg { background: repeating-linear-gradient(135deg, var(--rust) 0 2px, transparent 2px 4px); box-shadow: inset 0 0 0 1px var(--rust); }
+  .fx-b span:last-child { text-align: right; color: var(--ink-2); font-weight: 650; font-variant-numeric: tabular-nums; }
+  .fx-week { margin-top: var(--s-5); padding-top: var(--s-5); border-top: 1px solid var(--line-soft); }
+  .fx-blocks { display: flex; flex-wrap: wrap; gap: 3px; margin: 10px 0 8px; min-height: 14px; }
+  .fx-blocks i { width: 14px; height: 14px; border-radius: 3px; background: var(--leaf); transition: background-color var(--dur-2), transform var(--dur-3) var(--ease-spring); }
+  .fx-blocks i.over { background: var(--viz-dim); }
+  .fx-blocks i.cut { width: 1px; margin: 0 4px; background: var(--ink-3); border-radius: 0; }
+  .fx-week p { font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.6; font-variant-numeric: tabular-nums; }
+  .fx-week p b { color: var(--ink); font-weight: 650; }
+
+  /* 名词解释 */
+  .gl-sec + .gl-sec { margin-top: var(--s-5); padding-top: var(--s-5); border-top: 1px solid var(--line-soft); }
+  .gl-sec > .label { margin-bottom: 10px; font-size: var(--fs-2xs); letter-spacing: .04em; }
+  .gl-ladder { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+  .gl-step { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px 6px; border-radius: var(--r-md); text-align: center; }
+  .gl-step .fr { display: flex; align-items: flex-end; justify-content: center; height: 40px; }
+  .gl-step b { font-size: var(--fs-xs); font-weight: 650; color: var(--ink); white-space: nowrap; }
+  .gl-step small { font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .gl-step .n { font-size: 10.5px; font-weight: 650; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .gl-dl { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px 12px; font-size: var(--fs-sm); line-height: 1.6; }
+  .gl-dl dt { font-weight: 650; color: var(--ink); white-space: nowrap; }
+  .gl-dl dt .tag { margin-top: 1px; }
+  .gl-dl dd { color: var(--ink-2); }
+  .gl-dl dd .muted { font-size: var(--fs-xs); }
+  .gl-warn { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+  .gl-warn div { padding: 6px 8px; border-radius: var(--r-md); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-soft); font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .gl-warn b { display: block; font-size: var(--fs-sm); font-weight: 680; color: var(--ink); }
+  .gl-warn .meter { margin-top: 5px; height: 3px; }
+  .gl-warn .meter > i { background: var(--ink-3); }
+
+  @media (max-width: 1100px) {
+    .tm-body { grid-template-columns: 1fr; }
+    .tm-side { padding-left: 0; border-left: 0; border-top: 1px solid var(--line-soft); padding-top: var(--s-4); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-5) var(--s-8); }
+    .tm-side > .tm-facts-wrap { grid-column: 1 / -1; }
+  }
+  @media (max-width: 720px) {
+    .intro { margin-bottom: var(--s-6); }
+    .intro-stats { gap: 0; justify-content: space-between; padding-top: var(--s-4); border-top: 1px solid var(--line-soft); }
+    .istat b { font-size: var(--fs-xl); }
+    .lb-bar { padding: var(--s-4) var(--s-4) var(--s-3); gap: 10px; }
+    .lb-bar .card-title { flex: 1; }
+    .lb-bar .seg-wrap { order: 3; width: 100%; }
+    .lb-bar .seg-wrap .seg { display: flex; width: 100%; }
+    .lb-bar .seg-wrap .seg button { flex: 1; justify-content: center; }
+    .lb-bar .search { order: 4; width: 100%; margin-left: 0; }
+    .lb-meta { padding: 0 var(--s-4) 10px; flex-wrap: wrap; }
+    .lb-filters { flex-wrap: nowrap; overflow-x: auto; padding: 0 var(--s-4) var(--s-3); scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, black calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, black calc(100% - 28px), transparent); }
+    .lb-filters::-webkit-scrollbar { display: none; }
+    .lb-filters .chip { flex: none; }
+    .lb .lrow-head { padding-top: 8px; padding-bottom: 8px; row-gap: 2px; }
+    .lb .lrow-head .c-delta { display: none; }
+    .lb .lrow { grid-template-columns: 30px minmax(0, 1fr) auto; grid-template-areas: "rk who val" "dl fm sp"; row-gap: 6px; column-gap: 10px; padding: 10px var(--s-4); }
+    .lb .c-rank { grid-area: rk; }
+    .lb .c-delta { grid-area: dl; justify-content: flex-end; }
+    .lb .c-who { grid-area: who; }
+    .lb .c-form { grid-area: fm; padding-left: 36px; }
+    .lb .c-val { grid-area: val; }
+    .lb .c-spark { grid-area: sp; align-self: center; }
+    .lb .c-comp { display: none; }
+    .lb .rank { width: 30px; }
+    .lb .fm { grid-template-columns: auto minmax(0, 1fr); }
+    .lb-foot { padding: 12px var(--s-4); }
+    .lb-foot .legend { margin-left: 0; }
+    .tm-head { padding: var(--s-4) var(--s-4) 0; }
+    .tm-ctrl { flex-wrap: wrap; padding: 0 var(--s-4); row-gap: var(--s-3); }
+    .tm-scrub-wrap { order: 3; flex-basis: 100%; }
+    .tm-speed { margin-left: auto; }
+    .tm-body { padding: var(--s-3) var(--s-4) var(--s-4); }
+    .tm-stage { --rh: 30px; --n: 10; --lab: 104px; --endw: 74px; }
+    .tm-nm { font-size: var(--fs-xs); }
+    .tm-nm .frog { display: none; }
+    .tm-pop .t { display: none; }
+    .tm-pop.tag { padding: 0 2px; }
+    .tm-water { display: none; }
+    .tm-legend { flex-basis: 100%; align-self: auto; }
+    .tm-head > div:first-child { flex-basis: 100%; }
+    .tm-side { grid-template-columns: 1fr; }
+    .fx-grid { grid-template-columns: 1fr; }
+    .fx-week .hd { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .gl-warn { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tm-side .tm-facts-wrap .dateline { flex-wrap: wrap; }
+    .gl-dl { grid-template-columns: 1fr; gap: 2px; }
+    .gl-dl dd { margin-bottom: 10px; }
+  }
+</style>
+</head>
+<body>
+<header id="appbar"></header>
+
+<main class="page">
+  <section class="intro">
+    <div>
+      <span class="eyebrow">${trophy}排行榜</span>
+      <h1 class="headline" id="headline"></h1>
+      <p class="lede" id="lede"></p>
+    </div>
+    <div class="intro-stats" id="introStats"></div>
+  </section>
+
+  <section class="section">
+    <div class="card card-flush" id="lbCard">
+      <div class="lb-bar">
+        <div class="card-title">贡献度排行</div>
+        <div class="seg-wrap"><div id="winSeg" aria-label="时间窗"></div></div>
+        <label class="search">${search}<input id="q" type="text" placeholder="搜索账号" aria-label="搜索账号" autocomplete="off" spellcheck="false" data-focus-fallback><kbd class="only-kbd">/</kbd></label>
+      </div>
+      <div class="lb-meta" id="lbMeta" aria-live="polite"></div>
+      <div class="lb-filters chips" id="chips" role="group" aria-label="筛选"></div>
+      <div class="lb">
+        <div class="lrow lrow-head" role="presentation">
+          <span class="r c-rank">#</span>
+          <span class="c-delta">变化</span>
+          <span class="c-who">贡献者</span>
+          <span class="c-form"><span>形态 · 到下一级</span></span>
+          <span class="c-comp" id="hComp">魔力构成</span>
+          <span class="r c-val" id="hVal">魔力</span>
+          <span class="r c-spark">近 12 周</span>
+        </div>
+        <div class="rows" id="rows" role="listbox" tabindex="0" aria-label="排行榜，↑↓ 选择，回车打开档案"></div>
+      </div>
+      <div class="lb-foot" id="lbFoot"></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="card card-flush" id="tmCard">
+      <div class="tm-head">
+        <div style="flex:1;min-width:0">
+          <span class="eyebrow">${clock}时光机</span>
+          <h2>排名是怎么变成今天这样的</h2>
+          <p id="tmLede"></p>
+        </div>
+        <div class="legend tm-legend" aria-label="图例"><span class="key" style="--k:var(--leaf)">这一周拿到魔力</span><span class="key" style="--k:var(--viz-dim)">这一周没有新魔力</span></div>
+      </div>
+      <div class="tm-ctrl" style="margin-top:var(--s-4)">
+        <button type="button" class="btn btn-primary tm-play" id="tmPlay" aria-label="播放">${play}</button>
+        <div class="tm-when" aria-live="off"><span class="range" id="tmRange"></span><small id="tmSub"></small></div>
+        <div class="tm-scrub-wrap">
+          <div class="tm-scrub" id="tmScrub" role="slider" tabindex="0" aria-label="回放到哪一周" aria-valuemin="0"></div>
+          <div class="tm-months" id="tmMonths" aria-hidden="true"></div>
+        </div>
+        <div class="tm-speed" id="tmSpeed" aria-label="回放速度"></div>
+      </div>
+      <div class="tm-body">
+        <div class="tm-stage" id="tmStage" aria-label="累计魔力排名回放" role="img">
+          <div class="tm-axis" id="tmAxis"></div>
+          <div class="tm-water" id="tmWater" aria-hidden="true"></div>
+          <div class="tm-few" id="tmFew"></div>
+        </div>
+        <aside class="tm-side" id="tmSide" aria-live="polite"></aside>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="grid stretch">
+      <div class="card card-pad span-7" id="fxCard">
+        <div class="card-head"><div><div class="card-title"><span class="card-icon leaf">${zap}</span>贡献度公式</div><div class="card-sub" style="margin-left:36px">贡献度 = 魔力，按魔力降序排名。魔力只增不减。</div></div></div>
+        <div class="fx-main" id="fxMain"></div>
+        <div class="fx-grid">
+          <div>
+            <div class="fx-ctl"><div class="hd"><span>改动行数</span><b id="fxLinesV"></b></div><input class="rng" id="fxLines" type="range" min="0" max="1000" step="1" aria-label="改动行数"><div class="rng-ticks" id="fxLinesTicks"></div></div>
+            <div class="fx-ctl"><div class="hd"><span>commit 数</span><b id="fxCommitsV"></b></div><input class="rng" id="fxCommits" type="range" min="1" max="40" step="1" aria-label="commit 数"><div class="rng-ticks" id="fxCommitsTicks"></div></div>
+            <div class="fx-ctl"><div class="hd"><span>署名的模型</span><small id="fxModelNote"></small></div><div class="fx-models" id="fxModels" role="radiogroup" aria-label="署名的模型"></div></div>
+          </div>
+          <div class="fx-out" aria-live="polite">
+            <div><div class="label">这个 PR 得</div><div class="fx-big"><span id="fxScore" class="num"></span><small>魔力</small></div></div>
+            <div class="fx-bars" id="fxBars"></div>
+            <div class="fx-eq" id="fxEq"></div>
+            <div class="fx-eq" id="fxRef" style="padding-top:10px;border-top:1px solid var(--line-soft)"></div>
+          </div>
+        </div>
+        <div class="fx-week">
+          <div class="fx-ctl"><div class="hd"><span>如果这周合入 <b id="fxNV"></b> 个这样的 PR</span><small id="fxCapNote"></small></div><input class="rng" id="fxN" type="range" min="1" max="24" step="1" aria-label="这周合入几个这样的 PR"></div>
+          <div class="fx-blocks" id="fxBlocks" aria-hidden="true"></div>
+          <p id="fxWeek"></p>
+        </div>
+      </div>
+      <div class="card card-pad span-5" id="glCard">
+        <div class="card-head"><div class="card-title"><span class="card-icon water">${book}</span>名词解释</div></div>
+        <div id="gloss"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="text/x-nw-page">
+(function () {
+  const K = NWK, N = NW, { esc, mag, fmt, icon } = K;
+  const $ = (s, r = document) => r.querySelector(s);
+  const W = N.W, LAST = N.last, PEOPLE = N.people;
+  K.appHeader($('#appbar'), { active: 'c2' });
+  // 模板里的 ${图标} 占位
+  document.querySelectorAll('.eyebrow, .search, .card-title, .tm-play').forEach((el) => {
+    el.innerHTML = el.innerHTML.replace(/\$\{(\w+)\}/g, (_, n) => icon({ trophy: 'trophy', search: 'search', clock: 'rotate-ccw', play: 'play', zap: 'zap', book: 'book-open' }[n], n === 'search' ? 15 : n === 'play' ? 18 : 14));
+  });
+
+  const sumW = (p, a, b) => { let s = 0; for (let k = a; k <= b; k++) if (k >= 0) s += p.wk.get(W[k]) || 0; return s; };
+  const isNew = (p) => p.firstAt >= W[LAST]; // 首次贡献落在本周 = 新面孔
+  const levelName = (p) => K.formOf(p).name;
+
+  // ═════════════════ 引言：标题 + 导语（全部从数据算） ═════════════════
+  (function intro() {
+    const top = PEOPLE[0];
+    const byL4 = PEOPLE.slice().sort((a, b) => b.l4 - a.l4 || a.login.localeCompare(b.login));
+    const byTw = PEOPLE.slice().sort((a, b) => b.tw - a.tw || a.login.localeCompare(b.login));
+    const l4Lead = byL4[0], twLead = byTw[0];
+    const climb = PEOPLE.filter((p) => p.move > 0).sort((a, b) => b.move - a.move || a.rank - b.rank)[0];
+    const fresh = PEOPLE.filter(isNew);
+    const freshOut = fresh.filter((p) => !p.member).length;
+    const n = (x) => `<span class="n">${x}</span>`;
+    // 连续第一的周数：从本周往回数，排名一直是 1 的周
+    let streak = 0;
+    for (let i = LAST; i >= 0 && N.ranksAt(i).get(top.login) === 1; i--) streak++;
+    const l4Second = byL4[1];
+    $('#headline').innerHTML = l4Lead === top
+      ? `${K.pname(top.login, { avatar: false })} <span class="nowrap">${streak >= 4 ? `连续 ${streak} 周第一，` : '排在第一，'}</span><span class="nowrap">近 4 周也<mark>拿得最多</mark></span>`
+      : `<span class="nowrap">近 4 周，</span>${K.pname(l4Lead.login, { avatar: false })} <span class="nowrap"><mark>拿到的魔力最多</mark></span>`;
+    $('#headline').classList.add('is-in');
+    let s = `总榜第一是 ${K.pname(top.login)}，累计 ${n(mag(top.bonus))} 魔力`;
+    if (l4Lead === top && l4Second) {
+      s += `；近 4 周拿到 ${n(mag(top.l4))}，只比 ${K.pname(l4Second.login)} 多 ${mag(top.l4 - l4Second.l4)}`;
+    } else if (l4Lead !== top) {
+      const ratio = top.l4 > 0 ? l4Lead.l4 / top.l4 : null;
+      s += `；近 4 周 ${K.pname(l4Lead.login)} 拿到 ${n(mag(l4Lead.l4))}${ratio ? `，是第一名同期的 ${(Math.round(ratio * 10) / 10).toFixed(1)} 倍` : ''}`;
+    }
+    s += `。本周${K.week.asOf()}，${twLead === l4Lead ? '还是 ' : ''}${K.pname(twLead.login)} 以 ${n(mag(twLead.tw))} 领跑`;
+    if (climb) s += `，${K.pname(climb.login)} 在总榜上升最多（▲${climb.move} 到第 ${climb.rank}）`;
+    s += '。';
+    if (fresh.length) s += `另有 ${n(fresh.length)} 位新面孔第一次上榜${fresh.length === 1 ? (freshOut ? '，来自组织外' : '，是组织成员') : freshOut === fresh.length ? '，全部来自组织外' : freshOut ? `，其中 ${freshOut} 位来自组织外` : ''}。`;
+    $('#lede').innerHTML = s;
+    const twN = PEOPLE.filter((p) => p.tw > 0.005).length, l4N = PEOPLE.filter((p) => p.l4 > 0.005).length;
+    $('#introStats').innerHTML = [
+      ['总榜', fmt.int(PEOPLE.length), `组织成员 ${N.summary.members} · 组织外 ${N.summary.outsiders}`],
+      ['本周有魔力', fmt.int(twN), K.week.range(LAST)],
+      ['近 4 周有魔力', fmt.int(l4N), `${fmt.md(W[LAST - 3])}起`],
+    ].map(([l, v, s2]) => `<div class="istat"><span class="label">${l}</span><b>${v}<span class="muted" style="font-size:var(--fs-sm);font-weight:600;margin-left:3px">人</span></b><small>${s2}</small></div>`).join('');
+  })();
+
+  // ═════════════════ 排行榜 ═════════════════
+  const qs0 = new URLSearchParams(location.search);
+  const st = { win: ['all', 'week', 'l4'].includes(qs0.get('win')) ? qs0.get('win') : 'all', mem: 'all', form: null, flags: new Set(), q: '', sel: -1, all: false };
+  const LIMIT = 20;
+  const winName = { all: '总榜', week: '本周', l4: '近 4 周' };
+
+  function windowRank(score, prevScore) {
+    const ranked = PEOPLE.filter((p) => score(p) > 0.005).sort((a, b) => score(b) - score(a) || a.login.localeCompare(b.login));
+    const prevMap = new Map(PEOPLE.filter((p) => prevScore(p) > 0.005).sort((a, b) => prevScore(b) - prevScore(a) || a.login.localeCompare(b.login)).map((p, k) => [p.login, k + 1]));
+    return ranked.map((p, k) => ({ p, rank: k + 1, v: score(p), prank: prevMap.get(p.login), move: isNew(p) ? null : prevMap.has(p.login) ? prevMap.get(p.login) - (k + 1) : undefined }));
+  }
+  const cache = {};
+  function windowRows(win) {
+    if (cache[win]) return cache[win];
+    let rows;
+    if (win === 'all') rows = PEOPLE.map((p) => ({ p, rank: p.rank, v: p.bonus, prank: p.prank, move: p.move }));
+    else if (win === 'week') rows = windowRank((p) => p.tw, (p) => p.lw);
+    else rows = windowRank((p) => p.l4, (p) => sumW(p, LAST - 4, LAST - 1));
+    return (cache[win] = rows);
+  }
+
+  // 筛选：三组，组内单选、组间相交。计数 = 其他组条件不变时这一项的人数
+  const formKey = (p) => { const f = K.formOf(p); return f.egg ? 'egg' : f.unhatched ? 'unhatched' : `l${f.level}`; };
+  const GROUPS = {
+    mem: [['all', '全部'], ['m', '组织成员'], ['o', '组织外']],
+    form: [...N.LV.map((L, k) => [`l${k}`, L.name, L.icon]), ['egg', '蛙卵', 'egg'], ['unhatched', '未孵化', 'unhatched']],
+    flags: [['z', '冬眠', null, 'moon-z'], ['w', '合入率警告', null, 'alert-triangle'], ['a', '新手异常', null, 'zap']],
+  };
+  const TERM = {
+    m: '在数据更新时属于 nwverse 组织成员名单的账号。',
+    o: '数据更新时不在组织成员名单里的账号，例如从 fork 提 PR 的外部贡献者、已退出的人。贡献照常计分。',
+    z: `超过 ${N.RULES.dormantDays} 天没有任何动作。只做标记；${N.LV[N.RULES.dormantExemptLevel].name}及以上不标记。`,
+    w: `已收尾 PR 超过 ${N.RULES.warnLines[0].resolved} 个后，合入率低于 ${fmt.pct(N.RULES.warnLines[0].rate)} 就会被标记，门槛随已收尾数提高。只提醒，不扣魔力。`,
+    a: `考核期内开了 ${N.RULES.newbie.anomaly.opened} 个以上 PR，合入的不到 ${fmt.pct(N.RULES.newbie.anomaly.rate)}。最近 ${N.RULES.newbie.anomaly.graceHours} 小时内开的 PR 不计。`,
+    egg: `首次贡献起 ${N.RULES.newbie.days} 天内的考核期，还没孵化。`,
+    unhatched: `考核期已过仍未达标；魔力攒到 ${N.RULES.hatchBonus} 也能直接孵化。`,
+  };
+  const formTip = (k) => {
+    const L = N.LV[k], nx = N.LV[k + 1];
+    return k === 0 ? `已孵化，魔力不到 ${fmt.int(nx.bonus)}` : nx ? `魔力 ${fmt.int(L.bonus)} 到 ${fmt.int(nx.bonus)}` : `魔力 ≥ ${fmt.int(L.bonus)}`;
+  };
+  const pass = (p, s) => (s.mem === 'all' || (s.mem === 'm') === !!p.member)
+    && (!s.form || formKey(p) === s.form)
+    && (!s.flags.has('z') || p.dormant) && (!s.flags.has('w') || p.warn) && (!s.flags.has('a') || p.newbie.anomaly);
+  const matchQ = (p) => !st.q || p.login.toLowerCase().includes(st.q);
+  function filtered() { return windowRows(st.win).filter((r) => pass(r.p, st) && matchQ(r.p)); }
+
+  function chipsHTML() {
+    const base = windowRows(st.win).filter((r) => matchQ(r.p));
+    const cnt = (over) => { const s = { ...st, flags: new Set(st.flags), ...over }; return base.filter((r) => pass(r.p, s)).length; };
+    const chip = (grp, v, label, on, n, pre = '', tip = '') => `<button type="button" class="chip" data-g="${grp}" data-v="${v}" aria-pressed="${on}"${n === 0 && !on ? ' data-zero' : ''}${tip ? ` data-tip="${esc(tip)}"` : ''}><span class="chk">${icon('check', 13)}</span>${pre}${label}<span class="n">${n}</span></button>`;
+    return GROUPS.mem.map(([v, l]) => chip('mem', v, l, st.mem === v, cnt({ mem: v }), '', TERM[v] || '')).join('')
+      + '<span class="chip-sep"></span>'
+      + GROUPS.form.map(([v, l, fr]) => chip('form', v, l, st.form === v, cnt({ form: v }), K.frog(fr, 18), TERM[v] || formTip(+v.slice(1)))).join('')
+      + '<span class="chip-sep"></span>'
+      + GROUPS.flags.map(([v, l, , ic]) => { const s = new Set(st.flags); s.add(v); return chip('flags', v, l, st.flags.has(v), cnt({ flags: s }), icon(ic, 13), TERM[v]); }).join('');
+  }
+
+  const hl = (login) => {
+    if (!st.q) return esc(login);
+    const k = login.toLowerCase().indexOf(st.q);
+    if (k < 0) return esc(login);
+    return `${esc(login.slice(0, k))}<mark>${esc(login.slice(k, k + st.q.length))}</mark>${esc(login.slice(k + st.q.length))}`;
+  };
+  function formCell(p) {
+    const fo = K.formOf(p), nx = K.nextInfo(p);
+    let tip;
+    if (!fo.hatched) {
+      const h = K.hatchHint(p);
+      tip = `<div class='t-h'>${fo.name} · 魔力 ${mag(p.bonus)} / ${N.RULES.hatchBonus}</div><div class='t-l' style='white-space:normal;max-width:240px'>${esc(h ? h.text : '')}</div>`;
+      return `<div class="fm" data-tip-html="${esc(tip)}">${K.frogOf(p, 22)}<div style="min-width:0"><div class="fn">${fo.name}<span>${mag(p.bonus)}/${N.RULES.hatchBonus}</span></div><div class="meter yolk"><i style="width:${(p.progress * 100).toFixed(1)}%"></i></div></div></div>`;
+    }
+    tip = nx
+      ? `<div class='t-h'>${fo.name} → ${nx.name}（${fmt.int(N.LV[p.next.level].bonus)}）</div><div class='t-row'><span class='t-v'>${mag(nx.gap)}</span><span class='t-l'>还差</span></div><div class='t-row'><span class='t-v'>${mag(nx.pace)}</span><span class='t-l'>近 4 周周均 · ${K.etaText(nx.eta)}</span></div>`
+      : `<div class='t-h'>${fo.name}</div><div class='t-l'>已到最高形态</div>`;
+    return `<div class="fm" data-tip-html="${esc(tip)}">${K.frogOf(p, 22)}<div style="min-width:0"><div class="fn">${fo.name}<span>${nx ? `差 ${mag(nx.gap)}` : '最高'}</span></div><div class="meter"><i style="width:${(p.progress * 100).toFixed(1)}%"></i></div></div></div>`;
+  }
+  function deltaCell(r) {
+    const base = st.win === 'all' ? '上周末' : st.win === 'week' ? '上周' : '上周时的近 4 周榜';
+    const t = r.move === null ? '新面孔：首次贡献在本周' : r.move === undefined ? st.win === 'l4' ? `${base}上没有这个人（那 4 周 0 魔力）` : `${base}没有魔力，不在那张榜上` : r.move === 0 ? `${base}也是第 ${r.rank} 名` : `${base}第 ${r.prank} 名 → 现在第 ${r.rank} 名`;
+    return `<span class="c-delta" data-tip="${esc(t)}">${K.delta(r.move)}</span>`;
+  }
+  const SPARK_MAX = Math.max(1, ...PEOPLE.flatMap((p) => p.spark)); // 全员同一刻度，行间可比
+  function rowHTML(r, k, maxV) {
+    const { p, rank, v } = r;
+    const tags = `${p.member ? '' : '<span class="tag tag-out">组织外</span>'}${p.dormant ? `<span class="tag tag-sleep">${icon('moon-z', 11)}冬眠</span>` : ''}${p.warn ? `<span class="tag tag-warn">${icon('alert-triangle', 11)}警告</span>` : ''}${p.newbie.anomaly ? `<span class="tag tag-warn" data-tip="${esc(TERM.a)}">${icon('zap', 11)}新手异常</span>` : ''}`;
+    const sub = `合入 ${fmt.int(p.merged)} · 协作 ${fmt.int(p.collab)}${p.resolved ? `<span class="hide-sm"> · 合入率 ${fmt.pct(p.rate)}</span>` : ''}`;
+    const who = K.who(p, { size: 28, sub, tags }).replace(`<span class="nm">${esc(p.login)}</span>`, `<span class="nm">${hl(p.login)}</span>`);
+    let comp;
+    if (st.win === 'all') comp = K.comp(p, { scale: p.bonus / maxV });
+    else {
+      // 时间窗里没有按周拆分的 PR / 模型 / 协作，改画「这段时间 vs 此前」：看出谁的魔力是最近攒的
+      comp = K.stackedBar([
+        { label: `${winName[st.win]}拿到`, value: v, color: 'var(--leaf)' },
+        { label: '此前累计', value: Math.max(0, p.bonus - v), color: 'var(--viz-dim)' },
+      ], { scale: p.bonus / maxBonus, label: `累计 ${mag(p.bonus)} 魔力`, total: p.bonus });
+    }
+    const vs = st.win === 'all' ? (p.tw > 0.005 ? `本周 +${mag(p.tw)}` : '本周 —') : st.win === 'week' ? `累计 ${mag(p.bonus)}` : `周均 ${mag(p.pace)}`;
+    const spark = K.sparkline(p.spark, { w: 88, h: 22, max: SPARK_MAX });
+    return `<div class="lrow is-click" role="option" id="opt-${esc(p.login)}" aria-selected="${k === st.sel}" data-key="${esc(p.login)}" data-login="${esc(p.login)}">`
+      + `<span class="c-rank rank ${rank <= 3 ? 'top' : ''}">${rank}</span>${deltaCell(r)}`
+      + `<span class="c-who" style="min-width:0">${who}</span><span class="c-form">${formCell(p)}</span>`
+      + `<span class="c-comp">${comp}</span>`
+      + `<span class="c-val"><span class="val">${mag(v)}</span><small>${vs}</small></span>`
+      + `<span class="c-spark">${spark}</span></div>`;
+  }
+  const rowsEl = $('#rows');
+  const maxBonus = Math.max(1e-9, ...PEOPLE.map((p) => p.bonus));
+  function paintSparkHi() {
+    const his = st.win === 'l4' ? 4 : 1;
+    rowsEl.querySelectorAll('.c-spark svg').forEach((s) => {
+      const bars = [...s.children];
+      bars.forEach((b, i) => { if (b.classList.contains('b')) b.classList.toggle('cur', i >= bars.length - his && i < bars.length - 1); });
+    });
+  }
+  function meta(n, total) {
+    const parts = [];
+    if (st.win === 'all') parts.push('<b>累计魔力</b>', '名次变化对比上周末');
+    else if (st.win === 'week') parts.push(`<b>${K.week.range(LAST)}</b>`, K.week.asOf(), '只排本周有魔力的人', '对比上周全周');
+    else parts.push(`<b>${fmt.md(W[LAST - 3])} – ${fmt.md(W[LAST] + 6 * N.DAY)}</b>`, '含进行中的本周', '只排有魔力的人', '对比上周时的近 4 周榜');
+    parts.push(n === total ? `${total} 人` : `符合条件 <b>${n}</b> / ${total} 人`);
+    return parts.join('<i class="dot"></i>');
+  }
+  function footHTML(n) {
+    const more = n > LIMIT ? `<button type="button" class="btn btn-sm" id="moreBtn" aria-expanded="${st.all}">${icon(st.all ? 'chevron-up' : 'chevron-down', 14)}${st.all ? `收起，只看前 ${LIMIT}` : `显示全部 ${n} 人`}</button>` : `<span class="muted" style="font-size:var(--fs-xs)">${n ? `共 ${n} 人` : ''}</span>`;
+    const hint = !n ? '' : '<span class="only-kbd muted" style="font-size:var(--fs-xs);display:inline-flex;gap:4px;align-items:center"><kbd>↑</kbd><kbd>↓</kbd> 选择 <kbd>↵</kbd> 打开档案</span>';
+    const lg = `<span class="legend"><span class="lg">${K.delta(3)}上升</span><span class="lg">${K.delta(-2)}下降</span><span class="lg">${K.delta(0)}不变</span><span class="lg">${K.delta(null)}第一次出现</span><span class="lg">${K.delta(undefined)}上期没魔力</span></span>`;
+    return more + hint + lg;
+  }
+  function emptyHTML() {
+    if (st.flags.has('w') && !windowRows(st.win).some((r) => r.p.warn)) {
+      const wl = N.RULES.warnLines.map((x) => `<span>已收尾 &gt;${x.resolved}</span><b>≥ ${fmt.pct(x.rate)}</b>`);
+      return `<div class="lb-empty">${K.empty({ art: 'frog', sleep: false, title: '没有人触发合入率警告', body: `${winName[st.win]}里每个人的合入率都在警告线之上。警告只提醒，不扣魔力。<br><span class="warn-lines">${N.RULES.warnLines.map((x) => `<span>&gt;${x.resolved} 个 <b>${fmt.pct(x.rate)}</b></span>`).join('')}</span>`, action: `<button type="button" class="btn btn-sm" data-clear>${icon('x', 14)}清除筛选</button>` })}</div>`;
+    }
+    if (st.flags.has('a') && !windowRows(st.win).some((r) => r.p.newbie.anomaly)) {
+      return `<div class="lb-empty">${K.empty({ art: 'egg', title: '没有新手异常', body: `${winName[st.win]}里没有人触发新手异常。${esc(TERM.a)}`, action: `<button type="button" class="btn btn-sm" data-clear>${icon('x', 14)}清除筛选</button>` })}</div>`;
+    }
+    const why = st.q ? `没有账号包含「${esc(st.q)}」${st.win !== 'all' ? `，或者这个人${winName[st.win]}还没有魔力` : ''}。` : st.win !== 'all' ? `${winName[st.win]}榜只排有魔力的人；换成总榜看看。` : '换个条件，或清除筛选再看看。';
+    return `<div class="lb-empty">${K.empty({ art: st.q ? 'egg' : 'tadpole', title: '没有符合条件的人', body: why, action: `<button type="button" class="btn btn-sm" data-clear>${icon('x', 14)}清除${st.q ? '搜索和' : ''}筛选</button>` })}</div>`;
+  }
+  let lastList = [];
+  function render({ animate = true, chips = true } = {}) {
+    const total = windowRows(st.win).length;
+    const list = filtered();
+    lastList = list;
+    const shown = st.all ? list : list.slice(0, LIMIT);
+    const maxV = Math.max(1e-9, ...windowRows(st.win).map((r) => r.v));
+    st.sel = Math.min(st.sel, shown.length - 1);
+    const paint = () => {
+      rowsEl.innerHTML = shown.length ? shown.map((r, k) => rowHTML(r, k, maxV)).join('') : emptyHTML();
+      paintSparkHi();
+    };
+    if (animate) K.flip(rowsEl, paint); else paint();
+    $('#lbMeta').innerHTML = meta(list.length, total);
+    $('#lbFoot').innerHTML = footHTML(list.length);
+    $('#hVal').textContent = st.win === 'all' ? '魔力' : `${winName[st.win]}魔力`;
+    $('#hComp').textContent = st.win === 'all' ? '魔力构成' : `${winName[st.win]}占累计`;
+    if (chips) $('#chips').innerHTML = chipsHTML();
+    rowsEl.setAttribute('aria-activedescendant', st.sel >= 0 && shown[st.sel] ? `opt-${shown[st.sel].p.login}` : '');
+  }
+
+  const seg = K.segmented($('#winSeg'), [{ value: 'all', label: '总榜' }, { value: 'week', label: '本周' }, { value: 'l4', label: '近 4 周' }], (v) => setWin(v), { value: st.win });
+  function setWin(v) {
+    st.win = v; st.sel = -1;
+    const u = new URL(location.href);
+    if (v === 'all') u.searchParams.delete('win'); else u.searchParams.set('win', v);
+    history.replaceState(history.state, '', u);
+    render();
+  }
+  $('#chips').addEventListener('click', (e) => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    const { g, v } = c.dataset;
+    if (g === 'mem') st.mem = v;
+    else if (g === 'form') st.form = st.form === v ? null : v;
+    else st.flags.has(v) ? st.flags.delete(v) : st.flags.add(v);
+    st.sel = -1;
+    render();
+    const again = $(`#chips .chip[data-g="${g}"][data-v="${v}"]`);
+    if (again) again.focus({ preventScroll: true });
+  });
+  const qEl = $('#q');
+  let qT = 0;
+  qEl.addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(() => { st.q = qEl.value.trim().toLowerCase(); st.sel = st.q ? 0 : -1; render({ animate: true }); }, 60); });
+  qEl.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); st.sel = Math.max(0, st.sel); rowsEl.focus(); syncSel(); }
+    else if (e.key === 'Enter') { const r = rowsEl.querySelectorAll('.lrow')[Math.max(0, st.sel)]; if (r) K.openPerson(r.dataset.login); }
+    else if (e.key === 'Escape') { if (qEl.value) { qEl.value = ''; st.q = ''; render(); } else qEl.blur(); e.stopPropagation(); }
+  });
+  function syncSel(scroll = true) {
+    const rs = rowsEl.querySelectorAll('.lrow');
+    rs.forEach((r, k) => r.setAttribute('aria-selected', String(k === st.sel)));
+    const r = rs[st.sel];
+    rowsEl.setAttribute('aria-activedescendant', r ? r.id : '');
+    if (r && scroll) r.scrollIntoView({ block: 'nearest', behavior: K.reduced() ? 'auto' : 'smooth' });
+  }
+  rowsEl.addEventListener('focus', () => { if (st.sel < 0 && rowsEl.querySelector('.lrow')) { st.sel = 0; syncSel(false); } });
+  rowsEl.addEventListener('keydown', (e) => {
+    const rs = rowsEl.querySelectorAll('.lrow');
+    if (!rs.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End') {
+      e.preventDefault(); e.stopPropagation();
+      const k0 = st.sel;
+      if (e.key === 'Home') st.sel = 0; else if (e.key === 'End') st.sel = rs.length - 1;
+      else st.sel = K.clamp(st.sel + (e.key === 'ArrowDown' ? 1 : -1), 0, rs.length - 1);
+      if (e.key === 'ArrowDown' && k0 === rs.length - 1 && !st.all && lastList.length > rs.length) {
+        // 在第 20 行再按 ↓：自动展开全部，继续往下选
+        st.all = true; const keep = k0 + 1; render({ animate: false }); st.sel = keep;
+      }
+      syncSel();
+    } else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); K.openPerson(rs[Math.max(0, st.sel)].dataset.login); }
+  });
+  rowsEl.addEventListener('click', (e) => {
+    if (e.target.closest('[data-clear]')) { clearAll(); return; }
+    const r = e.target.closest('.lrow');
+    if (r && !e.target.closest('[data-person]')) K.openPerson(r.dataset.login);
+  });
+  function clearAll() { st.mem = 'all'; st.form = null; st.flags.clear(); st.q = ''; qEl.value = ''; render(); }
+  $('#lbFoot').addEventListener('click', (e) => {
+    if (!e.target.closest('#moreBtn')) return;
+    const wasAll = st.all;
+    st.all = !st.all;
+    render();
+    if (wasAll) { const top = $('#lbCard').getBoundingClientRect().top; if (top < 0) $('#lbCard').scrollIntoView({ behavior: K.reduced() ? 'auto' : 'smooth', block: 'start' }); }
+    $('#moreBtn')?.focus({ preventScroll: true });
+  });
+  // 迷你图悬停：逐周数值
+  const W12 = W.slice(-12);
+  rowsEl.addEventListener('pointermove', (e) => {
+    const s = e.target.closest('.c-spark svg'); if (!s) return;
+    const row = s.closest('.lrow'); const p = N.byLogin.get(row.dataset.login);
+    const r = s.getBoundingClientRect();
+    const i = K.clamp(Math.floor(((e.clientX - r.left) / r.width) * 12), 0, 11);
+    [...s.children].forEach((b, k) => b.classList.toggle('on', k === i && b.classList.contains('b')));
+    const gi = LAST - 11 + i;
+    K.tip.show(`<div class="t-h">${K.weekLabel(gi)}${gi === LAST ? ' · 进行中' : ''}</div><div class="t-row"><span class="t-key box" style="--k:var(--leaf)"></span><span class="t-v">${mag(p.spark[i])}</span><span class="t-l">${esc(p.login)} 当周魔力</span></div>`, e);
+  });
+  rowsEl.addEventListener('pointerout', (e) => {
+    const s = e.target.closest('.c-spark svg'); if (!s || s.contains(e.relatedTarget)) return;
+    [...s.children].forEach((b) => b.classList.remove('on')); K.tip.hide();
+  });
+
+  K.keys.add([
+    { key: '/', label: '聚焦搜索', group: '排行榜', handler: () => { qEl.focus(); qEl.select(); } },
+    { key: '1', label: '总榜', group: '排行榜', handler: () => seg.set('all') },
+    { key: '2', label: '本周', group: '排行榜', handler: () => seg.set('week') },
+    { key: '3', label: '近 4 周', group: '排行榜', handler: () => seg.set('l4') },
+    { key: 'j', display: 'J / ↓', label: '选择下一位（列表聚焦后用 ↑↓）', group: '排行榜', handler: () => { rowsEl.focus({ preventScroll: true }); st.sel = Math.min(st.sel + 1, rowsEl.querySelectorAll('.lrow').length - 1); syncSel(); } },
+    { key: 'k', display: 'K / ↑', label: '选择上一位', group: '排行榜', handler: () => { rowsEl.focus({ preventScroll: true }); st.sel = Math.max(st.sel - 1, 0); syncSel(); } },
+  ]);
+  K.cmdk.add({ label: '排行榜：只看组织外', icon: 'filter', run: () => { st.mem = 'o'; render(); $('#lbCard').scrollIntoView({ block: 'start' }); } });
+  K.cmdk.add({ label: '排行榜：近 4 周', icon: 'trending-up', run: () => { seg.set('l4'); $('#lbCard').scrollIntoView({ block: 'start' }); } });
+  K.cmdk.add({ label: '时光机：从头回放', icon: 'play', run: () => { $('#tmCard').scrollIntoView({ block: 'start' }); TM.play(true); } });
+
+  render({ animate: false });
+
+  // ═════════════════ 时光机 ═════════════════
+  const TM = (() => {
+    const stage = $('#tmStage'), axis = $('#tmAxis'), scrub = $('#tmScrub');
+    const weekMagic = W.map((w) => PEOPLE.reduce((s, p) => s + (p.wk.get(w) || 0), 0));
+    const START = Math.max(0, W.findIndex((_, i) => PEOPLE.filter((p) => p.started[i]).length >= 1));
+    let t = LAST, playing = false, raf = 0, last = 0, speed = 1, shownWeek = -1, drag = false, hover = null;
+    const rowEls = new Map();
+    const nRows = () => parseInt(getComputedStyle(stage).getPropertyValue('--n'), 10) || 12;
+    const rowH = () => parseFloat(getComputedStyle(stage).getPropertyValue('--rh')) || 34;
+    const topVal = (i) => Math.max(...PEOPLE.map((p) => (p.started[i] ? p.cum[i] : 0)));
+    const niceStep = (raw) => { const q = Math.pow(10, Math.floor(Math.log10(raw || 1))); const m = raw / q; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * q; };
+
+    // 拖动条：每周产出魔力的小柱
+    const maxWM = Math.max(...weekMagic);
+    scrub.setAttribute('aria-valuemax', String(LAST));
+    scrub.innerHTML = W.map((_, i) => `<i class="c ${weekMagic[i] < 0.05 ? 'z' : ''}" data-i="${i}"></i>`).join('') + '<span class="tm-thumb" id="tmThumb"></span>';
+    const cols = [...scrub.querySelectorAll('.c')];
+    const thumb = $('#tmThumb');
+    function layoutScrub() {
+      const w = scrub.clientWidth, n = W.length, gap = 2, bw = Math.min(18, (w - gap * (n - 1)) / n);
+      const step = (w - bw) / (n - 1);
+      cols.forEach((c, i) => { c.style.left = `${i * step}px`; c.style.width = `${bw}px`; c.style.height = `${Math.max(2, (weekMagic[i] / maxWM) * 30)}px`; });
+      scrub._x = (tt) => tt * step + bw / 2;
+      scrub._t = (x) => K.clamp((x - bw / 2) / step, 0, LAST);
+      let lastM = -1, lastX = -99;
+      $('#tmMonths').innerHTML = W.map((w0, i) => {
+        const m = new Date(w0 + 8 * 3600000 + 3 * 86400000).getUTCMonth();
+        if (m === lastM) return '';
+        lastM = m;
+        const x = scrub._x(i);
+        if (x - lastX < 30) return '';
+        lastX = x;
+        return `<span style="left:${x}px">${m + 1}月</span>`;
+      }).join('');
+      paintScrub();
+    }
+    function paintScrub() {
+      if (!scrub._x) return;
+      thumb.style.transform = `translateX(${scrub._x(t)}px)`;
+      const wk = Math.round(t);
+      cols.forEach((c, i) => c.classList.toggle('on', i <= wk));
+    }
+    new ResizeObserver(() => { layoutScrub(); draw(true); }).observe(scrub);
+
+    function rowEl(p) {
+      let el = rowEls.get(p.login);
+      if (el) return el;
+      el = document.createElement('div');
+      el.className = 'tm-row';
+      el.dataset.login = p.login;
+      el.innerHTML = `<span class="tm-rk"></span><span class="tm-nm" data-person="${esc(p.login)}" tabindex="-1"><span class="fr"></span><span class="ellipsis">${esc(p.login)}</span></span><span class="tm-track"><i class="tm-bar"></i><span class="tm-end">${K.avatar(p.login, 22)}<span class="v num"></span><span class="pop"></span></span></span>`;
+      el._rk = el.querySelector('.tm-rk'); el._fr = el.querySelector('.fr'); el._bar = el.querySelector('.tm-bar'); el._end = el.querySelector('.tm-end'); el._v = el.querySelector('.v'); el._pop = el.querySelector('.pop');
+      el._kind = '';
+      stage.appendChild(el);
+      rowEls.set(p.login, el);
+      return el;
+    }
+
+    // 位置不按「周末名次」硬插值（交换的两行会在中点重叠）：每帧按插值后的魔力排序，
+    // 显示位置再以指数平滑追向目标名次；停下来时一定收敛到整齐的行，不会叠在一起
+    const ys = new Map();
+    let lastT = 0, settleRaf = 0;
+    function draw(force = false) {
+      const now = performance.now();
+      const dt = lastT ? Math.min(64, now - lastT) : 16; lastT = now;
+      const i = Math.floor(t), f = i >= LAST ? 0 : t - i, j = Math.min(LAST, i + 1);
+      const n = nRows(), rh = rowH();
+      const cs = getComputedStyle(stage), endW = parseFloat(cs.getPropertyValue('--endw')) || 92;
+      const trackW = Math.max(60, stage.clientWidth - 28 - parseFloat(cs.getPropertyValue('--lab')) - endW);
+      const xmax = Math.max(5, (topVal(i) * (1 - f) + topVal(j) * f)) * 1.04;
+      const wk = Math.round(t);
+      const cand = [];
+      for (const p of PEOPLE) {
+        if (!p.started[i] && !(f > 0 && p.started[j])) continue;
+        cand.push({ p, v: p.cum[i] + ((p.cum[j] || 0) - p.cum[i]) * f });
+      }
+      const rj = N.ranksAt(f > 0.5 ? j : i);
+      cand.sort((a, b) => b.v - a.v || (rj.get(a.p.login) ?? 999) - (rj.get(b.p.login) ?? 999) || a.p.login.localeCompare(b.p.login));
+      const alpha = force || K.reduced() ? 1 : 1 - Math.exp(-dt / 110);
+      const live = new Set();
+      let moving = false;
+      cand.forEach(({ p, v }, k) => {
+        let y = ys.has(p.login) ? ys.get(p.login) : Math.max(k, n);
+        y += (k - y) * alpha;
+        if (Math.abs(k - y) < 0.002) y = k; else moving = true;
+        ys.set(p.login, y);
+        if (y > n + 0.6 && k >= n) return;
+        const el = rowEl(p);
+        live.add(p.login);
+        // 被超过、正在往下让位的行（sink）隐去文字、压暗柱子，从超车行底下滑过；停下时一定恢复
+        const sinking = y < k - 0.04;
+        el.classList.toggle('sink', sinking);
+        const op = K.clamp(n - y + 0.4, 0, 1) * (p.started[i] ? 1 : Math.max(f, 0.2));
+        el.style.transform = `translate3d(0, ${(y * rh).toFixed(2)}px, 0)`;
+        el.style.opacity = op.toFixed(3);
+        el.style.zIndex = String(1000 - k);
+        const rk = k + 1;
+        if (el._rkv !== rk) { el._rk.textContent = rk; el._rk.classList.toggle('top', rk <= 3); el._rkv = rk; }
+        const w = Math.max(0, (v / xmax) * trackW);
+        el._bar.classList.toggle('zero', v < 0.05);
+        el._bar.classList.toggle('idle', !((p.wk.get(W[wk]) || 0) > 0.005));
+        el._bar.style.width = `${w.toFixed(2)}px`;
+        el._end.style.transform = `translate3d(${(v < 0.05 ? 6 : w + 6).toFixed(2)}px, -50%, 0)`;
+        // 柱头右侧放不下提示时，提示改贴在柱头左侧（压在柱子上），不会被舞台边缘裁掉
+        el._end.classList.toggle('in', trackW < 220 || w + 6 + 210 > trackW + endW);
+        el._v.textContent = mag(v);
+        const kind = K.formOf(p, wk).kind;
+        if (el._kind !== kind) { el._fr.innerHTML = K.frog(kind, 18); el._kind = kind; }
+        el.classList.toggle('hl', hover === p.login);
+      });
+      rowEls.forEach((el, k) => { if (!live.has(k)) { el.style.opacity = '0'; ys.delete(k); } });
+      cancelAnimationFrame(settleRaf);
+      if (moving && !playing) settleRaf = requestAnimationFrame(() => draw());
+      // 坐标轴
+      const step = niceStep(xmax / (trackW < 220 ? 2 : 4)); // 窄屏只留两档刻度，免得数字挤在一起
+      let g = `<div class="g b" style="left:0"><span>0</span></div>`;
+      for (let v = step; v <= xmax; v += step) g += `<div class="g" style="left:${((v / xmax) * trackW).toFixed(1)}px"><span>${fmt.int(v)}</span></div>`;
+      if (axis._g !== g) { axis.innerHTML = g; axis._g = g; }
+      const few = PEOPLE.filter((p) => p.started[wk]).length;
+      $('#tmFew').style.transform = `translateY(${Math.min(few, n) * rh + 8}px)`;
+      $('#tmFew').style.opacity = few < n ? '1' : '0';
+      if (few < n) $('#tmFew').textContent = `${K.week.range(wk)}结束时，池塘里只有 ${few} 位贡献者`;
+      stage.setAttribute('aria-label', `${K.week.range(wk)} 累计魔力前 ${Math.min(n, few)} 名`);
+      paintScrub();
+      if (wk !== shownWeek || force) setWeek(wk, shownWeek);
+    }
+
+    function setWeek(wk, prevWk) {
+      const s = N.weekSnapshot(wk);
+      $('#tmRange').textContent = K.week.range(wk);
+      $('#tmSub').textContent = wk === LAST ? `本周 · ${K.week.asOf()}` : wk === LAST - 1 ? '上周 · 已结束' : `第 ${wk + 1} / ${W.length} 周`;
+      $('#tmWater').innerHTML = `<b>${fmt.week(W[wk])}</b><small>${wk === LAST ? '进行中' : `${fmt.int(s.contributors)} 位贡献者`}</small>`;
+      scrub.setAttribute('aria-valuenow', String(wk));
+      scrub.setAttribute('aria-valuetext', `${K.week.range(wk)}${wk === LAST ? '，本周' : ''}`);
+      // 形态升级的轻提示：只在向前逐周播放时出现
+      if (prevWk >= 0 && wk === prevWk + 1) {
+        [...s.newlyHatched.map((p) => [p, '孵化']), ...s.upgraded.map((p) => [p, `进化为${N.LV[p.levels[wk]].name}`])].forEach(([p, txt]) => {
+          const el = rowEls.get(p.login);
+          if (!el || +el.style.opacity < 0.5) return;
+          el._pop.innerHTML = `<span class="tag tag-new tm-pop">${K.frog(K.formOf(p, wk).kind, 16, 'hop')}<span class="t">${txt}</span></span>`;
+          el._pop.firstChild.setAttribute('aria-label', `${p.login} ${txt}`);
+          el.classList.add('up');
+          clearTimeout(el._popT);
+          el._popT = setTimeout(() => { el._pop.innerHTML = ''; el.classList.remove('up'); }, 1800);
+        });
+      }
+      shownWeek = wk;
+      side(wk, s);
+    }
+
+    function side(wk, s) {
+      const top = s.top.slice(0, 3);
+      const ev = [...s.newlyHatched.map((p) => [p, '孵化']), ...s.upgraded.map((p) => [p, '进化'])];
+      const facts = [['活跃', fmt.int(s.active), '人', '提 PR、合入或协作的人'], ['合入', fmt.int(s.merged), '个', '这一周合入的 PR'], ['有魔力', fmt.int(s.top.length), '人', '这一周拿到魔力的人；只开了 PR 的人算活跃，但没有魔力']];
+      const el = $('#tmSide');
+      el.innerHTML = `<div class="tm-facts-wrap"><div class="dateline" style="margin-bottom:10px"><span class="range">${K.weekLabel(wk)}</span>${K.week.status(wk)}</div>`
+        + `<div class="tm-facts">${facts.map(([l, v, u, tip]) => `<div class="tm-fact" data-tip="${tip}" tabindex="0"><span class="label">${l}</span><b>${v}<span class="muted" style="font-size:var(--fs-xs);font-weight:600;margin-left:2px">${u}</span></b></div>`).join('')}</div></div>`
+        + `<div><h4>${icon('flame', 13)}当周魔力最多</h4>${top.length ? `<div class="tm-list">${top.map((x, k) => `<div class="it"><span class="k">${k + 1}</span>${K.who(x.p, { size: 20 })}<span class="k" style="color:var(--ink)">${mag(x.v)}</span></div>`).join('')}</div>` : '<p class="none">这一周没有人拿到魔力。</p>'}</div>`
+        + `<div><h4>${icon('sparkles', 13)}孵化与进化 <span class="muted" style="font-weight:500">${ev.length ? `${ev.length} 人` : ''}</span></h4>${ev.length ? `<div class="tm-list">${ev.slice(0, 4).map(([p, kind]) => `<div class="tm-ev">${K.who(p, { size: 20 })}<span class="ek">${kind}${K.levelBadge(p, { i: wk, size: 16 })}</span></div>`).join('')}${ev.length > 4 ? `<span class="none">还有 ${K.people(ev.slice(4).map(([p]) => p.login), { max: 2 })}</span>` : ''}</div>` : '<p class="none">这一周没有人孵化或进化。</p>'}</div>`;
+      el.classList.remove('swap-in'); void el.offsetWidth; el.classList.add('swap-in');
+    }
+
+    const durOf = (i) => (weekMagic[i + 1] < 0.05 && weekMagic[i] < 0.05 ? 260 : 1100) / speed;
+    function frame(now) {
+      if (!playing) return;
+      const dt = Math.min(64, now - last); last = now;
+      const i = Math.floor(t);
+      t = Math.min(LAST, t + dt / durOf(i));
+      draw();
+      if (t >= LAST) { pause(); return; }
+      raf = requestAnimationFrame(frame);
+    }
+    const btn = $('#tmPlay');
+    function setBtn() { btn.innerHTML = icon(playing ? 'pause' : t >= LAST ? 'rotate-ccw' : 'play', 18); btn.setAttribute('aria-label', playing ? '暂停' : t >= LAST ? '从头回放' : '播放'); btn.dataset.tip = playing ? '暂停  P' : t >= LAST ? '从头回放  P' : '播放  P'; }
+    function play(restart = false) {
+      if (K.reduced()) { // 减少动效：逐周跳，不插值
+        if (restart || t >= LAST) t = START;
+        playing = true; setBtn();
+        const tick = () => { if (!playing) return; t = Math.min(LAST, Math.floor(t) + 1); draw(); if (t >= LAST) pause(); else raf = setTimeout(tick, 900 / speed); };
+        draw(); raf = setTimeout(tick, 900 / speed); return;
+      }
+      if (restart || t >= LAST) { t = START; shownWeek = -1; draw(true); }
+      playing = true; last = performance.now(); setBtn();
+      raf = requestAnimationFrame(frame);
+    }
+    function pause() { playing = false; cancelAnimationFrame(raf); clearTimeout(raf); setBtn(); }
+    btn.addEventListener('click', () => { if (playing) { pause(); seek(t, { snap: true }); } else play(); });
+    let snapRaf = 0;
+    function seek(to, { snap = false } = {}) {
+      to = K.clamp(to, 0, LAST);
+      if (snap && !K.reduced()) {
+        const from = t, target = Math.round(to), t0 = performance.now();
+        cancelAnimationFrame(snapRaf);
+        const go = (now) => { const k = Math.min(1, (now - t0) / 320); t = from + (target - from) * (1 - Math.pow(1 - k, 3)); draw(); if (k < 1) snapRaf = requestAnimationFrame(go); else setBtn(); };
+        snapRaf = requestAnimationFrame(go); return;
+      }
+      t = snap ? Math.round(to) : to; draw(); setBtn();
+    }
+    scrub.addEventListener('pointerdown', (e) => {
+      pause(); drag = true; scrub.classList.add('drag'); scrub.setPointerCapture(e.pointerId);
+      seek(scrub._t(e.clientX - scrub.getBoundingClientRect().left));
+    });
+    scrub.addEventListener('pointermove', (e) => {
+      const x = e.clientX - scrub.getBoundingClientRect().left;
+      if (drag) { seek(scrub._t(x)); return; }
+      const i = Math.round(scrub._t(x));
+      const s = N.weekSnapshot(i);
+      K.tip.show(`<div class="t-h">${K.weekLabel(i)}${i === LAST ? ' · 进行中' : ''}</div><div class="t-row"><span class="t-key box" style="--k:var(--water)"></span><span class="t-v">${mag(weekMagic[i])}</span><span class="t-l">全组织产出魔力</span></div><div class="t-l">${fmt.int(s.active)} 人活跃 · 合入 ${fmt.int(s.merged)} 个 · 点击跳到这一周</div>`, cols[i]);
+    });
+    scrub.addEventListener('pointerleave', () => K.tip.hide());
+    const endDrag = () => { if (!drag) return; drag = false; scrub.classList.remove('drag'); seek(t, { snap: true }); };
+    scrub.addEventListener('pointerup', endDrag);
+    scrub.addEventListener('pointercancel', endDrag);
+    scrub.addEventListener('keydown', (e) => {
+      const m = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 };
+      if (m[e.key]) { e.preventDefault(); e.stopPropagation(); pause(); seek(Math.round(t) + m[e.key], { snap: true }); }
+      else if (e.key === 'Home') { e.preventDefault(); pause(); seek(0, { snap: true }); }
+      else if (e.key === 'End') { e.preventDefault(); pause(); seek(LAST, { snap: true }); }
+      else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (playing) { pause(); seek(t, { snap: true }); } else play(); }
+    });
+    stage.addEventListener('pointermove', (e) => {
+      const r = e.target.closest('.tm-row');
+      const h = r ? r.dataset.login : null;
+      if (h !== hover) { hover = h; stage.classList.toggle('hov', !!hover); draw(); }
+      if (!r || e.target.closest('[data-person]')) { if (!r) K.tip.hide(); return; }
+      const p = N.byLogin.get(h), wk = Math.round(t), fo = K.formOf(p, wk);
+      K.tip.show(`<div class="t-h">${K.weekLabel(wk)} · 第 ${r._rkv} 名</div>`
+        + `<div class="t-row"><span class="t-key box" style="--k:var(--leaf)"></span><span class="t-v">${mag(p.cum[wk])}</span><span class="t-l">${esc(p.login)} 累计魔力</span></div>`
+        + `<div class="t-row"><span class="t-key box" style="--k:var(--viz-dim)"></span><span class="t-v">+${mag(p.wk.get(W[wk]) || 0)}</span><span class="t-l">当周 · ${fo.name}</span></div>`, e);
+    });
+    stage.addEventListener('pointerleave', () => { hover = null; stage.classList.remove('hov'); K.tip.hide(); draw(); });
+    K.segmented($('#tmSpeed'), [{ value: '1', label: '1×' }, { value: '2', label: '2×' }], (v) => { speed = +v; }, { size: 'sm' });
+    const stepKey = (d) => () => {
+      const a = document.activeElement;
+      if (a && a.closest && a.closest('[role="radiogroup"], [role="slider"], input, .rows')) return false; // 让控件自己处理方向键
+      const r = $('#tmCard').getBoundingClientRect();
+      if (r.bottom < 80 || r.top > innerHeight - 120) return false; // 时光机不在屏幕上时不抢方向键
+      pause(); seek(Math.round(t) + d, { snap: true }); return true;
+    };
+    K.keys.add([
+      { key: 'p', display: 'P', label: '播放 / 暂停时光机', group: '时光机', handler: () => { if (playing) { pause(); seek(t, { snap: true }); } else play(); } },
+      { key: 'ArrowLeft', display: '←', label: '时光机前一周', group: '时光机', handler: stepKey(-1) },
+      { key: 'ArrowRight', display: '→', label: '时光机后一周', group: '时光机', handler: stepKey(1) },
+    ]);
+
+    const firstW = W.findIndex((_, i) => PEOPLE.some((p) => p.started[i]));
+    const reach = PEOPLE.filter((p) => W.some((_, i) => p.started[i] && (N.ranksAt(i).get(p.login) || 99) <= 3)).length;
+    $('#tmLede').innerHTML = `从 ${fmt.md(W[firstW])} 那一周到本周，${W.length} 周里共有 <b class="strong">${reach}</b> 人进过前 3。柱长是到那一周末的累计魔力，柱子变亮说明那一周有新魔力。<span class="only-kbd">按 <kbd>P</kbd> 播放，<kbd>←</kbd> <kbd>→</kbd> 逐周。</span>`;
+    setBtn();
+    layoutScrub();
+    draw(true);
+    return { play, pause };
+  })();
+
+  // ═════════════════ 公式：单个 PR 计算器 ═════════════════
+  (function formula() {
+    const S = N.RULES.score, CAP = N.RULES.weeklyActionCap;
+    const models = N.summary.models.slice().sort((a, b) => b.weight - a.weight || b.count - a.count);
+    const topM = models[0];
+    $('#fxMain').innerHTML = `<span class="lhs">魔力</span><span>=</span><span class="sig"><b>Σ</b><small>每周</small></span>`
+      + `<span class="tm" data-tip="每周最多按 ${CAP} 个动作计分，超出按比例折算">min(1, ${CAP} ÷ 动作数)</span><span>×</span>`
+      + `<span class="nowrap" style="display:inline-flex;align-items:center;gap:8px"><span class="sig"><b>Σ</b><small>当周</small></span><span class="par">(</span><span class="tm" data-tip="(1 + ${S.lines}·log₁₀(1 + 改动行) + ${S.commits}·log₂(1 + commit 数)) × 模型系数"><span class="key" style="--k:var(--series-pr)">PR 分</span></span><span>+</span><span class="tm" data-tip="每参与一个他人的 PR / issue，或自己提的有效 issue"><span class="key" style="--k:var(--series-collab)">协作 ×${S.collab}</span></span><span class="par">)</span></span>`;
+    let m = models.findIndex((x) => x === topM);
+    $('#fxModels').innerHTML = models.map((x, k) => `<button type="button" class="chip ${x.weight < 1 ? 'neg' : ''}" role="radio" data-k="${k}" aria-pressed="${k === m}" aria-checked="${k === m}" data-tip="组织里有 ${fmt.int(x.count)} 个合入 PR 是这个署名"><span class="chk">${icon('check', 13)}</span>${esc(x.label)} <b>×${x.weight}</b></button>`).join('');
+    const L = $('#fxLines'), C = $('#fxCommits'), Nn = $('#fxN');
+    const linesOf = (pos) => { const v = Math.pow(10, (pos / 1000) * 4) - 1; return v < 100 ? Math.round(v) : v < 1000 ? Math.round(v / 10) * 10 : Math.round(v / 100) * 100; };
+    L.value = String(Math.round((Math.log10(301) / 4) * 1000)); C.value = '3'; Nn.value = '12';
+    // 刻度按滑块真实位置摆放（行数是对数轴）
+    $('#fxLinesTicks').innerHTML = [0, 10, 100, 1000, 10000].map((v) => `<span style="--x:${(Math.log10(1 + v) / 4).toFixed(4)}">${fmt.int(v)}</span>`).join('');
+    $('#fxCommitsTicks').innerHTML = [1, 10, 20, 30, 40].map((v) => `<span style="--x:${((v - 1) / 39).toFixed(4)}">${v}</span>`).join('');
+    const setP = (el) => el.style.setProperty('--p', `${((el.value - el.min) / (el.max - el.min)) * 100}%`);
+    const MAXS = 4; // 条形图横轴上限
+    function calc() {
+      [L, C, Nn].forEach(setP);
+      const lines = linesOf(+L.value), commits = +C.value, M = models[m];
+      const a = S.lines * Math.log10(1 + lines), b = S.commits * Math.log2(1 + commits);
+      const raw = 1 + a + b, score = raw * M.weight, dm = score - raw;
+      $('#fxLinesV').textContent = `${fmt.int(lines)} 行`;
+      $('#fxCommitsV').textContent = `${commits} 个`;
+      $('#fxModelNote').textContent = `组织里出现过的 ${models.length} 种署名`;
+      $('#fxScore').textContent = mag(score);
+      $('#fxScore').setAttribute('aria-label', `${mag(score)} 魔力`);
+      const x = (v) => `${(v / MAXS) * 100}%`;
+      const bar = (lab, from, to, cls = '', tip = '') => `<div class="fx-b"${tip ? ` data-tip="${esc(tip)}"` : ''}><span>${lab}</span><span class="tr"><i class="${cls}" style="left:${x(Math.min(from, to))};width:${x(Math.abs(to - from))}"></i></span><span>${(to - from) < 0 ? '−' : '+'}${mag(Math.abs(to - from))}</span></div>`;
+      $('#fxBars').innerHTML = bar('基础', 0, 1, '', '每个合入 PR 先得 1')
+        + bar('改动行', 1, 1 + a, '', `${S.lines} × log₁₀(1 + ${lines})`)
+        + bar('commit', 1 + a, raw, '', `${S.commits} × log₂(1 + ${commits})`)
+        + bar('模型', raw, score, `m ${dm < 0 ? 'neg' : ''}`, `× ${M.weight}（${M.label}）${dm < 0 ? '，低于 1 时按扣分计' : ''}`);
+      $('#fxEq').innerHTML = `相当于 <b>${mag(score / S.collab)}</b> 次协作。改动行和 commit 都按对数加分：行数翻 10 倍只多 ${S.lines}，commit 翻倍只多 ${S.commits}。`;
+      const n = +Nn.value, k = Math.min(1, CAP / n), wkScore = n * score * k;
+      $('#fxNV').textContent = n;
+      $('#fxCapNote').textContent = n > CAP ? `超过 ${CAP} 个，按 ${CAP}/${n} 折算` : `未超过 ${CAP} 个，不折算`;
+      $('#fxBlocks').innerHTML = Array.from({ length: n }, (_, i) => (i === CAP ? '<i class="cut"></i>' : '') + `<i class="${i >= CAP ? 'over' : ''}"></i>`).join('');
+      $('#fxWeek').innerHTML = n > CAP
+        ? `当周得分 = ${n} × ${mag(score)} × ${CAP}/${n} = <b>${mag(wkScore)}</b>。多出来的 ${n - CAP} 个不白干，但整周被摊薄，等于只算 ${CAP} 个。`
+        : `当周得分 = ${n} × ${mag(score)} = <b>${mag(wkScore)}</b>。再多 ${CAP - n + 1} 个动作（含协作）就开始按比例折算。`;
+    }
+    const sPR = PEOPLE.reduce((a, p) => a + p.bonusPr + p.bonusModel, 0), sM = PEOPLE.reduce((a, p) => a + p.merged, 0);
+    const minW = Math.min(...models.map((x) => x.weight)), avgPR = sPR / sM;
+    $('#fxRef').innerHTML = `对照：组织里 ${fmt.int(sM)} 个合入 PR 平均每个实得 <b>${mag(avgPR)}</b>`
+      + (avgPR < minW ? `，比单个 PR 的最低分 ${mag(minW)}（1 × 最低系数 ×${minW}）还低：一周合入远超 ${CAP} 个的人，被封顶摊薄了。` : '。');
+    [L, C, Nn].forEach((el) => el.addEventListener('input', calc));
+    const chipsM = () => [...$('#fxModels').querySelectorAll('.chip')];
+    const syncTab = () => chipsM().forEach((x, k) => x.tabIndex = k === m ? 0 : -1);
+    $('#fxModels').addEventListener('keydown', (e) => {
+      const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+      if (!d) return;
+      e.preventDefault(); e.stopPropagation();
+      const cs = chipsM(); cs[(m + d + cs.length) % cs.length].click(); cs[m].focus();
+    });
+    $('#fxModels').addEventListener('click', (e) => {
+      const c = e.target.closest('.chip'); if (!c) return;
+      m = +c.dataset.k;
+      $('#fxModels').querySelectorAll('.chip').forEach((x) => { const on = x === c; x.setAttribute('aria-pressed', String(on)); x.setAttribute('aria-checked', String(on)); });
+      syncTab(); calc();
+    });
+    syncTab(); calc();
+  })();
+
+  // ═════════════════ 名词解释 ═════════════════
+  (function gloss() {
+    const R = N.RULES, LC = N.summary.levelCounts;
+    const ladder = N.LV.map((L, k) => `<div class="gl-step" data-tip="${esc(L.tagline)}"><span class="fr">${K.frog(L.icon, 30 + k * 2, LC[k] ? '' : 'ghost')}</span><b>${L.name}</b><small>${k ? `≥ ${fmt.int(L.bonus)}` : '孵化即得'}</small><span class="n">${LC[k] ? `${LC[k]} 人` : '虚位以待'}</span></div>`).join('');
+    const wl = R.warnLines.map((x) => `<div><span>已收尾 &gt;${x.resolved}</span><b>${fmt.pct(x.rate)}</b><div class="meter sm"><i style="width:${x.rate * 100}%"></i></div></div>`).join('');
+    $('#gloss').innerHTML = `
+      <div class="gl-sec"><div class="label">形态 · 只看魔力，不降级</div><div class="gl-ladder">${ladder}</div>
+        <p class="footnote" style="margin-top:10px">${icon('egg', 13)}<span>首次贡献起 ${R.newbie.days} 天内合入 ≥ ${R.newbie.merged} 且活跃周 ≥ ${R.newbie.activeWeeks} 即孵化，或魔力 ≥ ${R.hatchBonus} 直接孵化。考核期内叫<b class="strong">蛙卵</b>（${N.summary.pending} 人），期满未达标叫<b class="strong">未孵化</b>（${N.summary.failed} 人）。</span></p></div>
+      <div class="gl-sec"><dl class="gl-dl">
+        <dt>魔力</dt><dd>合入 PR 分（已乘模型系数）加协作分，按周累计。每周最多按 ${R.weeklyActionCap} 个动作计分，超出按比例折算。</dd>
+        <dt>协作</dt><dd>参与别人的 PR 或 issue：review、评论、帮人合入。同一个只算一次；自己提的有效 issue 也算。每次 +${R.score.collab}。</dd>
+        <dt>活跃周</dt><dd>有合入或协作的不同自然周（周一 0 点起，UTC+8）。</dd>
+        <dt>合入率</dt><dd>合入 ÷ 已收尾。已收尾 = 合入 + 被他人关闭 + 打开超 ${R.staleOpenDays} 天未合；自己关闭的算撤回，不计入。</dd>
+        <dt><span class="tag tag-warn">${icon('alert-triangle', 11)}合入率警告</span></dt><dd>已收尾越多，警告线越高。只提醒，不扣魔力，也不影响形态。<div class="gl-warn">${wl}</div></dd>
+        <dt><span class="tag tag-sleep">${icon('moon-z', 11)}冬眠</span></dt><dd>${R.dormantDays} 天没有任何动作。只做标记；${N.LV[R.dormantExemptLevel].name}及以上豁免。</dd>
+        <dt><span class="tag tag-out">组织外</span></dt><dd>数据更新时不在组织成员名单里的账号。贡献照常计分。</dd>
+        <dt><span class="tag tag-warn">${icon('zap', 11)}新手异常</span></dt><dd>考核期内开了 ${R.newbie.anomaly.opened} 个以上 PR，合入的不到 ${fmt.pct(R.newbie.anomaly.rate)}。最近 ${R.newbie.anomaly.graceHours} 小时内开的 PR 不计。只做标记。</dd>
+      </dl></div>`;
+  })();
+})();
+</script>
+</body>
+</html>
