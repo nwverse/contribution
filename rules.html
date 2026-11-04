@@ -28,7 +28,7 @@
 
   /* ── 目录 + 正文 ── */
   .rl { display: grid; grid-template-columns: 188px minmax(0, 1fr); gap: var(--s-10); align-items: start; }
-  .toc { position: sticky; top: calc(var(--appbar-h) + var(--s-6)); }
+  .toc { position: sticky; top: calc(var(--appbar-h) + var(--s-6)); min-width: 0; }
   .toc-h { margin-bottom: var(--s-2); padding-left: 12px; }
   .toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; border-left: 1px solid var(--line); }
   .toc a { position: relative; display: flex; align-items: baseline; gap: 8px; margin-left: -1px; padding: 6px 10px 6px 12px; border-left: 2px solid transparent; border-radius: 0 var(--r-sm) var(--r-sm) 0; font-size: var(--fs-sm); color: var(--ink-3); transition: color var(--dur-1), background-color var(--dur-1), border-color var(--dur-2); }
@@ -131,8 +131,8 @@
   .map .from { text-align: right; color: var(--ink-2); padding-right: 2px; }
   .map .arrow { display: grid; place-items: center; align-self: stretch; color: var(--ink-4); }
   .map .to { display: flex; flex-direction: column; gap: 2px; padding-left: 2px; }
-  .map .to > span { align-self: flex-start; font-weight: 650; color: var(--ink); cursor: help; border-radius: var(--r-xs); text-decoration: underline dotted var(--line-strong); text-underline-offset: 0.3em; text-decoration-thickness: 1.5px; }
-  .map .to > span:hover { text-decoration-color: var(--leaf); }
+  .map .to > .lbl { align-self: flex-start; font-weight: 650; color: var(--ink); cursor: help; border-radius: var(--r-xs); text-decoration: underline dotted var(--line-strong); text-underline-offset: 0.3em; text-decoration-thickness: 1.5px; }
+  .map .to > .lbl:hover { text-decoration-color: var(--leaf); }
   .map .mrow.off .to > span { font-weight: 450; color: var(--ink-3); }
   .map .why { display: none; font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.55; }
   .src { margin-top: var(--s-4); }
@@ -221,7 +221,7 @@
     .map .c { align-self: start; }
     .map .from { padding-top: 9px; }
     .map .arrow { place-items: start center; padding-top: 11px; }
-    .map .to > span { text-decoration: none; cursor: default; }
+    .map .to > .lbl { text-decoration: none; cursor: default; }
   }
 </style>
 </head>
@@ -650,7 +650,7 @@
     $('#mapping').setAttribute('role', 'list');
     $('#mapping').innerHTML = rows.map(([from, to, why, off]) => `<div class="mrow${off ? ' off' : ''}" role="listitem">
       <span class="c from">${esc(from)}</span><span class="c arrow" aria-hidden="true">${K.icon('arrow-right', 14)}</span>
-      <span class="c to"><span tabindex="0" data-tip="${esc(why)}" aria-label="${esc(`${from} 对应 ${to}。${why}`)}">${esc(to)}</span><span class="why" aria-hidden="true">${esc(why)}</span></span>
+      <span class="c to"><span class="lbl" tabindex="0" data-tip="${esc(why)}" aria-label="${esc(`${from} 对应 ${to}。${why}`)}">${esc(to)}</span><span class="why" aria-hidden="true">${esc(why)}</span></span>
     </div>`).join('');
     $('#mapSrc').innerHTML = `${K.icon('external-link', 13, 'ic')}<span>来源：<a href="https://wiki.m-team.cc/zh-tw/account-rules" target="_blank" rel="noopener">M-Team 帐号规则</a>（2026-08-23 版）</span>`;
   })();
