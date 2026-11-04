@@ -888,10 +888,10 @@
   }
 
   // ───────────────────────── 应用顶栏 + 手机底部标签栏 ─────────────────────────
+  // 档案（profile.html）不单独占导航：点任意贡献者进入
   const SCREENS = [
     { id: 'c1', label: '本周', icon: 'sparkles', desc: '这周发生了什么' },
     { id: 'c2', label: '排行榜', icon: 'trophy', desc: '谁最近在发力' },
-    { id: 'c3', label: '档案', icon: 'user', desc: '我离下一级还差什么' },
     { id: 'c4', label: '孵化台', icon: 'egg', desc: '新人卡在哪一步' },
     { id: 'c5', label: '形态池', icon: 'layers', desc: '大家都进化到哪了' },
     { id: 'rules', label: '规则', icon: 'book-open', desc: '魔力怎么算、数据口径' },

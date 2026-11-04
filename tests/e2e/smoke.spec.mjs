@@ -1,5 +1,5 @@
 // 六个页面都能启动：无报错、导航正确、主题参数生效、只请求本站资源。
-import { test, expect, open, PAGES } from './fixtures.mjs';
+import { test, expect, open, PAGES, NAV } from './fixtures.mjs';
 
 for (const pg of PAGES) {
   test(`${pg.label}页能加载 @mobile`, async ({ page, external, isMobile }) => {
@@ -9,9 +9,10 @@ for (const pg of PAGES) {
     // 桌面看顶栏，手机看底部标签栏；当前页高亮
     const nav = isMobile ? page.locator('.tabbar') : page.locator('#appbar .nav');
     await expect(nav).toBeVisible();
-    await expect(nav.locator('a')).toHaveCount(PAGES.length);
-    for (const other of PAGES) await expect(nav.locator(`a[data-screen="${other.id}"]`)).toHaveAttribute('href', other.file);
-    await expect(nav.locator('[aria-current="page"]')).toHaveAttribute('data-screen', pg.id);
+    await expect(nav.locator('a')).toHaveCount(NAV.length);
+    for (const other of NAV) await expect(nav.locator(`a[data-screen="${other.id}"]`)).toHaveAttribute('href', other.file);
+    if (pg.nav === false) await expect(nav.locator('[aria-current="page"]')).toHaveCount(0);
+    else await expect(nav.locator('[aria-current="page"]')).toHaveAttribute('data-screen', pg.id);
     // 外部请求只允许 GitHub 头像（已被拦截）；不允许调用 GitHub API
     expect(external.filter((u) => !/^https:\/\/github\.com\/[^/]+\.png/.test(u))).toEqual([]);
   });

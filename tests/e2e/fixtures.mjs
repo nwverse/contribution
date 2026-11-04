@@ -11,11 +11,12 @@ export const mag = (x) => (Math.round((x || 0) * 10) / 10).toLocaleString('zh-CN
 export const PAGES = [
   { file: 'index.html', id: 'c1', label: '本周' },
   { file: 'ranking.html', id: 'c2', label: '排行榜' },
-  { file: 'profile.html', id: 'c3', label: '档案' },
+  { file: 'profile.html', id: 'c3', label: '档案', nav: false }, // 不在导航里，点贡献者进入
   { file: 'hatchery.html', id: 'c4', label: '孵化台' },
   { file: 'pond.html', id: 'c5', label: '形态池' },
   { file: 'rules.html', id: 'rules', label: '规则' },
 ];
+export const NAV = PAGES.filter((p) => p.nav !== false);
 
 export const test = base.extend({
   // 外部请求（GitHub 头像）一律拦截：测试不依赖网络，头像回退为首字母
