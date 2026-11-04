@@ -23,7 +23,7 @@ window.RULES = window.RULES || RULES;
     models: R.models,
     modelNone: R.modelNone,
     tzOffsetHours: R.tzOffsetHours,
-    laggard: R.laggard,
+    vitality: R.vitality,
   };
 
   // 孵化后取魔力达到的最高一级；未孵化返回 null
@@ -65,26 +65,49 @@ window.RULES = window.RULES || RULES;
     p.daysSinceLast = Math.floor((B.now - p.lastAt) / DAY);
   }
 
-  // 第 i 周的掉队名单：该周结束时首次贡献已满新手考核期，且最近 laggard.weeks 周魔力合计低于 laggard.minMagic。
-  // 返回 [{ p, recent, quietWeeks }]：recent = 窗口内魔力；quietWeeks = 截至该周连续几周没有魔力（从未有过为 null）。
-  // 按窗口魔力升序、沉寂周数降序排列。
-  function laggardsAt(i) {
-    const { weeks: n, minMagic } = RULES.laggard;
-    const end = Math.min(B.now, W[i] + WEEK);
-    const out = [];
-    for (const p of people) {
-      if (end - p.firstAt < RULES.newbie.days * DAY) continue;
-      let recent = 0;
-      for (let k = Math.max(0, i - n + 1); k <= i; k++) recent += p.wk.get(W[k]) || 0;
-      if (recent >= minMagic) continue;
-      let k = i;
-      while (k >= 0 && !(p.wk.get(W[k]) > 0)) k--;
-      out.push({ p, recent, quietWeeks: k < 0 ? null : i - k });
+  // ───────── 活力（RULES.vitality）─────────
+  // 输入：最近若干周每周魔力（k=0 为本周）、在组周数、累计魔力、距上次任何动作天数。返回总分与四项分（已乘权重，合计即总分）。
+  function vitalityScore({ weekly, tenure, bonus, days }) {
+    const V = RULES.vitality, w = V.weights;
+    const n = Math.max(1, Math.min(V.weeks, tenure));
+    let sum = 0, norm = 0, active = 0;
+    for (let k = 0; k < n; k++) {
+      const m = weekly[k] || 0, wt = Math.pow(2, -k / V.halfLife);
+      sum += m * wt;
+      norm += wt;
+      if (m > 0) active++;
     }
-    return out.sort((a, b) => a.recent - b.recent || (b.quietWeeks ?? Infinity) - (a.quietWeeks ?? Infinity) || a.p.rank - b.p.rank);
+    let quiet = weekly.findIndex((m) => m > 0);
+    if (quiet < 0) quiet = Infinity;
+    const f = {
+      recent: Math.min(1, sum / (V.pace * norm)),
+      steady: active / n,
+      history: Math.min(1, Math.log1p(bonus) / Math.log1p(V.historyRef)) * Math.pow(2, -quiet / V.creditHalfLife),
+      action: Math.max(0, 1 - days / RULES.dormantDays),
+    };
+    const parts = { recent: 100 * w.recent * f.recent, steady: 100 * w.steady * f.steady, history: 100 * w.history * f.history, action: 100 * w.action * f.action };
+    const v = parts.recent + parts.steady + parts.history + parts.action;
+    return { v, parts, f, quiet, status: v < V.laggard ? 'laggard' : v < V.watch ? 'watch' : 'ok' };
   }
-  const lagNow = new Map(laggardsAt(last).map((x) => [x.p.login, x]));
-  for (const p of people) p.laggard = lagNow.get(p.login) || null; // 当前是否掉队
+  for (const p of people) {
+    const tenure = Math.ceil((B.now - p.firstAt) / WEEK);
+    if (B.now - p.firstAt < RULES.newbie.days * DAY) { p.vit = null; continue; } // 新手考核期内不评
+    const weekly = W.map((_, k) => p.wk.get(W[last - k]) || 0);
+    const input = { weekly, tenure, bonus: p.bonus, days: p.daysSinceLast };
+    const r = vitalityScore(input);
+    // 本周再拿多少魔力能升一档（掉队 → 观察 → 正常）：拿到魔力本身也是一次动作
+    const target = r.status === 'laggard' ? RULES.vitality.laggard : r.status === 'watch' ? RULES.vitality.watch : null;
+    let need = null;
+    if (target !== null) {
+      const at = (m) => vitalityScore({ ...input, weekly: [weekly[0] + m, ...weekly.slice(1)], bonus: p.bonus + m, days: 0 }).v;
+      if (at(400) >= target) {
+        let lo = 0, hi = 400;
+        for (let t = 0; t < 30; t++) { const mid = (lo + hi) / 2; if (at(mid) >= target) hi = mid; else lo = mid; }
+        need = Math.ceil(hi * 10) / 10;
+      }
+    }
+    p.vit = { ...r, need };
+  }
 
   // 第 i 周末的排名（1 起）：只排该周结束前已有首次贡献的人。
   // 最后一周直接用线上排名；历史周按累计魔力降序、账号名升序。
@@ -139,7 +162,9 @@ window.RULES = window.RULES || RULES;
     B, LV, RULES, DAY, WEEK,
     weeks, W, last, people,
     byLogin: new Map(people.map((p) => [p.login, p])),
-    levelOf, ranksAt, weekSnapshot, laggardsAt, fmt,
+    levelOf, ranksAt, weekSnapshot, vitalityScore, fmt,
+    // 当前活力不达标的人：掉队在前，同档按活力升序
+    lowVitality: () => people.filter((p) => p.vit && p.vit.status !== 'ok').sort((a, b) => (a.vit.status === b.vit.status ? 0 : a.vit.status === 'laggard' ? -1 : 1) || a.vit.v - b.vit.v),
     avatar: (login, size = 64) => `https://github.com/${encodeURIComponent(login)}.png?size=${size}`,
     summary: B.summary,
     now: B.now,

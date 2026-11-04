@@ -108,8 +108,14 @@
   .upc .uv b { color: var(--ink-2); font-weight: 650; }
   .upc .eta { color: var(--leaf-ink); font-weight: 650; }
   .upc .eta.soon { color: var(--yolk-ink); }
-  .upc.lag .quiet { color: var(--rust); font-weight: 600; }
-  .lag-more { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; font-size: var(--fs-xs); }
+  .upc.lag .quiet { font-weight: 650; }
+  .upc.lag .st-laggard { color: var(--rust); }
+  .upc.lag .st-watch { color: var(--amber); }
+  .upc.lag .vbar { margin-top: 2px; }
+  .lag-links { display: flex; gap: 16px; margin-top: 8px; font-size: var(--fs-xs); }
+  .lag-links a { display: inline-flex; align-items: center; gap: 4px; }
+  .never { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: var(--fs-xs); color: var(--ink-3); }
+  .never b { color: var(--ink-2); }
 
   .card-foot .link { margin-left: auto; }
   .card-foot .ic { vertical-align: -2px; }
@@ -288,7 +294,7 @@
   $('#icHealth').innerHTML = icon('activity', 15);
   $('#icArrow1').innerHTML = icon('arrow-right', 13);
   $('#icArrow2').innerHTML = icon('arrow-right', 13);
-  $('#lagFoot').textContent = `掉队 = 满 ${NW.RULES.newbie.days} 天且近 ${NW.RULES.laggard.weeks} 周魔力 < ${NW.RULES.laggard.minMagic}`;
+  $('#lagFoot').innerHTML = `活力 &lt; ${NW.RULES.vitality.laggard} 掉队 · &lt; ${NW.RULES.vitality.watch} 观察 <a class="link" href="rules.html#vitality" data-screen="rules">怎么算</a>`;
 
   // ───────── 派生：某一周的全部事实（缓存） ─────────
   const wkv = (p, i) => (i < 0 ? 0 : p.wk.get(W[i]) || 0);
@@ -338,8 +344,7 @@
       ...s.upgraded.map((p) => ({ p, from: p.levels[i - 1], to: p.levels[i], kind: 'up' })).sort((a, b) => b.to - a.to || a.p.login.localeCompare(b.p.login)),
       ...s.newlyHatched.map((p) => ({ p, from: null, to: p.levels[i], kind: 'hatch' })),
     ];
-    const laggards = NW.laggardsAt(i);
-    const f = { i, s, ps, magic, pmagic, faces: facesR, pfaces, recA, recM, board, movers, entered, upcoming, evos, laggards, live: i === LAST };
+    const f = { i, s, ps, magic, pmagic, faces: facesR, pfaces, recA, recM, board, movers, entered, upcoming, evos, live: i === LAST };
     cache.set(i, f);
     return f;
   }
@@ -723,7 +728,10 @@
   $('#moves').addEventListener('click', (e) => { const c = e.target.closest('.face[data-login]'); if (c && !e.target.closest('[data-person]')) K.openPerson(c.dataset.login); });
 
   const FROM = (x) => (x.from === null ? '蛙卵' : LV[x.from].name);
-  const LAG_RULE = `掉队 = 首次贡献已满 ${NW.RULES.newbie.days} 天，且最近 ${NW.RULES.laggard.weeks} 周（含本周）魔力合计低于 ${NW.RULES.laggard.minMagic}，约等于平均每周不到 1 个合入 PR 或 1 次协作。只做提醒，不影响魔力与形态。`;
+  const VR = NW.RULES.vitality, VW = VR.weights;
+  const VIT_RULE = `活力 0–100 = ${Math.round(VW.recent * 100)}×近期产出 + ${Math.round(VW.steady * 100)}×持续度 + ${Math.round(VW.history * 100)}×历史信用 + ${Math.round(VW.action * 100)}×最近动作。低于 ${VR.laggard} 为掉队，低于 ${VR.watch} 为观察；首次贡献未满 ${NW.RULES.newbie.days} 天不评。只做提醒，不影响魔力与形态。`;
+  const LOW = NW.lowVitality();
+  const NEVER = Math.max(0, NW.summary.members - NW.summary.memberContributors); // 从未贡献的组织成员，只能以人数出现
   function renderEvo(f, animate, celebrate) {
     const name = f.live ? '本周' : '这一周';
     let h = `<div class="sub-h">${icon('sparkles', 14)}${name}进化与孵化 <span class="cnt">${f.evos.length}</span></div>`;
@@ -737,18 +745,19 @@
       h += `<div class="mini-empty">${K.frog('tadpole', 26, 'sleep')}<span>这一周没有人进化或孵化${u ? `；离得最近的是 ${K.pname(u.p.login, { avatar: false })}，还差 <b>${mag(u.gap)}</b>` : ''}</span></div>`;
     }
     h += '<div class="sep"></div>';
-    const LG = NW.RULES.laggard;
-    const quiet = (x) => (x.quietWeeks === null ? '从没拿到魔力' : x.quietWeeks === 0 ? `${name}有魔力` : `连续 ${x.quietWeeks} 周没有魔力`);
-    const quietShort = (x) => (x.quietWeeks === null ? '从未有魔力' : x.quietWeeks === 0 ? `${name}有魔力` : `${x.quietWeeks} 周无魔力`);
+    // 活力预警：按此刻的数据计算（最近动作只有当前快照），切到历史周时也显示此刻的名单
+    const low = LOW;
+    const nLag = low.filter((p) => p.vit.status === 'laggard').length, nWatch = low.length - nLag;
     h += `<div>`
-      + `<div class="sub-h">${icon('alert-triangle', 14)}掉队预警 <span class="cnt">${f.laggards.length}</span><span class="aside" data-tip="${esc(LAG_RULE)}">近 ${LG.weeks} 周魔力 &lt; ${LG.minMagic}</span></div>`;
-    const lag = f.laggards.slice(0, 5);
-    h += lag.length
-      ? lag.map((x) => `<div class="upc lag" data-login="${esc(x.p.login)}">${K.who(x.p, { size: 28, sub: `${K.formOf(x.p, f.i).name} · 累计 ${mag(x.p.cum[f.i])}` })}`
-        + `<div data-tip="${esc(`近 ${LG.weeks} 周魔力 ${mag(x.recent)}，低于 ${LG.minMagic}；${quiet(x)}`)}"><div class="meter rust"><i style="width:${(K.clamp(x.recent / LG.minMagic, 0, 1) * 100).toFixed(1)}%"></i></div>`
-        + `<div class="uv"><span><b>${mag(x.recent)}</b> / ${LG.minMagic}</span><span class="quiet">${quietShort(x)}</span></div></div></div>`).join('')
-        + (f.laggards.length > lag.length ? `<a class="link lag-more" href="ranking.html?flag=lag" data-screen="c2">查看全部 ${f.laggards.length} 人${icon('arrow-right', 13)}</a>` : '')
-      : `<div class="mini-empty">${K.frog('frog', 26)}<span>${name}没有人掉队</span></div>`;
+      + `<div class="sub-h">${icon('alert-triangle', 14)}活力预警 <span class="cnt">${low.length}</span><span class="aside" data-tip="${esc(VIT_RULE)}">${f.live ? '' : '此刻 · '}掉队 ${nLag} · 观察 ${nWatch}</span></div>`;
+    const shown = low.slice(0, 6);
+    h += shown.length
+      ? shown.map((p) => `<div class="upc lag" data-login="${esc(p.login)}">${K.who(p, { size: 28, sub: `${K.formOf(p).name} · 累计 ${mag(p.bonus)}` })}`
+        + `<div data-tip="${esc(K.vitTip(p))}">${K.vitBar(p.vit)}`
+        + `<div class="uv"><span>活力 <b>${K.vitNum(p.vit.v)}</b></span><span class="quiet st-${p.vit.status}">${K.VIT_STATUS[p.vit.status].label}</span></div></div></div>`).join('')
+        + `<div class="lag-links">${nLag ? `<a class="link" href="ranking.html?flag=lag" data-screen="c2">掉队 ${nLag} 人${icon('arrow-right', 13)}</a>` : ''}${nWatch ? `<a class="link" href="ranking.html?flag=watch" data-screen="c2">观察 ${nWatch} 人${icon('arrow-right', 13)}</a>` : ''}</div>`
+      : `<div class="mini-empty">${K.frog('frog', 26)}<span>此刻没有活力不足的人</span></div>`;
+    if (NEVER > 0) h += `<p class="never">${icon('users', 13)}另有 <b>${NEVER}</b> 名组织成员从未贡献（只计人数）</p>`;
     h += '</div>';
     swap($('#evo'), h, animate);
     if (celebrate && f.evos.length && !K.reduced()) {

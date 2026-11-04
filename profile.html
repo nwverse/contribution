@@ -229,6 +229,14 @@
     .pf-keys { display: none; }
     .pf-foot { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   }
+  .vit-top { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .vit-score { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .vit-th { margin-left: auto; font-size: var(--fs-xs); color: var(--ink-3); }
+  .vit-rows { display: grid; gap: 8px; margin-top: 14px; }
+  .vit-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) 64px; align-items: center; gap: 10px; font-size: var(--fs-xs); color: var(--ink-2); }
+  .vit-row .num { text-align: right; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .vit-row .num b { color: var(--ink); font-weight: 650; }
+  .vit-note, .vit-none { margin: 12px 0 0; font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -433,7 +441,7 @@
     const k = PEOPLE.indexOf(p);
     $('#pfPos', d.el).textContent = `第 ${k + 1} / ${PEOPLE.length} 位`;
     const f = K.formOf(p);
-    body.innerHTML = `<div class="pf-swap">${heroHTML(p, f)}${evoHTML(p)}${weeklyHTML(p)}${compHTML(p)}${rateHTML(p)}${modelHTML(p)}${newbieHTML(p, f)}${dormHTML(p)}</div>`;
+    body.innerHTML = `<div class="pf-swap">${heroHTML(p, f)}${evoHTML(p)}${vitHTML(p)}${weeklyHTML(p)}${compHTML(p)}${rateHTML(p)}${modelHTML(p)}${newbieHTML(p, f)}${dormHTML(p)}</div>`;
     // 魔力数字从上一个人的值滚到这个人
     K.countUp(body.querySelector('#pfMag'), p.bonus, { from: fromMag ?? 0, format: mag, dur: fromMag === null ? 0 : 700 });
     mountWeekly(p);
@@ -834,6 +842,23 @@
         <div class="nb-track" role="img" aria-label="${esc(`考核期 ${fmt.md(p.firstAt)} 到 ${fmt.md(nb.end)}`)}">${fill}${marks}${labels}</div>
         ${reqs}${call}
       </div>
+    </section>`;
+  }
+
+  // 活力：四项得分与满分对照，告诉人怎么回到上一档
+  function vitHTML(p) {
+    const V = R.vitality;
+    const head = `<div class="drawer-sec-h"><span class="t">${icon('activity', 15)}活力</span><a class="link" href="rules.html#vitality" data-screen="rules">怎么算</a></div>`;
+    if (!p.vit) return `<section class="drawer-sec" aria-label="活力">${head}<p class="vit-none">首次贡献未满 ${R.newbie.days} 天，还在新手考核期，不评活力。</p></section>`;
+    const v = p.vit, st = K.VIT_STATUS[v.status];
+    const quiet = v.quiet === 0 ? '本周有魔力' : Number.isFinite(v.quiet) ? `已连续 ${v.quiet} 周没有魔力` : '还没有拿到过魔力';
+    const need = K.vitNeed(v);
+    const rows = K.VIT_PARTS.map((x) => `<div class="vit-row"><span class="key" style="--k:${x.color}">${x.label}</span><div class="meter sm"><i style="width:${(v.parts[x.key] / (V.weights[x.key] * 100) * 100).toFixed(1)}%;background:${x.color}"></i></div><span class="num"><b>${K.vitNum(v.parts[x.key])}</b> / ${Math.round(V.weights[x.key] * 100)}</span></div>`).join('');
+    return `<section class="drawer-sec" aria-label="活力">${head}
+      <div class="vit-top"><span class="vit-score">${K.vitNum(v.v)}</span><span class="tag ${st.cls}">${icon(st.icon, 11)}${st.label}</span><span class="vit-th">掉队 &lt; ${V.laggard} · 观察 &lt; ${V.watch}</span></div>
+      ${K.vitBar(v, { h: 10 })}
+      <div class="vit-rows">${rows}</div>
+      <p class="vit-note">${quiet}${need ? `；${need}` : ''}。活力只做提醒，不影响魔力与形态。</p>
     </section>`;
   }
 

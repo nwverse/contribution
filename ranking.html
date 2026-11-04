@@ -425,7 +425,7 @@
   // ═════════════════ 排行榜 ═════════════════
   const qs0 = new URLSearchParams(location.search);
   // ?flag=lag 等：从首页「查看全部」进来时直接带上筛选
-  const st = { win: ['all', 'week', 'l4'].includes(qs0.get('win')) ? qs0.get('win') : 'all', mem: 'all', form: null, flags: new Set(qs0.getAll('flag').filter((f) => ['z', 'w', 'a', 'lag'].includes(f))), q: '', sel: -1, all: false };
+  const st = { win: ['all', 'week', 'l4'].includes(qs0.get('win')) ? qs0.get('win') : 'all', mem: 'all', form: null, flags: new Set(qs0.getAll('flag').filter((f) => ['z', 'w', 'a', 'lag', 'watch'].includes(f))), q: '', sel: -1, all: false };
   const LIMIT = 20;
   const winName = { all: '总榜', week: '本周', l4: '近 4 周' };
 
@@ -449,14 +449,15 @@
   const GROUPS = {
     mem: [['all', '全部'], ['m', '组织成员'], ['o', '组织外']],
     form: [...N.LV.map((L, k) => [`l${k}`, L.name, L.icon]), ['egg', '蛙卵', 'egg'], ['unhatched', '未孵化', 'unhatched']],
-    flags: [['z', '冬眠', null, 'moon-z'], ['w', '合入率警告', null, 'alert-triangle'], ['a', '新手异常', null, 'zap'], ['lag', '掉队', null, 'trending-down']],
+    flags: [['z', '冬眠', null, 'moon-z'], ['w', '合入率警告', null, 'alert-triangle'], ['a', '新手异常', null, 'zap'], ['lag', '掉队', null, 'trending-down'], ['watch', '观察', null, 'eye']],
   };
   const TERM = {
     m: '在数据更新时属于 nwverse 组织成员名单的账号。',
     o: '数据更新时不在组织成员名单里的账号，例如从 fork 提 PR 的外部贡献者、已退出的人。贡献照常计分。',
     z: `超过 ${N.RULES.dormantDays} 天没有任何动作。只做标记；${N.LV[N.RULES.dormantExemptLevel].name}及以上不标记。`,
     w: `已收尾 PR 超过 ${N.RULES.warnLines[0].resolved} 个后，合入率低于 ${fmt.pct(N.RULES.warnLines[0].rate)} 就会被标记，门槛随已收尾数提高。只提醒，不扣魔力。`,
-    lag: `首次贡献已满 ${N.RULES.newbie.days} 天，且最近 ${N.RULES.laggard.weeks} 周（含本周）魔力合计低于 ${N.RULES.laggard.minMagic}。只做提醒，不影响魔力与形态。`,
+    lag: `活力低于 ${N.RULES.vitality.laggard}：近期产出、持续度、历史信用、最近动作综合得分很低。只做提醒，不影响魔力与形态。`,
+    watch: `活力在 ${N.RULES.vitality.laggard} 到 ${N.RULES.vitality.watch} 之间：贡献在变少，还没到掉队。`,
     a: `考核期内开了 ${N.RULES.newbie.anomaly.opened} 个以上 PR，合入的不到 ${fmt.pct(N.RULES.newbie.anomaly.rate)}。最近 ${N.RULES.newbie.anomaly.graceHours} 小时内开的 PR 不计。`,
     egg: `首次贡献起 ${N.RULES.newbie.days} 天内的考核期，还没孵化。`,
     unhatched: `考核期已过仍未达标；魔力攒到 ${N.RULES.hatchBonus} 也能直接孵化。`,
@@ -467,7 +468,7 @@
   };
   const pass = (p, s) => (s.mem === 'all' || (s.mem === 'm') === !!p.member)
     && (!s.form || formKey(p) === s.form)
-    && (!s.flags.has('z') || p.dormant) && (!s.flags.has('w') || p.warn) && (!s.flags.has('a') || p.newbie.anomaly) && (!s.flags.has('lag') || p.laggard);
+    && (!s.flags.has('z') || p.dormant) && (!s.flags.has('w') || p.warn) && (!s.flags.has('a') || p.newbie.anomaly) && (!s.flags.has('lag') || (p.vit && p.vit.status === 'laggard')) && (!s.flags.has('watch') || (p.vit && p.vit.status === 'watch'));
   const matchQ = (p) => !st.q || p.login.toLowerCase().includes(st.q);
   function filtered() { return windowRows(st.win).filter((r) => pass(r.p, st) && matchQ(r.p)); }
 
@@ -509,7 +510,7 @@
   const SPARK_MAX = Math.max(1, ...PEOPLE.flatMap((p) => p.spark)); // 全员同一刻度，行间可比
   function rowHTML(r, k, maxV) {
     const { p, rank, v } = r;
-    const tags = `${p.member ? '' : '<span class="tag tag-out">组织外</span>'}${p.dormant ? `<span class="tag tag-sleep">${icon('moon-z', 11)}冬眠</span>` : ''}${p.warn ? `<span class="tag tag-warn">${icon('alert-triangle', 11)}警告</span>` : ''}${p.newbie.anomaly ? `<span class="tag tag-warn" data-tip="${esc(TERM.a)}">${icon('zap', 11)}新手异常</span>` : ''}${p.laggard ? `<span class="tag tag-warn" data-tip="${esc(`${TERM.lag}近 ${N.RULES.laggard.weeks} 周魔力 ${mag(p.laggard.recent)}。`)}">${icon('trending-down', 11)}掉队</span>` : ''}`;
+    const tags = `${p.member ? '' : '<span class="tag tag-out">组织外</span>'}${p.dormant ? `<span class="tag tag-sleep">${icon('moon-z', 11)}冬眠</span>` : ''}${p.warn ? `<span class="tag tag-warn">${icon('alert-triangle', 11)}警告</span>` : ''}${p.newbie.anomaly ? `<span class="tag tag-warn" data-tip="${esc(TERM.a)}">${icon('zap', 11)}新手异常</span>` : ''}${p.vit && p.vit.status !== 'ok' ? K.vitTag(p) : ''}`;
     const sub = `合入 ${fmt.int(p.merged)} · 协作 ${fmt.int(p.collab)}${p.resolved ? `<span class="hide-sm"> · 合入率 ${fmt.pct(p.rate)}</span>` : ''}`;
     const who = K.who(p, { size: 28, sub, tags }).replace(`<span class="nm">${esc(p.login)}</span>`, `<span class="nm">${hl(p.login)}</span>`);
     let comp;
@@ -1014,7 +1015,7 @@
         <dt><span class="tag tag-warn">${icon('alert-triangle', 11)}合入率警告</span></dt><dd>已收尾越多，警告线越高。只提醒，不扣魔力，也不影响形态。<div class="gl-warn">${wl}</div></dd>
         <dt><span class="tag tag-sleep">${icon('moon-z', 11)}冬眠</span></dt><dd>${R.dormantDays} 天没有任何动作。只做标记；${N.LV[R.dormantExemptLevel].name}及以上豁免。</dd>
         <dt><span class="tag tag-out">组织外</span></dt><dd>数据更新时不在组织成员名单里的账号。贡献照常计分。</dd>
-        <dt><span class="tag tag-warn">${icon('trending-down', 11)}掉队</span></dt><dd>首次贡献已满 ${R.newbie.days} 天，且最近 ${R.laggard.weeks} 周（含本周）魔力合计低于 ${R.laggard.minMagic}，约等于平均每周不到 1 个合入 PR 或 1 次协作。只做提醒，不影响魔力与形态。</dd>
+        <dt><span class="tag tag-warn">${icon('trending-down', 11)}掉队</span> <span class="tag tag-watch">${icon('eye', 11)}观察</span></dt><dd>按活力（0–100）判断：综合近期产出、持续度、历史信用与最近动作。低于 ${R.vitality.laggard} 为掉队，低于 ${R.vitality.watch} 为观察；首次贡献未满 ${R.newbie.days} 天不评。<a class="link" href="rules.html#vitality">公式</a></dd>
         <dt><span class="tag tag-warn">${icon('zap', 11)}新手异常</span></dt><dd>考核期内开了 ${R.newbie.anomaly.opened} 个以上 PR，合入的不到 ${fmt.pct(R.newbie.anomaly.rate)}。最近 ${R.newbie.anomaly.graceHours} 小时内开的 PR 不计。只做标记。</dd>
       </dl></div>`;
   })();

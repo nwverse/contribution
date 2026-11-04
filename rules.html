@@ -53,6 +53,18 @@
   .fdefs dd { margin: 0; color: var(--ink-2); font-variant-numeric: tabular-nums; line-height: 1.6; }
   .fdefs dd .k { font-weight: 680; color: var(--ink); }
   .fdefs .fn { display: block; margin-top: 2px; font-size: var(--fs-xs); color: var(--ink-3); }
+  .vt-th { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: var(--s-5); padding-top: var(--s-4); border-top: 1px solid var(--line-soft); font-size: var(--fs-sm); color: var(--ink-2); }
+  .vt-th .tag { font-size: var(--fs-xs); }
+  .vt-cases { width: 100%; margin-top: var(--s-5); border-collapse: collapse; font-size: var(--fs-sm); }
+  .vt-cases caption { text-align: left; padding-bottom: var(--s-2); font-size: var(--fs-xs); font-weight: 650; color: var(--ink-3); }
+  .vt-cases th, .vt-cases td { padding: 8px 10px; border-bottom: 1px solid var(--line-soft); text-align: left; vertical-align: middle; }
+  .vt-cases th { font-size: var(--fs-2xs); font-weight: 650; color: var(--ink-3); }
+  .vt-cases td.n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; color: var(--ink); white-space: nowrap; }
+  .vt-cases td.bar { width: 32%; min-width: 120px; }
+  .vt-cases td .d { display: block; font-size: var(--fs-xs); color: var(--ink-3); }
+  .vt-now { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: var(--s-4); font-size: var(--fs-sm); color: var(--ink-2); }
+  .vt-now a { display: inline-flex; align-items: center; gap: 4px; }
+  @media (max-width: 720px) { .vt-cases td.bar { display: none; } .vt-cases th.bar { display: none; } }
   .nw { white-space: nowrap; }
   .examples { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--s-2) var(--s-4); margin: var(--s-5) 0 0; padding-top: var(--s-4); border-top: 1px solid var(--line-soft); font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.6; }
   .examples dt { font-size: var(--fs-xs); font-weight: 650; color: var(--ink-3); padding-top: 1px; }
@@ -291,8 +303,13 @@
         </div>
       </section>
 
+      <section class="section" id="vitality" aria-labelledby="h-vitality">
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">05</span> · 活力</span><h2 id="h-vitality">活力与掉队</h2><p>综合近期产出、持续度、历史贡献与最近动作，找出不再贡献的人</p></div></div>
+        <div class="card card-pad" id="vitCard"></div>
+      </section>
+
       <section class="section" id="mteam" aria-labelledby="h-mteam">
-        <div class="sec-h"><div><span class="eyebrow"><span class="i">05</span> · 对照</span><h2 id="h-mteam">M-Team 规则对照</h2><p>左边是 M-Team 的规则，右边是这里的对应做法；悬停查看映射理由</p></div></div>
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">06</span> · 对照</span><h2 id="h-mteam">M-Team 规则对照</h2><p>左边是 M-Team 的规则，右边是这里的对应做法；悬停查看映射理由</p></div></div>
         <div class="card card-pad">
           <div class="map" id="mapping"></div>
           <p class="footnote src" id="mapSrc"></p>
@@ -300,12 +317,12 @@
       </section>
 
       <section class="section" id="terms" aria-labelledby="h-terms">
-        <div class="sec-h"><div><span class="eyebrow"><span class="i">06</span> · 名词</span><h2 id="h-terms">名词解释</h2><p>排行、档案和人物卡上的标签都按这里的定义</p></div></div>
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">07</span> · 名词</span><h2 id="h-terms">名词解释</h2><p>排行、档案和人物卡上的标签都按这里的定义</p></div></div>
         <div class="card card-pad"><dl class="terms" id="termsDl"></dl></div>
       </section>
 
       <section class="section" id="detail" aria-labelledby="h-detail">
-        <div class="sec-h"><div><span class="eyebrow"><span class="i">07</span> · 明细</span><h2 id="h-detail">完整明细表</h2><p>所有贡献者的全部计分字段；点表头排序，点账号进档案</p></div></div>
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">08</span> · 明细</span><h2 id="h-detail">完整明细表</h2><p>所有贡献者的全部计分字段；点表头排序，点账号进档案</p></div></div>
         <div class="card">
           <button type="button" class="dt-toggle" id="dtToggle" aria-expanded="false" aria-controls="dtBody">
             <span class="card-icon" data-ic="list" data-ic-size="15"></span>
@@ -322,7 +339,7 @@
       </section>
 
       <section class="section" id="blind" aria-labelledby="h-blind">
-        <div class="sec-h"><div><span class="eyebrow"><span class="i">08</span> · 口径</span><h2 id="h-blind">口径与盲区</h2><p>这些数字能说明什么、不能说明什么</p></div></div>
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">09</span> · 口径</span><h2 id="h-blind">口径与盲区</h2><p>这些数字能说明什么、不能说明什么</p></div></div>
         <div class="card card-pad"><ul class="blind" id="blindList"></ul></div>
       </section>
     </div>
@@ -360,8 +377,60 @@
       outsider: { name: '组织外', tag: 'tag tag-out', text: '数据更新时不在 nwverse 组织成员名单里的账号，例如从 fork 提 PR 的外部贡献者、已退出的人。贡献照常计分。' },
       anomaly: { name: '新手异常', tag: 'tag tag-warn', icon: 'zap', text: `孵化期内开了 ${a.opened} 个以上 PR，合入的不到 ${pct(a.rate)}。最近 ${a.graceHours} 小时内开的 PR 不计。` },
       dormant: { name: '冬眠', tag: 'tag tag-sleep', icon: 'moon-z', text: `超过 ${R.dormantDays} 天没有任何动作。只做标记；${R.levels[R.dormantExemptLevel].name}及以上不标记。` },
-      laggard: { name: '掉队', tag: 'tag tag-warn', icon: 'trending-down', text: `首次贡献已满 ${R.newbie.days} 天，且最近 ${R.laggard.weeks} 周（含本周）魔力合计低于 ${R.laggard.minMagic}，约等于平均每周不到 1 个合入 PR 或 1 次协作。名单用于定期清理不再贡献的人；只做提醒，不影响魔力与形态。` },
+      laggard: { name: '掉队', tag: 'tag tag-warn', icon: 'trending-down', text: `活力低于 ${R.vitality.laggard}。活力综合近期产出、持续度、历史信用与最近动作，见「活力与掉队」。名单用于定期清理不再贡献的人；只做提醒，不影响魔力与形态。` },
+      watch: { name: '观察', tag: 'tag tag-watch', icon: 'eye', text: `活力在 ${R.vitality.laggard} 到 ${R.vitality.watch} 之间：贡献在变少，还没到掉队。本周有一次合入或协作，通常就能回升。` },
     };
+  })();
+
+  // ───────── 活力与掉队（RULES.vitality）─────────
+  (() => {
+    const V = R.vitality, w = V.weights, pc = (x) => Math.round(x * 100);
+    const KEYS = Object.fromEntries(K.VIT_PARTS.map((x) => [x.key, x]));
+    const key = (k) => `<span class="key" style="--k:${KEYS[k].color}">${KEYS[k].label}</span>`;
+    // 典型情形：用同一个打分函数现算，规则改了这里跟着变
+    const rep = (x, n) => Array(n).fill(x);
+    const CASES = [
+      ['稳定贡献者', `每周约 ${V.pace} 魔力，连续 12 周`, { weekly: rep(V.pace, 12), tenure: 12, bonus: V.pace * 12, days: 0 }],
+      ['少量但每周都来', '每周约 1 魔力，连续 12 周', { weekly: rep(1, 12), tenure: 12, bonus: 12, days: 1 }],
+      ['每月冒一次泡', '每 4 周拿 2 魔力', { weekly: [0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0], tenure: 12, bonus: 6, days: 14 }],
+      ['老成员停更 6 周', '累计 60，之后 6 周没有任何动作', { weekly: [0, 0, 0, 0, 0, 0, 12, 12, 12, 12, 12, 0], tenure: 11, bonus: 60, days: 42 }],
+      ['老成员停更 10 周', '累计 60，之后 10 周没有任何动作', { weekly: [...rep(0, 10), 12, 12, 12, 12, 12], tenure: 15, bonus: 60, days: 70 }],
+      ['头部停更 6 周', '累计 174，之后 6 周没有任何动作', { weekly: [...rep(0, 6), ...rep(20, 6)], tenure: 12, bonus: 174, days: 42 }],
+      ['小额贡献后停更', '累计 8，之后 6 周没有任何动作', { weekly: [0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0], tenure: 12, bonus: 8, days: 42 }],
+      ['只开 PR、没有合入', '累计 14，6 周没有魔力，昨天还开了 PR', { weekly: [0, 0, 0, 0, 0, 0, 4, 4, 3, 3], tenure: 10, bonus: 14, days: 1 }],
+    ];
+    const cases = CASES.map(([name, desc, x]) => ({ name, desc, r: NW.vitalityScore(x) }));
+    const evald = NW.people.filter((p) => p.vit);
+    const cnt = (st) => evald.filter((p) => p.vit.status === st).length;
+    const tagOf = (st) => { const t = K.VIT_STATUS[st]; return `<span class="tag ${t.cls}">${K.icon(t.icon, 11)}${t.label}</span>`; };
+    $('#vitCard').innerHTML = `
+      <div class="fx-main" role="img" aria-label="活力等于 ${pc(w.recent)} 乘近期产出，加 ${pc(w.steady)} 乘持续度，加 ${pc(w.history)} 乘历史信用，加 ${pc(w.action)} 乘最近动作">
+        <span class="lhs">活力</span><span>=</span>
+        <span class="tm">${pc(w.recent)} × 近期产出</span><span>+</span>
+        <span class="tm">${pc(w.steady)} × 持续度</span><span>+</span>
+        <span class="tm">${pc(w.history)} × 历史信用</span><span>+</span>
+        <span class="tm">${pc(w.action)} × 最近动作</span>
+      </div>
+      <dl class="fdefs">
+        <dt>${key('recent')}</dt>
+        <dd>min(1, 最近 ${V.weeks} 周加权周均魔力 ÷ <span class="k">${V.pace}</span>)<span class="fn">越近的周权重越高，每往前 ${V.halfLife} 周减半；周均 ${V.pace} 魔力约是组织的中位水平，达到即满分</span></dd>
+        <dt>${key('steady')}</dt>
+        <dd>最近 ${V.weeks} 周里有魔力的周数 ÷ ${V.weeks}<span class="fn">在组不满 ${V.weeks} 周按实际周数算；每周都来比集中冲一周得分高</span></dd>
+        <dt>${key('history')}</dt>
+        <dd>min(1, ln(1 + 累计魔力) ÷ ln(${1 + V.historyRef})) × 0.5<sup>连续无魔力周数 ÷ ${V.creditHalfLife}</sup><span class="fn">累计魔力越多信用越高（${R.levels.find((l) => l.bonus === V.historyRef)?.name || V.historyRef} 起满分）；停更后每 ${V.creditHalfLife} 周减半：老成员有宽限，但不会永久豁免</span></dd>
+        <dt>${key('action')}</dt>
+        <dd>max(0, 1 − 距上次任何动作的天数 ÷ ${R.dormantDays})<span class="fn">任何动作都算，包括开 PR、review、评论；${R.dormantDays} 天没有动作（冬眠）时为 0</span></dd>
+      </dl>
+      <div class="vt-th">${tagOf('laggard')}<span>活力 &lt; ${V.laggard}</span>${tagOf('watch')}<span>${V.laggard} ≤ 活力 &lt; ${V.watch}</span>${tagOf('ok')}<span>活力 ≥ ${V.watch}</span><span class="muted">首次贡献未满 ${R.newbie.days} 天不评；只做提醒，不影响魔力与形态</span></div>
+      <table class="vt-cases">
+        <caption>典型情形（按上面的公式现算）</caption>
+        <thead><tr><th scope="col">情形</th><th scope="col" class="bar">构成</th><th scope="col" style="text-align:right">活力</th><th scope="col">结果</th></tr></thead>
+        <tbody>${cases.map((c) => `<tr><td>${esc(c.name)}<span class="d">${esc(c.desc)}</span></td><td class="bar">${K.vitBar(c.r)}</td><td class="n">${K.vitNum(c.r.v)}</td><td>${tagOf(c.r.status)}</td></tr>`).join('')}</tbody>
+      </table>
+      <div class="vt-now"><span>此刻 ${evald.length} 人参与评估：</span>
+        <a class="link" href="ranking.html?flag=lag" data-screen="c2">掉队 ${cnt('laggard')} 人${K.icon('arrow-right', 13)}</a>
+        <a class="link" href="ranking.html?flag=watch" data-screen="c2">观察 ${cnt('watch')} 人${K.icon('arrow-right', 13)}</a>
+        <span>正常 ${cnt('ok')} 人</span></div>`;
   })();
 
   // ───────── 导语 ─────────
@@ -646,7 +715,7 @@
       ['等级与降级线', '奶蛙进化（只看魔力）', 'M-Team 升级同时看注册时间、上传量和分享率；这里只看魔力，不设降级线，合入率只用于警告。'],
       ['分享率警告期', '合入率警告线', '已收尾 PR 越多，合入率要求越高。'],
       ['40 天不登录删号', `${R.dormantDays} 天无动作 → 冬眠`, `只标记不处理；${R.levels[R.dormantExemptLevel].name}及以上豁免。`],
-      ['考核不达标清退', `近 ${R.laggard.weeks} 周魔力 < ${R.laggard.minMagic} → 掉队`, '看板只给出名单，是否移除由组织决定；任何形态都会进入名单，不设豁免。'],
+      ['考核不达标清退', `活力 < ${R.vitality.laggard} → 掉队`, '活力综合近期产出、持续度、历史信用与最近动作；老成员靠历史信用获得宽限，停更越久信用越低。看板只给出名单，是否移除由组织决定。'],
       ['魔力兑换、连坐', '不映射', '兑换需要保存余额，违背无状态；组织没有邀请树。', true],
     ];
     $('#mapping').setAttribute('role', 'list');
@@ -740,7 +809,7 @@
     '直接推送到默认分支的 commit 不计入；仓库要求「所有改动走 PR」之前的贡献会被低估。',
     'AI 生成的 PR 记在开 PR 的账号名下，账号持有人对内容负责。',
     `每个 PR 和 issue 只读取前 ${LIM.nested} 条 review 和前 ${LIM.nested} 条评论。`,
-    `掉队只看魔力：只开 PR 未合入、线下讨论、组织外的工作都不计；本周还没结束时，窗口里的本周只算到数据更新时刻。`,
+    `活力里的产出只看魔力；只开 PR 未合入只体现在「最近动作」。线下讨论、组织外的工作都不计。本周还没结束时，本周只算到数据更新时刻。从未贡献的组织成员不在任何名单里，只以人数出现在首页。`,
     `「首次贡献」代替入组时间；第一次贡献很早、之后长期不活跃的人，新手考核会按那次贡献起算，之后要靠魔力达到 ${R.levels[1].bonus} 孵化。`,
   ].map((t) => `<li>${esc(t)}</li>`).join('');
 

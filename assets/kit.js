@@ -292,6 +292,45 @@
     ];
   }
   const comp = (p, { scale = 1, h = 8 } = {}) => stackedBar(compParts(p), { scale, h, label: '魔力构成', total: p.bonus });
+  // ───────── 活力（RULES.vitality，由 derive.js 算好放在 p.vit）─────────
+  const VIT_PARTS = [
+    { key: 'recent', label: '近期产出', color: 'var(--series-pr)' },
+    { key: 'steady', label: '持续度', color: 'var(--series-collab)' },
+    { key: 'history', label: '历史信用', color: 'var(--violet)' },
+    { key: 'action', label: '最近动作', color: 'var(--series-model)' },
+  ];
+  const VIT_STATUS = {
+    laggard: { label: '掉队', cls: 'tag-warn', icon: 'trending-down', next: '观察' },
+    watch: { label: '观察', cls: 'tag-watch', icon: 'eye', next: '正常' },
+    ok: { label: '正常', cls: 'tag-leaf', icon: 'check', next: null },
+  };
+  const vitNum = (v) => (Math.round(v * 10) / 10).toFixed(1);
+  // 回到上一档要做什么：拿到任意魔力本身也是一次动作，所以掉队的人常常一次合入或协作就能回到观察
+  function vitNeed(vit) {
+    if (!vit || vit.need === null) return '';
+    const next = VIT_STATUS[vit.status].next;
+    return vit.need <= 1 ? `本周有 1 次合入或协作就能回到「${next}」` : `本周再拿 ${mag(vit.need)} 魔力能回到「${next}」`;
+  }
+  function vitTip(p) {
+    const v = p.vit;
+    if (!v) return `首次贡献未满 ${NW.RULES.newbie.days} 天，不评活力`;
+    const parts = VIT_PARTS.map((x) => `${x.label} ${vitNum(v.parts[x.key])}`).join(' + ');
+    const need = vitNeed(v);
+    return `活力 ${vitNum(v.v)}（${VIT_STATUS[v.status].label}）= ${parts}${need ? `。${need}` : ''}`;
+  }
+  // 活力条：整条 = 100 分，四段按得分着色，掉队线与观察线两条刻度
+  function vitBar(vit, { h = 6 } = {}) {
+    const V = NW.RULES.vitality;
+    if (!vit) return '';
+    const bar = stackedBar(VIT_PARTS.map((x) => ({ label: x.label, value: vit.parts[x.key], color: x.color })), { h, scale: clamp(vit.v / 100, 0, 1), label: '活力', total: vit.v, f: vitNum });
+    return `<div class="vbar" style="--h:${h}px">${bar}<i class="vmark" style="left:${V.laggard}%" aria-hidden="true"></i><i class="vmark" style="left:${V.watch}%" aria-hidden="true"></i></div>`;
+  }
+  const vitTag = (p, { score = true } = {}) => {
+    if (!p.vit) return '';
+    const s = VIT_STATUS[p.vit.status];
+    return `<span class="tag ${s.cls}" data-tip="${esc(vitTip(p))}">${icon(s.icon, 11)}${s.label}${score ? ` ${vitNum(p.vit.v)}` : ''}</span>`;
+  };
+
   // 名次哑铃：上周 ○ —— ● 本周；#n 在左、#1 在右（向右 = 上升）
   function dotRange(prev, cur, { n = NW ? NW.people.length : 100, ends = true } = {}) {
     const x = (r) => ((n - r) / Math.max(1, n - 1)) * 100;
@@ -1415,6 +1454,8 @@
     avatar, who, pname, people, delta, change,
     sparkline, ring, countdown, stackedBar, compParts, comp, dotRange, empty, skeletonRows,
     pond, pondData, evoAxis, kpi, themeToggleHTML,
+    // 活力
+    VIT_PARTS, VIT_STATUS, vitNum, vitNeed, vitTip, vitBar, vitTag,
     // 周
     week, weekLabel,
     // 行为助手

@@ -64,9 +64,23 @@ const RULES = {
   dormantDays: 40,
   // 达到该等级下标及以上免于冬眠标记
   dormantExemptLevel: 2,
-  // 掉队：首次贡献已满新手考核期（newbie.days 天），且最近 weeks 周（含进行中的本周）魔力合计低于 minMagic。
-  // minMagic 4 约等于平均每周不到 1 个合入 PR 或 1 次协作。只用于页面展示，不影响魔力与形态。
-  laggard: { weeks: 4, minMagic: 4 },
+  // 活力：综合近期产出、持续度、历史贡献与最近动作，0–100 分，用于找出不再贡献的人。只用于页面展示，不影响魔力与形态。
+  // 活力 = 100 ×（recent × 近期产出 + steady × 持续度 + history × 历史信用 + action × 最近动作），四项各 0–1：
+  //   近期产出 = min(1, 最近 weeks 周按周衰减（每 halfLife 周减半）的加权周均魔力 ÷ pace)
+  //   持续度   = 最近 weeks 周里有魔力的周数占比（在组不满 weeks 周按实际周数）
+  //   历史信用 = min(1, ln(1 + 累计魔力) ÷ ln(1 + historyRef)) × 0.5 ^ (连续无魔力周数 ÷ creditHalfLife)
+  //   最近动作 = max(0, 1 − 距上次任何动作的天数 ÷ dormantDays)
+  // 首次贡献未满 newbie.days 天的人不评。活力低于 laggard 记为掉队，低于 watch 记为观察。
+  vitality: {
+    weeks: 8,
+    halfLife: 2,
+    pace: 4,
+    historyRef: 150,
+    creditHalfLife: 10,
+    weights: { recent: 0.35, steady: 0.25, history: 0.25, action: 0.15 },
+    laggard: 20,
+    watch: 40,
+  },
   // 不计为有效 issue 的关闭原因
   invalidIssueReasons: ['NOT_PLANNED', 'DUPLICATE'],
   // GitHub 类型为 User、但实际是自动化的账号

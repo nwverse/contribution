@@ -692,6 +692,11 @@ kbd, .kbd {
 .tag-leaf { color: var(--leaf-ink); background: var(--leaf-soft); box-shadow: none; }
 .tag-warn { color: var(--rust); background: var(--rust-soft); box-shadow: none; }
 .tag-sleep { color: var(--ink-3); }
+.tag-watch { color: var(--amber); background: color-mix(in srgb, var(--amber) 12%, transparent); box-shadow: none; }
+/* 活力条：底轨 = 100 分，刻度线标出掉队线与观察线 */
+.vbar { position: relative; height: var(--h, 6px); border-radius: calc(var(--h, 6px) / 2); background: var(--bg-sunken); }
+.vbar .sbar { height: 100%; }
+.vbar .vmark { position: absolute; top: -2px; bottom: -2px; width: 1.5px; margin-left: -0.75px; border-radius: 1px; background: var(--ink-4); opacity: 0.7; pointer-events: none; }
 .tag-ghost { color: var(--ink-3); background: transparent; box-shadow: none; border: 1px dashed var(--line-strong); }
 
 /* 形态徽章：小蛙 + 名称 */

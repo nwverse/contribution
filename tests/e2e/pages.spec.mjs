@@ -104,28 +104,55 @@ test('档案页不带 #u= 时打开总榜第一名', async ({ page }) => {
   await expect(page.locator('.drawer.on #pfBody')).toContainText(BOARD.people[0].login);
 });
 
-// 掉队：按规则独立重算一遍，与页面对照
-function laggards() {
-  const { weeks: n, minMagic } = RULES.laggard;
-  const W = BOARD.weeks.map((w) => w.start);
-  const end = Math.min(BOARD.now, W[LAST] + 7 * 86400000);
-  return P.filter((p) => end - p.firstAt >= RULES.newbie.days * 86400000)
-    .filter((p) => W.slice(LAST - n + 1).reduce((s, w) => s + weekValue(p, w), 0) < minMagic);
+// 活力：按 RULES.vitality 在测试里独立重算一遍，与页面对照
+const DAY = 86400000, WEEK = 7 * DAY;
+function vitality(p) {
+  const V = RULES.vitality, w = V.weights;
+  if (BOARD.now - p.firstAt < RULES.newbie.days * DAY) return null;
+  const weekly = BOARD.weeks.map((_, k) => weekValue(p, BOARD.weeks[LAST - k].start));
+  const n = Math.max(1, Math.min(V.weeks, Math.ceil((BOARD.now - p.firstAt) / WEEK)));
+  let sum = 0, norm = 0, active = 0;
+  for (let k = 0; k < n; k++) { const wt = 2 ** (-k / V.halfLife); sum += weekly[k] * wt; norm += wt; if (weekly[k] > 0) active++; }
+  const quiet = weekly.findIndex((m) => m > 0);
+  const days = Math.floor((BOARD.now - p.lastAt) / DAY);
+  const v = 100 * (w.recent * Math.min(1, sum / (V.pace * norm))
+    + w.steady * active / n
+    + w.history * Math.min(1, Math.log1p(p.bonus) / Math.log1p(V.historyRef)) * 2 ** (-(quiet < 0 ? Infinity : quiet) / V.creditHalfLife)
+    + w.action * Math.max(0, 1 - days / RULES.dormantDays));
+  return { v, status: v < V.laggard ? 'laggard' : v < V.watch ? 'watch' : 'ok' };
 }
+const VIT = P.map((p) => ({ p, r: vitality(p) })).filter((x) => x.r);
+const lagN = VIT.filter((x) => x.r.status === 'laggard').length;
+const watchN = VIT.filter((x) => x.r.status === 'watch').length;
 
-test('首页掉队预警人数与规则一致，查看全部带筛选进入排行榜', async ({ page }) => {
-  const expected = laggards();
+test('首页活力预警：人数与独立重算一致，掉队在前，链接带筛选进入排行榜', async ({ page }) => {
   await open(page, '/index.html');
   const evo = page.locator('#evo');
-  await expect(evo).toContainText(`掉队预警 ${expected.length}`);
-  await expect(evo.locator('.upc.lag')).toHaveCount(Math.min(5, expected.length));
-  for (const row of await evo.locator('.upc.lag').all()) {
-    expect(expected.map((p) => p.login)).toContain(await row.getAttribute('data-login'));
-  }
-  if (expected.length > 5) {
-    await evo.locator('.lag-more').click();
+  await expect(evo).toContainText(`活力预警 ${lagN + watchN}`);
+  await expect(evo).toContainText(`掉队 ${lagN} · 观察 ${watchN}`);
+  const rows = evo.locator('.upc.lag');
+  await expect(rows).toHaveCount(Math.min(6, lagN + watchN));
+  const lowest = VIT.filter((x) => x.r.status === 'laggard').sort((a, b) => a.r.v - b.r.v)[0];
+  if (lowest) await expect(rows.first()).toHaveAttribute('data-login', lowest.p.login);
+  const never = BOARD.summary.members - BOARD.summary.memberContributors;
+  if (never > 0) await expect(evo.locator('.never')).toContainText(String(never));
+  if (lagN) {
+    await evo.locator('.lag-links a', { hasText: '掉队' }).click();
     await expect(page).toHaveURL(/ranking\.html\?flag=lag/);
     await expect(page.locator('.chip[data-v="lag"]')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('#lbCard [data-key]')).toHaveCount(expected.length);
+    await expect(page.locator('#lbCard [data-key]')).toHaveCount(lagN);
   }
+});
+
+test('排行榜观察筛选人数与独立重算一致', async ({ page }) => {
+  await open(page, '/ranking.html?flag=watch');
+  await expect(page.locator('#lbCard [data-key]')).toHaveCount(watchN);
+});
+
+test('档案页显示活力分与四项构成', async ({ page }) => {
+  const x = VIT.sort((a, b) => a.r.v - b.r.v)[0];
+  await open(page, `/profile.html#u=${x.p.login}`);
+  const sec = page.locator('.drawer.on section[aria-label="活力"]');
+  await expect(sec.locator('.vit-score')).toHaveText((Math.round(x.r.v * 10) / 10).toFixed(1));
+  await expect(sec.locator('.vit-row')).toHaveCount(4);
 });
