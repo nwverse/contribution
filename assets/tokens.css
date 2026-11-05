@@ -68,7 +68,7 @@
   --rust: #ad3f19;           /* 下降、到期、警告线 */
   --rust-soft: #f8e2d6;
   --amber: #bf7d0f;          /* 图表系列 2：模型加成 */
-  --amber-ink: #8a5700;      /* 琥珀色文字：在 12% 琥珀底上 ≥ 4.5:1 */
+  --amber-ink: #805100;      /* 琥珀色文字：在各级底色及其 12% 琥珀底上 ≥ 4.5:1 */
   --violet: #7a63d8;         /* 宇宙星环，仅装饰 */
   --focus: #2a8a57;
 
@@ -161,7 +161,7 @@
   --rust: #f08a6a;
   --rust-soft: rgba(240, 138, 106, 0.14);
   --amber: #c9841f;
-  --amber-ink: #c9841f;
+  --amber-ink: #e0a656;      /* 同上，深色各级底色 */
   --violet: #a594f2;
   --focus: #74d3a0;
 
@@ -1343,7 +1343,7 @@ kbd, .kbd {
 .pc-txt { min-width: 0; }
 .pc-txt b { display: block; font-size: 17px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pc-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 5px; font-size: var(--fs-xs); color: var(--ink-3); }
-.pc-swap { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-size: var(--fs-xs); color: var(--amber); }
+.pc-swap { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-size: var(--fs-xs); color: var(--amber-ink); }
 .pc-act { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 .pk-confirm .footnote { margin-top: 12px; }
 .cmdk-empty b { display: block; color: var(--ink); font-weight: 650; }
