@@ -65,3 +65,45 @@ test.describe('柱图', () => {
     await expect(live).toHaveText('');
   });
 });
+
+test.describe('孵化台', () => {
+  test('清空筛选后焦点回到筛选框，取消单项后焦点回到对应 chip', async ({ page }) => {
+    // 让考核中的蛙卵全是组织成员，勾「组织外」必然落到空状态，且只取消「组织外」就有结果
+    const board = structuredClone(BOARD);
+    for (const p of board.people) if (p.newbie.status === 'pending' && p.level === null) p.member = true;
+    await page.route('**/data/board.json', (route) => route.fulfill({ json: board }));
+    await open(page, '/hatchery.html');
+    const chips = page.locator('#chips .chip');
+    const focusedId = () => page.evaluate(() => document.activeElement.id || document.activeElement.tagName);
+
+    // 结果栏里的「清空筛选」
+    await chips.first().click();
+    await expect(chips.first()).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('#res [data-clear]').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#res')).toBeHidden();
+    for (const c of await chips.all()) await expect(c).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('#q')).toBeFocused();
+    expect(await focusedId()).toBe('q');
+
+    // 空状态里的「取消「组织外」」
+    const out = page.locator('#chips .chip[data-k="out"]');
+    await out.click();
+    const drop = page.locator('#board [data-drop="out"]');
+    await expect(drop).toBeVisible();
+    await drop.focus();
+    await page.keyboard.press('Enter');
+    await expect(drop).toHaveCount(0);
+    await expect(out).toHaveAttribute('aria-pressed', 'false');
+    await expect(out).toBeFocused();
+    await expect(page.locator('#board article.egg').first()).toBeVisible();
+
+    // 空状态里的「清空筛选」
+    await out.click();
+    await page.locator('#board [data-clear]').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#board [data-clear]')).toHaveCount(0);
+    for (const c of await chips.all()) await expect(c).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('#q')).toBeFocused();
+  });
+});

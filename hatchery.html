@@ -655,16 +655,23 @@
     };
     if (anim) K.flip(host, mutate, { selector: '.egg[data-key]' }); else mutate();
   }
+  // 清空、取消按钮会随重绘消失，焦点挪到稳定的位置：清空后回到刚清空的筛选框，取消某项后回到对应 chip
+  const focusQ = () => $('#q').focus({ preventScroll: true });
   $('#board').addEventListener('click', (e) => {
     if (e.target.closest('[data-more]')) { expanded = true; renderBoard(); return; }
-    if (e.target.closest('[data-clear]')) { clearFilters(); return; }
+    if (e.target.closest('[data-clear]')) { clearFilters(); focusQ(); return; }
     const dr = e.target.closest('[data-drop]');
-    if (dr) { state[dr.dataset.drop] = false; $(`#chips .chip[data-k="${dr.dataset.drop}"]`).setAttribute('aria-pressed', 'false'); renderBoard(); return; }
+    if (dr) {
+      const chip = $(`#chips .chip[data-k="${dr.dataset.drop}"]`);
+      state[dr.dataset.drop] = false; chip.setAttribute('aria-pressed', 'false'); renderBoard();
+      chip.focus({ preventScroll: true });
+      return;
+    }
     const c = e.target.closest('.egg');
     if (c && !e.target.closest('[data-person],[data-tip],a,button')) K.openPerson(c.dataset.key);
   });
   matchMedia('(max-width: 720px)').addEventListener('change', () => renderBoard(false));
-  $('#res').addEventListener('click', (e) => { if (e.target.closest('[data-clear]')) clearFilters(); });
+  $('#res').addEventListener('click', (e) => { if (e.target.closest('[data-clear]')) { clearFilters(); focusQ(); } });
 
   // ───────── 批次孵化率 ─────────
   const CO = NW.W.map((w, i) => {
