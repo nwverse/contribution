@@ -68,6 +68,7 @@
   --rust: #ad3f19;           /* 下降、到期、警告线 */
   --rust-soft: #f8e2d6;
   --amber: #bf7d0f;          /* 图表系列 2：模型加成 */
+  --amber-ink: #805100;      /* 琥珀色文字：在各级底色及其 12% 琥珀底上 ≥ 4.5:1 */
   --violet: #7a63d8;         /* 宇宙星环，仅装饰 */
   --focus: #2a8a57;
 
@@ -160,6 +161,7 @@
   --rust: #f08a6a;
   --rust-soft: rgba(240, 138, 106, 0.14);
   --amber: #c9841f;
+  --amber-ink: #e0a656;      /* 同上，深色各级底色 */
   --violet: #a594f2;
   --focus: #74d3a0;
 
@@ -649,7 +651,7 @@ kbd, .kbd {
 .chip .n { color: var(--ink-3); font-weight: 550; font-variant-numeric: tabular-nums; }
 .chip .chk { width: 0; opacity: 0; margin-right: -6px; overflow: hidden; transition: width var(--dur-4) var(--ease-spring), opacity var(--dur-2), margin var(--dur-4) var(--ease-spring); }
 .chip[aria-pressed="true"] { background: var(--leaf-soft); border-color: color-mix(in srgb, var(--leaf) 40%, transparent); color: var(--leaf-ink); }
-.chip[aria-pressed="true"] .n { color: var(--leaf-ink); opacity: 0.75; }
+.chip[aria-pressed="true"] .n { color: var(--leaf-ink); }
 .chip[aria-pressed="true"] .chk { width: 13px; opacity: 1; margin-right: 0; }
 .chip .frog { margin-left: -3px; }
 .chip-sep { width: 1px; height: 16px; align-self: center; margin: 0 4px; background: var(--line); }
@@ -694,7 +696,7 @@ kbd, .kbd {
 .tag-leaf { color: var(--leaf-ink); background: var(--leaf-soft); box-shadow: none; }
 .tag-warn { color: var(--rust); background: var(--rust-soft); box-shadow: none; }
 .tag-sleep { color: var(--ink-3); }
-.tag-watch { color: var(--amber); background: color-mix(in srgb, var(--amber) 12%, transparent); box-shadow: none; }
+.tag-watch { color: var(--amber-ink); background: color-mix(in srgb, var(--amber) 12%, transparent); box-shadow: none; }
 /* 活力条：底轨 = 100 分，刻度线标出掉队线与观察线 */
 .vbar { position: relative; height: var(--h, 6px); border-radius: calc(var(--h, 6px) / 2); background: var(--bg-sunken); }
 .vbar .sbar { height: 100%; }
@@ -712,8 +714,7 @@ kbd, .kbd {
 .delta svg { width: 7px; height: 7px; fill: currentColor; flex: none; }
 .delta.up { color: var(--leaf-ink); }
 .delta.down { color: var(--rust); }
-.delta.flat { color: var(--ink-4); font-weight: 500; }
-:root[data-theme="dark"] .delta.flat { color: var(--ink-3); }
+.delta.flat { color: var(--ink-3); font-weight: 500; }
 .delta.new { height: 18px; padding: 0 6px; border-radius: var(--r-pill); background: var(--yolk); color: #4d3400; font-size: var(--fs-2xs); }
 :root[data-theme="dark"] .delta.new { color: #2a1d00; }
 .delta.enter { height: 18px; padding: 0 6px; border-radius: var(--r-pill); color: var(--ink-2); font-size: var(--fs-2xs); box-shadow: inset 0 0 0 1px var(--line-strong); }
@@ -898,7 +899,7 @@ kbd, .kbd {
 .lrow .r { text-align: right; justify-self: end; }
 .rank { width: 28px; text-align: right; font-size: 15px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
 .rank.top { color: var(--yolk-ink); }
-.rank.none { color: var(--ink-4); font-weight: 500; }
+.rank.none { color: var(--ink-3); font-weight: 500; }
 .val { font-weight: 680; font-variant-numeric: tabular-nums; color: var(--ink); }
 .list-compact .lrow { --row-h: 40px; padding: 4px var(--s-4); }
 
@@ -1342,7 +1343,7 @@ kbd, .kbd {
 .pc-txt { min-width: 0; }
 .pc-txt b { display: block; font-size: 17px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pc-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 5px; font-size: var(--fs-xs); color: var(--ink-3); }
-.pc-swap { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-size: var(--fs-xs); color: var(--amber); }
+.pc-swap { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-size: var(--fs-xs); color: var(--amber-ink); }
 .pc-act { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 .pk-confirm .footnote { margin-top: 12px; }
 .cmdk-empty b { display: block; color: var(--ink); font-weight: 650; }

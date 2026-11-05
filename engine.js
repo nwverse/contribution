@@ -17,22 +17,23 @@ const RULES = {
   },
   // 按 commit 作者与共同作者（Co-Authored-By）的名字识别模型，PR 分乘以 weight。
   // 系数按组织偏好整体定档，不区分版本：Claude 强于 GPT；DeepSeek 胜在速度、Gemini 胜在成本，系数低于前两家。
+  // 没有署名的 PR 绝大多数也由 agent 编写，署名与否主要取决于工具配置，所以各档与「无 AI 标注」只拉开小幅差距。
   // 同一个署名按列表顺序取第一个匹配，所以扣分工具与更具体的代号排在前面。
   // 一个 PR 出现多个模型时取系数最高的；出现系数低于 1 的扣分工具时按扣分计。
   models: [
-    { key: 'trae', family: '其他', short: 'TRAE CLI', label: 'TRAE CLI', weight: 0.9, pattern: /\btrae\b/i },
-    { key: 'opus', family: 'Claude', short: 'Opus', label: 'Claude Opus', weight: 1.3, pattern: /\bopus\b/i },
-    { key: 'fable', family: 'Claude', short: 'Fable', label: 'Claude Fable', weight: 1.25, pattern: /\bfable\b/i },
-    { key: 'sonnet', family: 'Claude', short: 'Sonnet', label: 'Claude Sonnet', weight: 1.2, pattern: /\bsonnet\b/i },
-    { key: 'haiku', family: 'Claude', short: 'Haiku', label: 'Claude Haiku', weight: 1.1, pattern: /\bhaiku\b/i },
-    { key: 'claude', family: 'Claude', short: '未注明型号', label: 'Claude 未注明型号', weight: 1.1, pattern: /\bclaude\b/i },
-    { key: 'gptTop', family: 'GPT', short: 'Astra、Pro', label: 'GPT Astra / Pro', weight: 1.2, pattern: /\bgpt\b[\w. -]*?\b(astra|pro)\b/i },
-    { key: 'gptSol', family: 'GPT', short: 'Sol', label: 'GPT Sol', weight: 1.15, pattern: /\bgpt\b[\w. -]*?\bsol\b/i },
-    { key: 'gpt', family: 'GPT', short: 'Terra、Luna、mini 等，Codex 默认署名', label: 'GPT 其他', weight: 1.05, pattern: /\b(gpt|codex|openai|chatgpt)\b/i },
-    { key: 'geminiPro', family: 'Gemini', short: 'Carbon、Argon、Pro', label: 'Gemini Carbon / Argon', weight: 1.1, pattern: /\bgemini\b[\w. -]*?\b(carbon|argon|ultra|pro)\b/i },
-    { key: 'gemini', family: 'Gemini', short: 'Flash 等', label: 'Gemini 其他', weight: 1.05, pattern: /\bgemini\b/i },
-    { key: 'deepseekPro', family: 'DeepSeek', short: 'Pro、Reasoner', label: 'DeepSeek Pro', weight: 1.1, pattern: /\bdeepseek\b[\w. -]*?\b(pro|reasoner|r\d)\b/i },
-    { key: 'deepseek', family: 'DeepSeek', short: 'Flash 等', label: 'DeepSeek 其他', weight: 1.05, pattern: /\bdeepseek\b/i },
+    { key: 'trae', family: '其他', short: 'TRAE CLI', label: 'TRAE CLI', weight: 0.94, pattern: /\btrae\b/i },
+    { key: 'opus', family: 'Claude', short: 'Opus', label: 'Claude Opus', weight: 1.18, pattern: /\bopus\b/i },
+    { key: 'fable', family: 'Claude', short: 'Fable', label: 'Claude Fable', weight: 1.15, pattern: /\bfable\b/i },
+    { key: 'sonnet', family: 'Claude', short: 'Sonnet', label: 'Claude Sonnet', weight: 1.12, pattern: /\bsonnet\b/i },
+    { key: 'haiku', family: 'Claude', short: 'Haiku', label: 'Claude Haiku', weight: 1.06, pattern: /\bhaiku\b/i },
+    { key: 'claude', family: 'Claude', short: '未注明型号', label: 'Claude 未注明型号', weight: 1.06, pattern: /\bclaude\b/i },
+    { key: 'gptTop', family: 'GPT', short: 'Astra、Pro', label: 'GPT Astra / Pro', weight: 1.12, pattern: /\bgpt\b[\w. -]*?\b(astra|pro)\b/i },
+    { key: 'gptSol', family: 'GPT', short: 'Sol', label: 'GPT Sol', weight: 1.09, pattern: /\bgpt\b[\w. -]*?\bsol\b/i },
+    { key: 'gpt', family: 'GPT', short: 'Terra、Luna、mini 等，Codex 默认署名', label: 'GPT 其他', weight: 1.03, pattern: /\b(gpt|codex|openai|chatgpt)\b/i },
+    { key: 'geminiPro', family: 'Gemini', short: 'Carbon、Argon、Pro', label: 'Gemini Carbon / Argon', weight: 1.06, pattern: /\bgemini\b[\w. -]*?\b(carbon|argon|ultra|pro)\b/i },
+    { key: 'gemini', family: 'Gemini', short: 'Flash 等', label: 'Gemini 其他', weight: 1.03, pattern: /\bgemini\b/i },
+    { key: 'deepseekPro', family: 'DeepSeek', short: 'Pro、Reasoner', label: 'DeepSeek Pro', weight: 1.06, pattern: /\bdeepseek\b[\w. -]*?\b(pro|reasoner|r\d)\b/i },
+    { key: 'deepseek', family: 'DeepSeek', short: 'Flash 等', label: 'DeepSeek 其他', weight: 1.03, pattern: /\bdeepseek\b/i },
     { key: 'cursor', family: '其他', short: 'Cursor', label: 'Cursor', weight: 1, pattern: /\bcursor\b/i },
     { key: 'copilot', family: '其他', short: 'Copilot', label: 'Copilot', weight: 1, pattern: /\bcopilot\b/i },
   ],
@@ -178,7 +179,7 @@ function computeBoard(data, rules, now) {
   const get = (login) => {
     let p = people.get(login);
     if (!p) {
-      p = { login, member: members.has(login), prs: [], threads: new Map(), issuesFiled: 0 };
+      p = { login, member: members.has(login), prs: [], threads: new Map(), activityTimes: [], issuesFiled: 0 };
       people.set(login, p);
     }
     return p;
@@ -188,6 +189,8 @@ function computeBoard(data, rules, now) {
     const login = human(actor);
     if (!login || login === owner || t == null) return;
     const p = get(login);
+    // 每次有效协作都更新活动时间；线程去重只影响计分。
+    p.activityTimes.push(t);
     const prev = p.threads.get(key);
     if (prev === undefined || t < prev) p.threads.set(key, t);
   };
@@ -248,6 +251,7 @@ function computeBoard(data, rules, now) {
       if (owner && !rules.invalidIssueReasons.includes(issue.stateReason)) {
         const p = get(owner);
         p.threads.set(key, toTime(issue.createdAt));
+        p.activityTimes.push(toTime(issue.createdAt));
         p.issuesFiled++;
       }
       for (const c of issue.comments.nodes) touch(c.author, toTime(c.createdAt), key, owner);
@@ -267,7 +271,7 @@ function computeBoard(data, rules, now) {
       ...mergedPrs.map((x) => ({ t: x.merged, pr: x.raw, model: x.raw * (x.model.weight - 1), collab: 0 })),
       ...threadTimes.map((t) => ({ t, pr: 0, model: 0, collab: rules.score.collab })),
     ].sort((a, b) => a.t - b.t);
-    const allTimes = [...p.prs.map((x) => x.created), ...acts.map((a) => a.t)];
+    const allTimes = [...p.prs.map((x) => x.created), ...acts.map((a) => a.t), ...p.activityTimes];
     const firstAt = Math.min(...allTimes);
     const lastAt = Math.max(...allTimes);
     for (const t of allTimes) {
@@ -326,7 +330,7 @@ function computeBoard(data, rules, now) {
     let passAt = null;
     const windowWeeks = new Set();
     let windowMerged = 0;
-    const events = [...mergedTimes.map((t) => [t, true]), ...threadTimes.map((t) => [t, false])].sort((x, y) => x[0] - y[0]);
+    const events = [...mergedTimes.map((t) => [t, true]), ...p.activityTimes.map((t) => [t, false])].sort((x, y) => x[0] - y[0]);
     for (const [t, isMerge] of events) {
       if (t > evalAt) break;
       windowWeeks.add(weekStart(t, tz));
@@ -395,7 +399,7 @@ function computeBoard(data, rules, now) {
       bonusModel: score.model,
       bonusCollab: score.collab,
       weekly: score.weekly,
-      activeWeeks: score.weekly.size,
+      activeWeeks: new Set([...mergedTimes, ...p.activityTimes].map((t) => weekStart(t, tz))).size,
       lines: mergedPrs.reduce((n, x) => n + x.lines, 0),
       commits: mergedPrs.reduce((n, x) => n + x.commits, 0),
       modelMix,

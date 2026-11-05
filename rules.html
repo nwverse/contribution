@@ -33,7 +33,7 @@
   .toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; border-left: 1px solid var(--line); }
   .toc a { position: relative; display: flex; align-items: baseline; gap: 8px; margin-left: -1px; padding: 6px 10px 6px 12px; border-left: 2px solid transparent; border-radius: 0 var(--r-sm) var(--r-sm) 0; font-size: var(--fs-sm); color: var(--ink-3); transition: color var(--dur-1), background-color var(--dur-1), border-color var(--dur-2); }
   .toc a:hover { color: var(--ink); background: var(--surface-hover); }
-  .toc a .i { font-size: var(--fs-2xs); font-weight: 650; color: var(--ink-4); font-variant-numeric: tabular-nums; min-width: 1.4em; }
+  .toc a .i { font-size: var(--fs-2xs); font-weight: 650; color: var(--ink-3); font-variant-numeric: tabular-nums; min-width: 1.4em; }
   .toc a[aria-current="true"] { color: var(--leaf-ink); font-weight: 650; border-left-color: var(--leaf); background: var(--leaf-wash); }
   .toc a[aria-current="true"] .i { color: var(--leaf-ink); }
   .rl-main { min-width: 0; }
@@ -807,6 +807,7 @@
     `模型来自 commit 的 Co-Authored-By 标记，是提交者自行声明的文本，可以伪造，也可以删掉；只看每个 PR 最后 ${LIM.commits} 个 commit。删掉了标记的 PR 按「无 AI 标注」计，所以 AI 占比是下限。`,
     'Codex CLI 默认署名「Codex」、Cursor 默认署名「Cursor」，都不含型号，分别按「GPT 其他」和 ×1 计。需要按型号计分时，在工具里把署名配置成带型号的名字（如 Codex 的 commit_attribution）。TRAE CLI 默认署名「TRAE CLI」，按扣分计。',
     '模型系数按组织偏好整体定档：Claude 强于 GPT；DeepSeek 胜在速度、Gemini 胜在成本，系数低于前两家。不区分版本，也不对应具体的基准测试分数；出现新的型号名或代号时需要更新识别规则。',
+    '没有 AI 署名的 PR 绝大多数也由 agent 编写，署名与否主要取决于工具配置，所以各档系数与「无 AI 标注」的 ×1 只拉开小幅差距，PR 分主要由改动行和 commit 数决定。',
     '直接推送到默认分支的 commit 不计入；仓库要求「所有改动走 PR」之前的贡献会被低估。',
     'AI 生成的 PR 记在开 PR 的账号名下，账号持有人对内容负责。',
     `每个 PR 和 issue 只读取前 ${LIM.nested} 条 review 和前 ${LIM.nested} 条评论。`,
