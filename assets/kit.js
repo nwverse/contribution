@@ -1036,6 +1036,21 @@
     { id: 'c5', label: '形态池', icon: 'layers', desc: '大家都进化到哪了' },
     { id: 'rules', label: '规则', icon: 'book-open', desc: '魔力怎么算、数据口径' },
   ];
+  // Skip link: first Tab stop on every page, jumps keyboard focus past the header into <main>.
+  // Off-screen until focused, so pointer users see no change.
+  function skipLink() {
+    const main = $('main');
+    if (!main || $('.skip-link')) return;
+    if (!main.id) main.id = 'main';
+    if (!main.hasAttribute('tabindex')) main.tabIndex = -1;
+    const a = document.createElement('a');
+    a.className = 'skip-link';
+    a.href = `#${main.id}`;
+    a.textContent = '跳到正文';
+    // Focus directly instead of following the hash: pages read location.hash for their own state
+    a.addEventListener('click', (e) => { e.preventDefault(); main.focus({ preventScroll: false }); });
+    document.body.prepend(a);
+  }
   function appHeader(el, { active = null, sub = '贡献度看板' } = {}) {
     if (!el) return null;
     const href = (id) => `${pageFile(id)}${keepSearch()}`;
@@ -1053,6 +1068,7 @@
         ${themeToggleHTML()}
       </div></div>`;
     meEntry.mount($('[data-me-wrap]', el));
+    skipLink();
     let tb = $('.tabbar');
     if (!tb) { tb = document.createElement('nav'); tb.className = 'tabbar'; tb.setAttribute('aria-label', '页面导航'); document.body.appendChild(tb); }
     tb.innerHTML = SCREENS.map((s) => `<a href="${href(s.id)}" data-screen="${s.id}"${s.id === active ? ' aria-current="page"' : ''}>${icon(s.icon, 21)}<span>${s.label}</span></a>`).join('');
