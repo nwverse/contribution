@@ -1,4 +1,4 @@
-// 六个页面都能启动：无报错、导航正确、主题参数生效、只请求本站资源、启动脚本与数据并行下载。
+// 六个页面都能启动：无报错、导航正确、启动无布局偏移、主题参数生效、只请求本站资源、启动脚本与数据并行下载。
 import { test, expect, open, PAGES, NAV } from './fixtures.mjs';
 
 for (const pg of PAGES) {
@@ -15,6 +15,21 @@ for (const pg of PAGES) {
     else await expect(nav.locator('[aria-current="page"]')).toHaveAttribute('data-screen', pg.id);
     // 外部请求只允许 GitHub 头像（已被拦截）；不允许调用 GitHub API
     expect(external.filter((u) => !/^https:\/\/github\.com\/[^/]+\.png/.test(u))).toEqual([]);
+  });
+}
+
+// 启动期间顶栏占住高度、正文隐藏到页面脚本填好再显示，所以首屏没有布局偏移（CLS 按 web-vitals 口径应低于 0.1）
+for (const pg of PAGES) {
+  test(`${pg.label}页启动时没有布局偏移 @mobile`, async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__cls = 0;
+      new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) if (!e.hadRecentInput) window.__cls += e.value;
+      }).observe({ type: 'layout-shift', buffered: true });
+    });
+    await open(page, `/${pg.file}`);
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    expect(await page.evaluate(() => window.__cls)).toBeLessThan(0.1);
   });
 }
 

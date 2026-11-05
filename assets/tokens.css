@@ -399,7 +399,8 @@ svg { overflow: visible; }
 @media (min-width: 721px) { .show-sm { display: none !important; } }
 
 /* ---------- 5. 应用顶栏 / 手机底部标签栏 ---------- */
-.appbar {
+/* #appbar 在 kit.js appHeader() 加上 .appbar 前就占住高度，正文不会在启动时下移 */
+.appbar, #appbar {
   position: sticky;
   top: 0;
   z-index: var(--z-appbar);
@@ -1255,6 +1256,8 @@ kbd, .kbd {
   .skel { animation: none !important; }
 }
 
+/* 启动期间正文先隐藏但保留占位，页面脚本填好内容后一次显示，避免启动时的布局偏移；出错时 boot.js 同样会去掉 is-booting */
+.is-booting .page { visibility: hidden; }
 /* 启动失败（boot.js）：数据或脚本没加载出来时的提示 */
 .boot-error { position: fixed; z-index: 100; left: 50%; top: 96px; translate: -50% 0; display: flex; flex-direction: column; align-items: center; gap: var(--s-2); width: min(420px, calc(100vw - 32px)); padding: var(--s-5) var(--s-6); border-radius: var(--r-xl); background: var(--surface-raised); box-shadow: var(--sh-hl), 0 0 0 1px var(--line), var(--sh-3); text-align: center; color: var(--ink-2); font-size: var(--fs-sm); }
 .boot-error b { color: var(--ink); font-size: var(--fs-md); }
