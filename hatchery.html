@@ -219,6 +219,8 @@
   @media (prefers-reduced-motion: reduce) {
     .fx-in .fx-link, .fx-in .fx-node .bx { animation: none; }
   }
+  /* 屏外蛋卡跳过布局与绘制。contain-intrinsic-size 指内容盒，实测 212–249px（桌面中位 228、手机 212），取 220px */
+  .lane-g > .card.egg { content-visibility: auto; contain-intrinsic-size: auto 220px; }
 </style>
 </head>
 <body>
