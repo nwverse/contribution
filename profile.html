@@ -381,7 +381,14 @@
     if (!cur) return;
     const k = PEOPLE.indexOf(cur) + dir;
     if (k < 0 || k >= PEOPLE.length) { K.toast(dir < 0 ? '已经是第一名了' : '已经是最后一位了', { ms: 1400 }); return; }
+    // 底栏按钮会随换人重建：焦点原本在某个换人按钮上时，换完落回同侧的新按钮，避免跌出对话框
+    const side = foot.contains(document.activeElement) && document.activeElement.dataset.step;
     show(PEOPLE[k].login, { keepScroll: true });
+    if (side) focusStep(+side);
+  }
+  // 同侧按钮在名单两端会变成 disabled（没有 data-step），这时退到另一侧按钮或抽屉本身
+  function focusStep(dir) {
+    (foot.querySelector(`[data-step="${dir}"]`) || foot.querySelector('[data-step]') || d.el).focus({ preventScroll: true });
   }
   d.onKey = (e) => {
     if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return false;
@@ -444,7 +451,7 @@
     $('#pfPos', d.el).textContent = '';
     body.innerHTML = `<div class="pf-missing pf-swap">${K.empty({ art: 'egg', title: `没有找到「${login}」`, body: '只有有贡献记录的人才有档案。账号名要和 GitHub 上一致，可以用上面的搜索找一找。', action: `<button type="button" class="btn btn-sm" data-go="${esc(DEFAULT)}">${icon('arrow-right', 14)}看看 ${esc(DEFAULT)} 的档案</button>` })}</div>`;
     foot.innerHTML = '';
-    body.querySelector('[data-go]').addEventListener('click', (e) => show(e.currentTarget.dataset.go));
+    body.querySelector('[data-go]').addEventListener('click', (e) => { show(e.currentTarget.dataset.go); d.el.focus({ preventScroll: true }); });
     document.title = '没有找到 · 档案 · 奶蛙宇宙';
   }
 

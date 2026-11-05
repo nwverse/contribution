@@ -107,3 +107,52 @@ test.describe('孵化台', () => {
     await expect(page.locator('#q')).toBeFocused();
   });
 });
+
+test.describe('档案', () => {
+  test('底栏换人后焦点留在抽屉里，落在同侧按钮上', async ({ page }) => {
+    await open(page, '/profile.html#u=frog-03');
+    await expect(page.locator('.drawer.on #pfBody')).toContainText('frog-03');
+    const nx = page.locator('.drawer .pf-step.nx');
+    await expect(nx).toHaveAttribute('data-step', '1');
+    const next = (await nx.getAttribute('aria-label')).split('：')[1];
+    await nx.focus();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(new RegExp(`#u=${next}$`));
+    await expect(page.locator('.drawer.on #pfBody')).toContainText(next);
+    const focus = () => page.evaluate(() => {
+      const a = document.activeElement;
+      return { inDrawer: !!a.closest('.drawer'), nx: a.matches('.pf-step.nx'), prev: a.matches('.pf-step[data-step="-1"]'), drawer: a.matches('.drawer') };
+    });
+    expect(await focus()).toMatchObject({ inDrawer: true, nx: true });
+    // 焦点在底栏按钮上时用 ← 换人，同样不丢焦点
+    await page.keyboard.press('ArrowLeft');
+    await expect(page).toHaveURL(/#u=frog-03$/);
+    expect(await focus()).toMatchObject({ inDrawer: true, nx: true });
+  });
+
+  test('换到最后一位时焦点退到上一位按钮或抽屉', async ({ page }) => {
+    await open(page, '/profile.html');
+    const [penult, last] = await page.evaluate(() => NW.people.slice(-2).map((p) => p.login));
+    await page.goto(`/profile.html#u=${penult}`);
+    await page.reload();
+    await expect(page.locator('.drawer.on #pfBody')).toContainText(penult);
+    await page.locator('.drawer .pf-step.nx').focus();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(new RegExp(`#u=${last}$`));
+    await expect(page.locator('.drawer .pf-step.nx')).toBeDisabled();
+    const f = await page.evaluate(() => {
+      const a = document.activeElement;
+      return { inDrawer: !!a.closest('.drawer'), ok: a.matches('.pf-step[data-step="-1"]:not([disabled]), .drawer') };
+    });
+    expect(f).toEqual({ inDrawer: true, ok: true });
+  });
+
+  test('找不到的人点「看看默认档案」后焦点留在抽屉里', async ({ page }) => {
+    await open(page, '/profile.html#u=no-such-frog-zz');
+    const go = page.locator('.drawer.on [data-go]');
+    await go.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.drawer.on .pf-missing')).toHaveCount(0);
+    expect(await page.evaluate(() => !!document.activeElement.closest('.drawer'))).toBe(true);
+  });
+});
