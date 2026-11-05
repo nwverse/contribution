@@ -42,8 +42,9 @@ const RULES = {
   staleOpenDays: 14,
   // 样式改动减分：已有样式文件的改动行占 PR 改动行的比例为 s 时，PR 分（含模型系数）乘 1 − s × (1 − weight)。
   // 只改已有样式文件的 PR 乘 weight，不改已有样式文件的 PR 不变。样式文件按路径识别：pattern 匹配的扩展名与 Tailwind 配置。
-  // 新增的文件（changeType 在 newFileTypes 里）按非样式计：新写页面、组件连同它的样式是新功能，不打折；
-  // 修改、重命名、删除已有样式文件的行计入 s。
+  // 新增的文件（changeType 在 newFileTypes 里）按非样式计：新写页面、组件连同它的样式是新功能，不打折。
+  // 已有样式文件里净增的行（新增行多于删除行的部分）也按新样式计，例如新功能往共用样式表追加的样式；
+  // 删除行和与之等量的新增行算修改，计入 s：每个文件计 deletions + min(additions, deletions)。
   // 改动文件超过上传脚本读取上限时，未读到的文件按非样式计，所以比例是下限。
   style: {
     weight: 0.5,
@@ -117,14 +118,15 @@ function toTime(s) {
   return s ? Date.parse(s) : null;
 }
 
-// 已有样式文件的改动行 ÷ PR 改动行，0–1。新增的样式文件按非样式计；没有文件明细（旧数据、测试快照）时按 0 计
+// 已有样式文件的修改行 ÷ PR 改动行，0–1。新增的样式文件与已有样式文件里净增的行按非样式计；
+// 没有文件明细（旧数据、测试快照）时按 0 计
 function styleShare(pr, rules) {
   const total = pr.additions + pr.deletions;
   if (!total || !pr.files?.nodes) return 0;
   let style = 0;
   for (const f of pr.files.nodes) {
     if (rules.style.newFileTypes.includes(f.changeType)) continue;
-    if (rules.style.pattern.test(f.path)) style += f.additions + f.deletions;
+    if (rules.style.pattern.test(f.path)) style += f.deletions + Math.min(f.additions, f.deletions);
   }
   return Math.min(1, style / total);
 }
