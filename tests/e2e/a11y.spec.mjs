@@ -105,6 +105,11 @@ test.describe('孵化台', () => {
     await expect(page.locator('#board [data-clear]')).toHaveCount(0);
     for (const c of await chips.all()) await expect(c).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('#q')).toBeFocused();
+    // 鼠标点「清空筛选」不把焦点放进筛选框（手机上会弹出键盘）
+    await chips.first().click();
+    await page.locator('#res [data-clear]').click();
+    await expect(page.locator('#res')).toBeHidden();
+    await expect(page.locator('#q')).not.toBeFocused();
   });
 });
 

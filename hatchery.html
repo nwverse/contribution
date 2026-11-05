@@ -655,11 +655,12 @@
     };
     if (anim) K.flip(host, mutate, { selector: '.egg[data-key]' }); else mutate();
   }
-  // 清空、取消按钮会随重绘消失，焦点挪到稳定的位置：清空后回到刚清空的筛选框，取消某项后回到对应 chip
-  const focusQ = () => $('#q').focus({ preventScroll: true });
+  // 清空、取消按钮会随重绘消失，焦点挪到稳定的位置：清空后回到刚清空的筛选框，取消某项后回到对应 chip。
+  // 筛选框只在键盘触发时（click 的 detail 为 0）才聚焦：点按时聚焦输入框会在手机上弹出键盘、在桌面上吞掉单键快捷键
+  const focusQ = (e) => { if (e.detail === 0) $('#q').focus({ preventScroll: true }); };
   $('#board').addEventListener('click', (e) => {
     if (e.target.closest('[data-more]')) { expanded = true; renderBoard(); return; }
-    if (e.target.closest('[data-clear]')) { clearFilters(); focusQ(); return; }
+    if (e.target.closest('[data-clear]')) { clearFilters(); focusQ(e); return; }
     const dr = e.target.closest('[data-drop]');
     if (dr) {
       const chip = $(`#chips .chip[data-k="${dr.dataset.drop}"]`);
@@ -671,7 +672,7 @@
     if (c && !e.target.closest('[data-person],[data-tip],a,button')) K.openPerson(c.dataset.key);
   });
   matchMedia('(max-width: 720px)').addEventListener('change', () => renderBoard(false));
-  $('#res').addEventListener('click', (e) => { if (e.target.closest('[data-clear]')) { clearFilters(); focusQ(); } });
+  $('#res').addEventListener('click', (e) => { if (e.target.closest('[data-clear]')) { clearFilters(); focusQ(e); } });
 
   // ───────── 批次孵化率 ─────────
   const CO = NW.W.map((w, i) => {
