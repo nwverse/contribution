@@ -671,6 +671,18 @@
     const evShow = events.slice(-2);
     legend.innerHTML = `<span class="key line" style="--k:var(--leaf)">累计魔力</span>${projW ? '<span class="key dash" style="--k:var(--leaf)">按近 4 周均速预测</span>' : ''}<span class="key dash" style="--k:var(--yolk-deep)">形态门槛</span>`;
     let hov = -1, G = null;
+    // Same pattern as NWK.columns(): role=img hides the curve, so keyboard moves are read out by a sibling
+    // polite live region, created up front because some screen readers ignore a region inserted as it changes
+    let live = document.createElement('span');
+    live.className = 'sr-only';
+    live.setAttribute('aria-live', 'polite');
+    host.after(live);
+    function announce(k) {
+      if (!live) return;
+      if (k < 0 || vals[k] === null) { live.textContent = ''; return; }
+      const i = idx[k], now = i === LAST;
+      live.textContent = `${fmt.week(W[i])}${now ? ' · 进行中' : ''}：${now ? '截至此刻累计' : '周末累计'} ${mag(vals[k])} 魔力，当周 +${mag(p.wk.get(W[i]) || 0)}，${now ? '现在是' : '当时是'}${K.formOf(p, i).name}`;
+    }
     function render() {
       const Wd = host.clientWidth || 480, H = 172, padL = 30, padR = 6, padT = 22, padB = 22;
       const slots = n + projW;
@@ -755,11 +767,13 @@
       if (e.key === 'Home') k = Math.max(0, fi - idx[0]);
       if (e.key === 'End') k = n - 1;
       hover(k);
+      announce(k);
     };
+    const onBlur = () => { hover(-1); announce(-1); };
     host.addEventListener('pointermove', onMove);
     host.addEventListener('pointerleave', onLeave);
     host.addEventListener('keydown', onKey);
-    host.addEventListener('blur', onLeave);
+    host.addEventListener('blur', onBlur);
     const ro = new ResizeObserver(() => { render(); if (hov >= 0) hover(hov); });
     ro.observe(host);
     render();
@@ -769,9 +783,10 @@
       destroy() {
         ro.disconnect();
         host.removeEventListener('pointermove', onMove); host.removeEventListener('pointerleave', onLeave);
-        host.removeEventListener('keydown', onKey); host.removeEventListener('blur', onLeave);
+        host.removeEventListener('keydown', onKey); host.removeEventListener('blur', onBlur);
         host.classList.remove('chart', 'cum'); host.removeAttribute('tabindex'); host.removeAttribute('role'); host.removeAttribute('aria-label');
         host.innerHTML = '';
+        live?.remove(); live = null;
       },
     };
   }

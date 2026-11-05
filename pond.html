@@ -555,6 +555,20 @@
     host.tabIndex = 0;
     host.setAttribute('role', 'img');
     let G = null, hov = -1, series = null;
+    // Same pattern as NWK.columns(): role=img hides the layers, so keyboard week moves are read out by a sibling
+    // polite live region, created up front because some screen readers ignore a region inserted as it changes.
+    // The chart lives as long as the page, so there is no destroy() to remove it from.
+    const live = document.createElement('span');
+    live.className = 'sr-only';
+    live.setAttribute('aria-live', 'polite');
+    host.after(live);
+    function announce(k) {
+      const d = k >= 0 && series ? series[k] : null;
+      if (!d) { live.textContent = ''; return; }
+      const rows = LAYERS.map((Lr, li) => ({ Lr, v: d.v[li] })).filter((r) => r.v > 0).reverse();
+      live.textContent = `${K.week.short(k)}${k === LAST ? ' 本周 · 截至此刻' : ''}：已孵化 ${d.hatched} / ${d.total} 人`
+        + (rows.length ? `，${rows.map((r) => `${r.Lr.name} ${r.v}`).join('，')}` : '，还没有贡献者');
+    }
     const tw = (s) => [...String(s)].reduce((n, c) => n + (/[　-鿿＀-￯]/.test(c) ? 11 : 6.2), 0);
     function compute() {
       const list = pool();
@@ -687,13 +701,13 @@
     host.addEventListener('pointerup', () => { drag = false; });
     host.addEventListener('pointercancel', () => { drag = false; });
     host.addEventListener('focus', () => { if (host.matches(':focus-visible')) hover(state.i); });
-    host.addEventListener('blur', () => hover(-1));
+    host.addEventListener('blur', () => { hover(-1); announce(-1); });
     new ResizeObserver(() => draw()).observe(host);
-    return { draw, hover, get hov() { return hov; } };
+    return { draw, hover, announce, get hov() { return hov; } };
   })();
 
   // ───────── 快捷键与命令面板 ─────────
-  const after = (fn) => () => { fn(); if (document.activeElement === $('#chart')) chart.hover(state.i); };
+  const after = (fn) => () => { fn(); if (document.activeElement === $('#chart')) { chart.hover(state.i); chart.announce(state.i); } };
   K.keys.add([
     { key: 'ArrowLeft', label: '前一周', group: '形态池', handler: after(() => setWeek(state.i - 1)) },
     { key: 'ArrowRight', label: '后一周', group: '形态池', handler: after(() => setWeek(state.i + 1)) },
