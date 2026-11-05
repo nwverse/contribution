@@ -40,11 +40,14 @@ const RULES = {
   modelNone: { key: 'none', family: '其他', short: '无 AI 标注', label: '无 AI 标注', weight: 1 },
   // PR 打开超过这么多天仍未合入也未关闭，算作「未收尾」
   staleOpenDays: 14,
-  // 样式改动减分：样式文件改动行占 PR 改动行的比例为 s 时，PR 分（含模型系数）乘 1 − s × (1 − weight)。
-  // 只改样式文件的 PR 乘 weight，不改样式文件的 PR 不变。样式文件按路径识别：pattern 匹配的扩展名与 Tailwind 配置。
+  // 样式改动减分：已有样式文件的改动行占 PR 改动行的比例为 s 时，PR 分（含模型系数）乘 1 − s × (1 − weight)。
+  // 只改已有样式文件的 PR 乘 weight，不改已有样式文件的 PR 不变。样式文件按路径识别：pattern 匹配的扩展名与 Tailwind 配置。
+  // 新增的文件（changeType 在 newFileTypes 里）按非样式计：新写页面、组件连同它的样式是新功能，不打折；
+  // 修改、重命名、删除已有样式文件的行计入 s。
   // 改动文件超过上传脚本读取上限时，未读到的文件按非样式计，所以比例是下限。
   style: {
     weight: 0.5,
+    newFileTypes: ['ADDED', 'COPIED'],
     pattern: /(\.(css|scss|sass|less|styl|stylus|pcss|postcss)|(^|\/)tailwind\.config\.[cm]?[jt]s)$/i,
   },
   newbie: {
@@ -114,12 +117,15 @@ function toTime(s) {
   return s ? Date.parse(s) : null;
 }
 
-// 样式文件改动行 ÷ PR 改动行，0–1。没有文件明细（旧数据、测试快照）时按 0 计
+// 已有样式文件的改动行 ÷ PR 改动行，0–1。新增的样式文件按非样式计；没有文件明细（旧数据、测试快照）时按 0 计
 function styleShare(pr, rules) {
   const total = pr.additions + pr.deletions;
   if (!total || !pr.files?.nodes) return 0;
   let style = 0;
-  for (const f of pr.files.nodes) if (rules.style.pattern.test(f.path)) style += f.additions + f.deletions;
+  for (const f of pr.files.nodes) {
+    if (rules.style.newFileTypes.includes(f.changeType)) continue;
+    if (rules.style.pattern.test(f.path)) style += f.additions + f.deletions;
+  }
   return Math.min(1, style / total);
 }
 

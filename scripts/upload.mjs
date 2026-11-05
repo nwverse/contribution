@@ -79,13 +79,13 @@ const CLOSER_QUERY = `query($ids: [ID!]!) {
   }
 }`;
 
-// 合入 PR 的改动文件，供引擎按样式文件占比计分：files 是嵌套连接，同样只对合入 PR 单独查询，每批 100 个 PR 计 1 点。
+// 合入 PR 的改动文件，供引擎按已有样式文件占比计分（changeType 区分新增与修改）：files 是嵌套连接，同样只对合入 PR 单独查询，每批 100 个 PR 计 1 点。
 // 文件路径只在内存中参与计算，不写入 board.json。
 const FILES_LIMIT = 100;
 const FILES_BATCH = 100;
 const FILES_QUERY = `query($ids: [ID!]!) {
   nodes(ids: $ids) {
-    ... on PullRequest { id files(first: ${FILES_LIMIT}) { nodes { path additions deletions } } }
+    ... on PullRequest { id files(first: ${FILES_LIMIT}) { nodes { path additions deletions changeType } } }
   }
 }`;
 
@@ -255,7 +255,7 @@ async function fetchClosers(token, prs) {
   log(`查询了 ${ids.length} 个关闭未合入 PR 的关闭人，共 ${tasks.length} 批`);
 }
 
-// 给合入 PR 补上改动文件 files（{ nodes: [{ path, additions, deletions }] }）；查不到时保持缺失，引擎按非样式计
+// 给合入 PR 补上改动文件 files（{ nodes: [{ path, additions, deletions, changeType }] }）；查不到时保持缺失，引擎按非样式计
 async function fetchFiles(token, prs) {
   const byId = new Map(prs.map((p) => [p.id, p]));
   const ids = [...byId.keys()];

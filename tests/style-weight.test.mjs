@@ -1,4 +1,4 @@
-// Scoring tests for RULES.style: style-only and mixed PRs score less than logic PRs.
+// Scoring tests for RULES.style: edits to existing style files score less than logic; new files are never discounted.
 // Run with: node --test tests/style-weight.test.mjs
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -11,7 +11,8 @@ const { RULES, computeBoard, styleShare, styleFactor } = vm.runInNewContext(
 const NOW = Date.parse('2026-11-04T12:00:00Z');
 const author = { login: 'author', __typename: 'User' };
 const empty = { totalCount: 0, nodes: [] };
-const file = (path, additions, deletions = 0) => ({ path, additions, deletions });
+const file = (path, additions, deletions = 0, changeType = 'MODIFIED') => ({ path, additions, deletions, changeType });
+const added = (path, additions) => file(path, additions, 0, 'ADDED');
 const pr = (number, files, extra = {}) => {
   const lines = files ? files.reduce((n, f) => n + f.additions + f.deletions, 0) : 40;
   return {
@@ -53,4 +54,20 @@ test('same-size PRs score style-only < mixed < logic', () => {
 test('weight 1 disables the reduction', () => {
   const rules = { ...RULES, style: { ...RULES.style, weight: 1 } };
   assert.equal(bonusOf([pr(1, [file('src/app.css', 40)])], rules), bonusOf([pr(1, [file('src/app.js', 40)])], rules));
+});
+
+test('newly added style files are not discounted', () => {
+  assert.equal(styleShare(pr(1, [added('src/a.css', 30), added('src/b.css', 10)]), RULES), 0);
+  assert.equal(styleShare(pr(1, [file('src/a.css', 10, 0, 'COPIED')]), RULES), 0);
+  assert.equal(bonusOf([pr(1, [added('src/a.css', 40)])]), bonusOf([pr(1, [file('src/app.js', 40)])]));
+});
+
+test('new component + new css + edit of an old css: only the old css share is discounted', () => {
+  const files = [added('src/Card.tsx', 50), added('src/Card.css', 30), file('src/theme.css', 15, 5)];
+  assert.equal(styleShare(pr(1, files), RULES), 0.2);
+  assert.equal(styleFactor(pr(1, files), RULES), 1 - 0.2 * (1 - RULES.style.weight));
+});
+
+test('renamed and deleted style lines still count as style', () => {
+  assert.equal(styleShare(pr(1, [file('src/a.css', 10, 0, 'RENAMED'), file('src/old.scss', 0, 10, 'DELETED'), file('src/app.js', 20)]), RULES), 0.5);
 });
