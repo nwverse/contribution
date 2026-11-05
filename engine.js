@@ -39,6 +39,13 @@ const RULES = {
   modelNone: { key: 'none', family: '其他', short: '无 AI 标注', label: '无 AI 标注', weight: 1 },
   // PR 打开超过这么多天仍未合入也未关闭，算作「未收尾」
   staleOpenDays: 14,
+  // 样式改动减分：样式文件改动行占 PR 改动行的比例为 s 时，PR 分（含模型系数）乘 1 − s × (1 − weight)。
+  // 只改样式文件的 PR 乘 weight，不改样式文件的 PR 不变。样式文件按路径识别：pattern 匹配的扩展名与 Tailwind 配置。
+  // 改动文件超过上传脚本读取上限时，未读到的文件按非样式计，所以比例是下限。
+  style: {
+    weight: 0.5,
+    pattern: /(\.(css|scss|sass|less|styl|stylus|pcss|postcss)|(^|\/)tailwind\.config\.[cm]?[jt]s)$/i,
+  },
   newbie: {
     days: 30,
     merged: 3,
@@ -104,6 +111,19 @@ function weekStart(t, tzHours) {
 
 function toTime(s) {
   return s ? Date.parse(s) : null;
+}
+
+// 样式文件改动行 ÷ PR 改动行，0–1。没有文件明细（旧数据、测试快照）时按 0 计
+function styleShare(pr, rules) {
+  const total = pr.additions + pr.deletions;
+  if (!total || !pr.files?.nodes) return 0;
+  let style = 0;
+  for (const f of pr.files.nodes) if (rules.style.pattern.test(f.path)) style += f.additions + f.deletions;
+  return Math.min(1, style / total);
+}
+
+function styleFactor(pr, rules) {
+  return 1 - styleShare(pr, rules) * (1 - rules.style.weight);
 }
 
 function countUpTo(sorted, t) {
@@ -197,7 +217,8 @@ function computeBoard(data, rules, now) {
           lines,
           commits,
           model,
-          raw: prRawScore(lines, commits, rules),
+          // 样式系数乘在原始分上，模型加减随之按比例缩放
+          raw: prRawScore(lines, commits, rules) * styleFactor(pr, rules),
         });
       }
       let reviewed = false;
