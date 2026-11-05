@@ -321,7 +321,7 @@
       : `<div class="fm">${K.frogOf(p, 20)}<div style="min-width:0"><div class="fn">${fo.name}<span>魔力 ${mag(p.bonus)}/50</span></div><div class="meter yolk"><i style="width:${(p.progress * 100).toFixed(1)}%"></i></div></div></div>`;
     const tags = `${p.member ? '' : '<span class="tag tag-out">组织外</span>'}${p.dormant ? `<span class="tag tag-sleep">${icon('moon-z', 11)}冬眠</span>` : ''}`;
     const sub = `合入 ${fmt.int(p.merged)} · 协作 ${fmt.int(p.collab)}${p.resolved ? ` · 合入率 ${fmt.pct(p.rate)}` : ''}`;
-    return `<div class="lrow is-click ${K.me.is(p) ? 'is-me' : ''}" role="option" tabindex="-1" aria-selected="false" data-login="${esc(p.login)}">`
+    return `<div class="lrow is-click ${K.me.is(p) ? 'is-me' : ''}" role="option" tabindex="-1" id="pf-opt-${esc(p.login)}" aria-selected="false" data-login="${esc(p.login)}">`
       + `<span class="rank ${p.rank <= 3 ? 'top' : ''} ${p.bonus <= 0.005 ? 'none' : ''}">${p.rank}</span><span>${deltaHTML(p)}</span>`
       + `<span style="min-width:0">${K.who(p, { size: 28, sub, tags })}</span><span class="c-form">${form}</span>`
       + `<span class="c-comp">${K.comp(p, { scale: p.bonus / maxB })}</span>`
@@ -340,20 +340,27 @@
       em.innerHTML = K.empty({ art: 'egg', title: `没有找到「${q}」`, body: '只有有贡献记录的人会出现在排行榜上。', action: `<button type="button" class="btn btn-sm" id="lbClear">${icon('rotate-ccw', 14)}清空筛选</button>` });
       em.querySelector('#lbClear').addEventListener('click', () => { const i = document.getElementById('lbSearch'); i.value = ''; filterRows(''); i.focus(); });
     }
+    // Filtering invalidates the keyboard selection: drop stale aria-selected and the active descendant
     kb = -1;
+    rowsEl.querySelectorAll('.lrow[aria-selected="true"]').forEach((r) => r.setAttribute('aria-selected', 'false'));
+    rowsEl.removeAttribute('aria-activedescendant');
   }
   filterRows('');
   document.getElementById('lbSearch').addEventListener('input', (e) => filterRows(e.target.value.trim().toLowerCase()));
   document.getElementById('lbSearch').addEventListener('keydown', (e) => { if (e.key === 'ArrowDown') { e.preventDefault(); rowsEl.focus(); moveKb(1); } });
   const visRows = () => [...rowsEl.querySelectorAll('.lrow:not([hidden])')];
-  function moveKb(d) {
+  // Focus stays on the listbox; aria-activedescendant tells screen readers which option is selected
+  function selectKb(i) {
     const v = visRows(); if (!v.length) return;
-    kb = K.clamp(kb + d, 0, v.length - 1);
+    kb = K.clamp(i, 0, v.length - 1);
     v.forEach((r, k) => r.setAttribute('aria-selected', String(k === kb)));
+    rowsEl.setAttribute('aria-activedescendant', v[kb].id);
     v[kb].scrollIntoView({ block: 'nearest' });
   }
+  const moveKb = (d) => selectKb(kb + d);
   rowsEl.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); moveKb(e.key === 'ArrowDown' ? 1 : -1); }
+    else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); e.stopPropagation(); selectKb(e.key === 'Home' ? 0 : Infinity); }
     else if (e.key === 'Enter' && kb >= 0) { e.preventDefault(); e.stopPropagation(); const r = visRows()[kb]; trigger = r; show(r.dataset.login, { open: true }); }
   });
   rowsEl.addEventListener('click', (e) => { const r = e.target.closest('.lrow'); if (!r) return; trigger = r; if (!e.target.closest('[data-person]')) show(r.dataset.login, { open: true }); });

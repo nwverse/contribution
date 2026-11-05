@@ -181,6 +181,48 @@ test.describe('档案', () => {
     await expect(page.locator('.drawer.on .pf-missing')).toHaveCount(0);
     expect(await page.evaluate(() => !!document.activeElement.closest('.drawer'))).toBe(true);
   });
+
+  test('背景排行榜方向键选中时用 aria-activedescendant 告知读屏，支持 Home / End', async ({ page }) => {
+    await open(page, '/profile.html');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.drawer.on')).toHaveCount(0);
+    const rows = page.locator('#rows');
+    const vis = rows.locator('.lrow:not([hidden])');
+    const selected = rows.locator('.lrow[aria-selected="true"]');
+    // The active descendant must name the expected visible row, and it must be the only selected one
+    const expectActive = async (row) => {
+      const id = await row.getAttribute('id');
+      expect(id).toMatch(/^pf-opt-/);
+      await expect(rows).toHaveAttribute('aria-activedescendant', id);
+      await expect(row).toHaveAttribute('aria-selected', 'true');
+      await expect(selected).toHaveCount(1);
+    };
+
+    const n = await vis.count();
+    expect(n).toBeGreaterThan(2);
+    const ids = await vis.evaluateAll((rs) => rs.map((r) => r.id));
+    expect(new Set(ids).size, 'option id 唯一').toBe(n);
+
+    await rows.focus();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await expectActive(vis.nth(1));
+    await page.keyboard.press('End');
+    await expectActive(vis.last());
+    await page.keyboard.press('Home');
+    await expectActive(vis.first());
+    await expect(rows).toBeFocused();
+
+    // Filtering clears the stale selection; ArrowDown from the search box picks the first filtered row
+    const q = await vis.nth(1).getAttribute('data-login');
+    await page.locator('#lbSearch').fill(q);
+    await expect(selected).toHaveCount(0);
+    expect(await rows.getAttribute('aria-activedescendant')).toBeFalsy();
+    await page.keyboard.press('ArrowDown');
+    await expect(rows).toBeFocused();
+    await expectActive(vis.first());
+    expect(await vis.first().getAttribute('data-login')).toContain(q);
+  });
 });
 
 test.describe('我的菜单', () => {
