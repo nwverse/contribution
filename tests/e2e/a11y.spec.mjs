@@ -182,3 +182,84 @@ test.describe('档案', () => {
     expect(await page.evaluate(() => !!document.activeElement.closest('.drawer'))).toBe(true);
   });
 });
+
+test.describe('我的菜单', () => {
+  const login = BOARD.people[0].login;
+  const remember = (page) => page.addInitScript((l) => localStorage.setItem('nwverse:contribution:me', JSON.stringify({ v: 1, login: l })), login);
+  const active = (page) => page.evaluate(() => {
+    const a = document.activeElement;
+    return { inMenu: !!a.closest('.me-menu'), btn: a.matches('#appbar .me-btn'), action: a.dataset.action || null };
+  });
+  const ACTIONS = ['me-go', 'me-rank', 'me-pick', 'me-forget'];
+
+  test('收起时菜单项不在 Tab 序里', async ({ page }) => {
+    await remember(page);
+    await open(page, '/index.html');
+    const btn = page.locator('#appbar .me-btn');
+    await expect(btn).toContainText(`@${login}`);
+    await btn.focus();
+    for (let k = 0; k < ACTIONS.length + 2; k++) {
+      await page.keyboard.press('Tab');
+      expect((await active(page)).inMenu, `第 ${k + 1} 下 Tab`).toBe(false);
+    }
+    // 反向同样跳过
+    await btn.focus();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Shift+Tab');
+    expect(await active(page)).toMatchObject({ inMenu: false, btn: true });
+  });
+
+  test('方向键在菜单项间移动；Esc 关闭后焦点回到按钮', async ({ page }) => {
+    await remember(page);
+    await open(page, '/index.html');
+    const btn = page.locator('#appbar .me-btn');
+    await btn.click();
+    await expect(page.locator('#appbar .me-menu.on')).toHaveCount(1);
+    await expect(btn).toHaveAttribute('aria-expanded', 'true');
+    expect((await active(page)).action).toBe('me-go');
+    const steps = [['ArrowDown', 'me-rank'], ['End', 'me-forget'], ['ArrowDown', 'me-go'], ['ArrowUp', 'me-forget'], ['Home', 'me-go'], ['ArrowUp', 'me-forget']];
+    for (const [key, want] of steps) {
+      await page.keyboard.press(key);
+      expect((await active(page)).action, key).toBe(want);
+    }
+    await expect(page.locator('#appbar .me-menu.on')).toHaveCount(1);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#appbar .me-menu.on')).toHaveCount(0);
+    await expect(btn).toHaveAttribute('aria-expanded', 'false');
+    await expect(btn).toBeFocused();
+  });
+
+  test('Tab 离开展开的菜单时收起；Shift+Tab 回到按钮', async ({ page }) => {
+    await remember(page);
+    await open(page, '/index.html');
+    const btn = page.locator('#appbar .me-btn');
+    await btn.click();
+    await expect(page.locator('#appbar .me-menu.on')).toHaveCount(1);
+    await page.keyboard.press('Tab');
+    await expect(page.locator('#appbar .me-menu.on')).toHaveCount(0);
+    await expect(btn).toHaveAttribute('aria-expanded', 'false');
+    expect(await active(page)).toMatchObject({ inMenu: false, btn: false });
+    expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true);
+
+    await btn.click();
+    await expect(page.locator('#appbar .me-menu.on')).toHaveCount(1);
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.locator('#appbar .me-menu.on')).toHaveCount(0);
+    await expect(btn).toBeFocused();
+  });
+
+  test('从菜单打开「更换账号」，关闭后焦点回到按钮', async ({ page }) => {
+    await remember(page);
+    await open(page, '/index.html');
+    const btn = page.locator('#appbar .me-btn');
+    await btn.click();
+    await page.keyboard.press('End');
+    await page.keyboard.press('ArrowUp');
+    expect((await active(page)).action).toBe('me-pick');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.me-picker.on input')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.me-picker.on')).toHaveCount(0);
+    await expect(btn).toBeFocused();
+  });
+});

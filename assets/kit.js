@@ -991,7 +991,24 @@
   // 顶栏入口：未设置「找到我」；已设置「我 · @账号」+ 菜单（我的档案 / 我的总榜名次 / 更换 / 不再记住）
   const meEntry = (() => {
     let host = null, menuOpen = false;
-    const menuApi = { scrim: false, lock: false, isOpen: () => menuOpen, close: () => setMenu(false), key(e) { if (e.key === 'Escape') { setMenu(false); return true; } return false; } };
+    const menuApi = { scrim: false, lock: false, isOpen: () => menuOpen, close: () => setMenu(false), key: menuKey };
+    // role=menu keyboard model: arrows/Home/End move between items, Escape closes, Tab closes and lets focus move on
+    function menuKey(e) {
+      const m = host && $('.me-menu', host);
+      if (!m) return false;
+      if (e.key === 'Escape') { setMenu(false); return true; }
+      // setMenu(false) parks focus on .me-btn; plain Tab then continues past the inert menu, Shift+Tab stops on the button
+      if (e.key === 'Tab') { setMenu(false); return e.shiftKey; }
+      const items = $$('.mi', m), n = items.length, i = items.indexOf(document.activeElement);
+      let j = -1;
+      if (e.key === 'ArrowDown') j = (i + 1) % n;
+      else if (e.key === 'ArrowUp') j = i < 0 ? n - 1 : (i - 1 + n) % n;
+      else if (e.key === 'Home') j = 0;
+      else if (e.key === 'End') j = n - 1;
+      if (j < 0 || !n) return false;
+      items[j].focus({ preventScroll: true });
+      return true;
+    }
     function buttonHTML() {
       const s = me.state();
       if (s === 'unset') return `<button type="button" class="btn me-btn" data-action="me-pick" aria-label="找到我：选择我的账号" data-tip="选一次账号，这个浏览器会记住">${icon('user-plus', 15)}<span class="lbl">找到我</span></button>`;
@@ -1011,20 +1028,28 @@
       return `<div class="me-menu card" role="menu" aria-label="我的账号"><div class="mm-head">${avatar(p.login, 28)}<div><b>@${esc(p.login)}</b><small>仅此浏览器记住</small></div></div>`
         + `${item('me-go', 'user', '我的档案')}${item('me-rank', 'trophy', '我的总榜名次', `#${p.rank}`)}<hr>${item('me-pick', 'repeat', '更换账号')}${item('me-forget', 'log-out', '不再记住', '', 'danger')}</div>`;
     }
-    function render() { if (host) host.innerHTML = buttonHTML() + menuHTML(); }
+    // The closed menu stays in the DOM for its transition; inert keeps its items out of the Tab order and the a11y tree
+    function render() {
+      if (!host) return;
+      host.innerHTML = buttonHTML() + menuHTML();
+      const m = $('.me-menu', host);
+      if (m) m.inert = true;
+    }
     function setMenu(on) {
       if (!host) return;
       const m = $('.me-menu', host), b = $('.me-btn', host);
       if (!m) on = false;
       menuOpen = on;
-      if (m) m.classList.toggle('on', on);
+      // Focus inside a menu that is about to turn inert would drop to <body>; hand it back to the button first
+      if (!on && m && b && m.contains(document.activeElement)) b.focus({ preventScroll: true });
+      if (m) { m.classList.toggle('on', on); m.inert = !on; }
       if (b) b.setAttribute('aria-expanded', String(on));
       if (on) { pushLayer(menuApi); tip.hide(); const f = $('.mi', m); if (f) f.focus({ preventScroll: true }); }
       else popLayer(menuApi);
     }
     document.addEventListener('pointerdown', (e) => { if (menuOpen && host && !host.contains(e.target)) setMenu(false); });
     me.subscribe(() => { if (menuOpen) popLayer(menuApi); menuOpen = false; render(); });
-    return { mount(el) { host = el; render(); }, toggle: () => setMenu(!menuOpen), close: () => setMenu(false), isOpen: () => menuOpen };
+    return { mount(el) { host = el; render(); }, toggle: () => setMenu(!menuOpen), close: () => setMenu(false), isOpen: () => menuOpen, button: () => host && $('.me-btn', host) };
   })();
 
   // ───────────────────────── 应用顶栏 + 手机底部标签栏 ─────────────────────────
@@ -1084,7 +1109,8 @@
     const act = a.dataset.action;
     if (act === 'cmdk') cmdk.open();
     else if (act === 'keys') keys.open();
-    else if (act === 'me-pick') { meEntry.close(); mePicker.open(a); }
+    // From the menu, the picker returns focus to the visible .me-btn, not to an item of the now-inert menu
+    else if (act === 'me-pick') { const t = (a.closest('.me-menu') && meEntry.button()) || a; meEntry.close(); mePicker.open(t); }
     else if (act === 'me-menu') meEntry.toggle();
     else if (act === 'me-forget') { meEntry.close(); me.forget(); }
     else if (act === 'me-go') { meEntry.close(); if (me.person) openPerson(me.person.login); }
