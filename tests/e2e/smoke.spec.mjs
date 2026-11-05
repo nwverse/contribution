@@ -33,6 +33,16 @@ for (const pg of PAGES) {
   });
 }
 
+test('页面滚动后顶栏显示底部分隔线', async ({ page }) => {
+  await open(page, '/index.html');
+  const bar = page.locator('#appbar');
+  const color = () => bar.evaluate((el) => getComputedStyle(el).borderBottomColor);
+  await expect.poll(color).toBe('rgba(0, 0, 0, 0)');
+  await page.evaluate(() => scrollTo(0, 400));
+  await expect(bar).toHaveClass(/is-scrolled/);
+  await expect.poll(color).not.toBe('rgba(0, 0, 0, 0)');
+});
+
 test('?theme=dark 切到暗色，导航时保留', async ({ page }) => {
   await open(page, '/index.html?theme=dark');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
