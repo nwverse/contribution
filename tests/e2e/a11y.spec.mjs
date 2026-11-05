@@ -57,12 +57,33 @@ test.describe('柱图', () => {
     await page.keyboard.press('End');
     await expect(live).toContainText(`${mag(weekValue(p, BOARD.weeks[LAST].start))}魔力`);
     await expect(live).toContainText('近 4 周均值');
-    // 每次重绘都会 destroy 旧图：换人后抽屉里仍只有一个读出区域
+    // 换人会整体替换抽屉内容，这里只确认读出区域没有累积；destroy() 的清理由「柱图 destroy」单独覆盖
     await page.locator('.drawer.on #pfBody').click({ position: { x: 4, y: 4 } });
     await page.keyboard.press('ArrowRight');
     await expect(page).toHaveURL(/#u=frog-04/);
     await expect(live).toHaveCount(1);
     await expect(live).toHaveText('');
+  });
+});
+
+test.describe('柱图 destroy', () => {
+  test('destroy() 移除宿主旁的读出区域', async ({ page }) => {
+    await open(page, '/index.html');
+    // 单独建一张图，避免页面重绘（替换父节点）顺带删掉 live 区域而掩盖 destroy() 的清理
+    const counts = await page.evaluate(() => {
+      const wrap = document.createElement('div');
+      const host = document.createElement('div');
+      wrap.appendChild(host);
+      document.body.appendChild(wrap);
+      const c = NWK.columns(host, { data: [{ label: 'W1', v: 1 }, { label: 'W2', v: 2 }] });
+      const live = () => wrap.querySelectorAll('[aria-live="polite"]').length;
+      const before = live();
+      c.destroy();
+      const after = live();
+      wrap.remove();
+      return { before, after };
+    });
+    expect(counts).toEqual({ before: 1, after: 0 });
   });
 });
 
