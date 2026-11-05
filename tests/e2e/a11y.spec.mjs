@@ -1,5 +1,5 @@
-// 无障碍：跳到正文链接、页面语言。与 pages.spec.mjs 分开，逐页检查键盘用户的第一个落点。
-import { test, expect, open, PAGES } from './fixtures.mjs';
+// 无障碍：键盘落点、焦点归还与读屏播报。与 pages.spec.mjs 分开，只检查辅助技术能感知的行为，页面外观不变。
+import { test, expect, open, PAGES, BOARD, LAST, weekValue, mag } from './fixtures.mjs';
 
 for (const { file, label } of PAGES) {
   test(`${label}：第一下 Tab 落在「跳到正文」，回车后焦点进入正文`, async ({ page }) => {
@@ -24,3 +24,44 @@ for (const { file, label } of PAGES) {
     expect(await page.evaluate(() => !!document.activeElement.closest('#appbar'))).toBe(false);
   });
 }
+
+test.describe('柱图', () => {
+  // 柱图宿主是 role=img，子元素对读屏不可见；键盘选中的那一周由紧挨着的 aria-live 区域读出
+  const liveOf = (page, sel) => page.locator(`${sel} + [aria-live="polite"]`);
+
+  for (const [id, key] of [['#chartActive', 'active'], ['#chartMerged', 'merged']]) {
+    test(`本周页 ${id} 用方向键移动时读出当周数值`, async ({ page }) => {
+      await open(page, '/index.html');
+      const live = liveOf(page, id);
+      await expect(live).toHaveCount(1);
+      await expect(live).toHaveText('');
+      await page.locator(id).focus();
+      await page.keyboard.press('End');
+      await expect(live).toContainText(String(BOARD.weeks[LAST][key]));
+      await page.keyboard.press('ArrowLeft');
+      await expect(live).toContainText(`：${BOARD.weeks[LAST - 1][key]}`);
+      await expect(live).not.toContainText('进行中');
+      await page.locator(id).blur();
+      await expect(live).toHaveText('');
+    });
+  }
+
+  test('档案抽屉的每周柱图读出本周魔力与近 4 周均值，换人后不留旧区域', async ({ page }) => {
+    const p = BOARD.people.find((x) => x.login === 'frog-03');
+    await open(page, `/profile.html#u=${p.login}`);
+    const chart = page.locator('.drawer.on #wkHost .chart');
+    await expect(chart).toHaveAttribute('role', 'img');
+    const live = page.locator('.drawer.on #wkHost [aria-live="polite"]');
+    await expect(live).toHaveCount(1);
+    await chart.focus();
+    await page.keyboard.press('End');
+    await expect(live).toContainText(`${mag(weekValue(p, BOARD.weeks[LAST].start))}魔力`);
+    await expect(live).toContainText('近 4 周均值');
+    // 每次重绘都会 destroy 旧图：换人后抽屉里仍只有一个读出区域
+    await page.locator('.drawer.on #pfBody').click({ position: { x: 4, y: 4 } });
+    await page.keyboard.press('ArrowRight');
+    await expect(page).toHaveURL(/#u=frog-04/);
+    await expect(live).toHaveCount(1);
+    await expect(live).toHaveText('');
+  });
+});

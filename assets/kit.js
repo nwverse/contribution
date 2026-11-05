@@ -1527,6 +1527,17 @@
     host.tabIndex = 0;
     host.setAttribute('role', 'img');
     let hov = -1, G = null;
+    // role=img hides the bars from assistive tech, so keyboard moves are read out by a sibling live region,
+    // created up front because some screen readers ignore a live region inserted at the moment it changes
+    let live = document.createElement('span');
+    live.className = 'sr-only';
+    live.setAttribute('aria-live', 'polite');
+    host.after(live);
+    function announce(k) {
+      if (!live) return;
+      const d = k >= 0 ? o.data[k] : null;
+      live.textContent = d ? `${d.label}：${o.f(d.v)}${o.unit}${o.avg ? `，近 4 周均值 ${o.f(o.avg[k])}` : ''}` : '';
+    }
     const tw = (s) => [...String(s)].reduce((n, c) => n + (/[　-鿿＀-￯]/.test(c) ? 11 : 6.2), 0);
     function render() {
       const W = host.clientWidth || 480;
@@ -1630,12 +1641,13 @@
       if (e.key === 'End') k = n - 1;
       if (e.key === 'Enter' && o.onSelect) { o.onSelect(k); return; }
       hover(k);
+      announce(k);
     });
-    host.addEventListener('blur', () => hover(-1));
+    host.addEventListener('blur', () => { hover(-1); announce(-1); });
     const ro = new ResizeObserver(() => render());
     ro.observe(host);
     render();
-    return { el: host, update(next) { o = { ...o, ...next }; render(); }, destroy() { ro.disconnect(); host.innerHTML = ''; } };
+    return { el: host, update(next) { o = { ...o, ...next }; render(); }, destroy() { ro.disconnect(); host.innerHTML = ''; live?.remove(); live = null; } };
   }
 
   // ───────────────────────── 池塘形态站（某一周末的形态分布） ─────────────────────────
