@@ -221,6 +221,9 @@
   }
   /* 屏外蛋卡跳过布局与绘制。contain-intrinsic-size 指内容盒，实测 212–249px（桌面中位 228、手机 212），取 220px */
   .lane-g > .card.egg { content-visibility: auto; contain-intrinsic-size: auto 220px; }
+  /* 筛选、排序会用 innerHTML 重绘整个看板，新卡片没有记住的尺寸，屏外卡片按 220px 占位会让滚动锚定和 FLIP 测量出错。
+     所以只在首次渲染时跳过屏外卡片，第一次重绘起恢复完整布局 */
+  #board.cv-off .lane-g > .card.egg { content-visibility: visible; }
 </style>
 </head>
 <body>
@@ -619,8 +622,12 @@
     { id: 'due', icon: 'hourglass', cls: 'rust', title: `${DUE} 天内到期`, desc: `两项都还差，考核期剩余 ≤${DUE} 天` },
     { id: 'prog', icon: 'clock', cls: '', title: '进行中', desc: `两项都还差，考核期剩余超过 ${DUE} 天` },
   ];
+  let boardDrawn = false;
   function renderBoard(anim = true) {
     const host = $('#board');
+    // 第一次重绘前关掉 content-visibility 并立即排版（原因见样式表 .cv-off），滚动锚定先补偿掉占位高度的误差，FLIP 也按真实位置测量
+    if (boardDrawn && !host.classList.contains('cv-off')) { host.classList.add('cv-off'); void host.offsetHeight; }
+    boardDrawn = true;
     const cmp = SORTS[state.sort];
     const mutate = () => {
       const mobile = matchMedia('(max-width: 720px)').matches;

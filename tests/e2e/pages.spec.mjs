@@ -135,6 +135,32 @@ test.describe('孵化台', () => {
     await expect(page.locator('#headline')).toContainText(String(pending));
     await expect(page.locator('#board article.egg')).toHaveCount(pending);
   });
+
+  test('页面很长时，深处开关一次筛选，视口仍停在原来那张蛙卵', async ({ page }) => {
+    // 测试数据复制 10 份，页面才够长；屏外蛋卡用了 content-visibility，重绘后的占位高度曾让滚动位置跳到页尾
+    const board = structuredClone(BOARD);
+    board.people = Array.from({ length: 10 }, (_, i) => BOARD.people.map((p) => ({ ...p, login: i ? `${p.login}-x${i}` : p.login }))).flat();
+    await page.route('**/data/board.json', (route) => route.fulfill({ json: board }));
+    await open(page, '/hatchery.html');
+    await page.evaluate(() => scrollTo(0, 9000));
+    const firstVisible = () => page.evaluate(() => {
+      const e = [...document.querySelectorAll('#board .egg[data-key]')].find((x) => x.getBoundingClientRect().bottom > 0);
+      return { key: e.dataset.key, top: e.getBoundingClientRect().top };
+    });
+    await page.waitForTimeout(300); // 等屏内卡片渲染、滚动锚定稳定
+    const before = await firstVisible();
+    // 筛选栏不吸顶，用 locator.click() 会先滚回顶部，这里直接派发点击
+    const chip = page.locator('#chips .chip').first();
+    await chip.evaluate((el) => el.click());
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await page.waitForTimeout(700);
+    await chip.evaluate((el) => el.click());
+    await expect(chip).toHaveAttribute('aria-pressed', 'false');
+    await page.waitForTimeout(700); // 等 FLIP 动画结束
+    const after = await firstVisible();
+    expect(after.key).toBe(before.key);
+    expect(Math.abs(after.top - before.top)).toBeLessThan(120);
+  });
 });
 
 test.describe('形态池', () => {
