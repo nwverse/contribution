@@ -362,11 +362,6 @@
     return `<div class="empty"><div class="empty-art">${frog(art, 64, sleep ? 'sleep' : '')}${pad}${sleep ? '<span class="zz" aria-hidden="true">z z</span>' : ''}</div>`
       + `<h4>${esc(title)}</h4>${body ? `<p>${body}</p>` : ''}${action}</div>`;
   }
-  // 骨架行
-  const skeletonRows = (n = 5, { avatar: withAv = true } = {}) => Array.from({ length: n }, (_, k) => `<div class="lrow" aria-hidden="true" style="--cols:28px ${withAv ? '28px ' : ''}minmax(0,1fr) 80px">`
-    + `<span class="skel skel-line" style="width:18px"></span>${withAv ? '<span class="skel skel-circle" style="width:28px;height:28px"></span>' : ''}`
-    + `<span><span class="skel skel-line" style="width:${[46, 62, 38, 54, 44][k % 5]}%"></span><span class="skel skel-line" style="width:${[28, 22, 34, 26, 30][k % 5]}%;height:8px"></span></span>`
-    + '<span class="skel skel-line" style="width:56px;justify-self:end"></span></div>').join('');
 
   // ───────────────────────── 周 ─────────────────────────
   const week = {
@@ -1820,7 +1815,7 @@
     // 渲染助手（返回字符串）
     icon, frog, frogOf, formOf, levelBadge, nextInfo, etaText, hatchHint,
     avatar, who, pname, people, delta, change,
-    sparkline, ring, countdown, stackedBar, compParts, comp, dotRange, empty, skeletonRows,
+    sparkline, ring, countdown, stackedBar, compParts, comp, dotRange, empty,
     pond, pondData, evoAxis, kpi, themeToggleHTML,
     // 活力
     VIT_PARTS, VIT_STATUS, vitNum, vitNeed, vitTip, vitBar, vitTag,

@@ -1121,13 +1121,7 @@ kbd, .kbd {
 .annot-pop h4 i { display: inline-grid; place-items: center; width: 18px; height: 18px; flex: none; border-radius: 50%; background: var(--tip-bg); color: var(--tip-ink); font: 700 10px/1 var(--font-mono); font-style: normal; box-shadow: 0 0 0 1.5px var(--yolk); }
 .annot-pop p { margin-top: 6px; font-size: var(--fs-xs); line-height: 1.65; color: var(--ink-2); }
 
-/* ---------- 20. 骨架屏 / 空状态 ---------- */
-.skel { display: block; border-radius: var(--r-sm); background: linear-gradient(90deg, var(--bg-sunken) 0%, color-mix(in srgb, var(--bg-sunken) 40%, var(--surface)) 45%, var(--bg-sunken) 90%) 0 0 / 220% 100%; animation: skel 1.4s var(--ease-in-out) infinite; }
-:root[data-theme="dark"] .skel { background-image: linear-gradient(90deg, rgba(170, 225, 205, 0.06) 0%, rgba(170, 225, 205, 0.12) 45%, rgba(170, 225, 205, 0.06) 90%); }
-.skel-line { height: 10px; margin: 7px 0; }
-.skel-line.lg { height: 18px; }
-.skel-circle { border-radius: 50%; }
-@keyframes skel { from { background-position: 120% 0; } to { background-position: -100% 0; } }
+/* ---------- 20. 空状态 ---------- */
 .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: var(--s-8) var(--s-4); text-align: center; }
 .empty-art { position: relative; margin-bottom: 6px; isolation: isolate; }
 .empty-art .zz { position: absolute; right: -10px; top: -4px; font: 700 12px/1 var(--font-mono); color: var(--ink-3); letter-spacing: 1px; animation: zz 3s var(--ease-in-out) infinite; }
@@ -1259,7 +1253,6 @@ kbd, .kbd {
   *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; scroll-behavior: auto !important; }
   .fireflies i { animation: none !important; opacity: 0.6; }
   .live-dot::after, .annot-dot::after, .is-next .evo-dot::after { display: none; }
-  .skel { animation: none !important; }
 }
 
 /* 启动期间正文先隐藏但保留占位，页面脚本填好内容后一次显示，避免启动时的布局偏移；出错时 boot.js 同样会去掉 is-booting */
