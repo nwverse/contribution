@@ -1,13 +1,12 @@
 // 奶蛙宇宙看板 · 交互层（window.NWK）
 // 依赖：assets/boot.js 读取 data/board.json → engine.js（RULES）→ assets/derive.js（window.NW）→ assets/icons.js（window.frogIcon）→ tokens.css
-// 只读 NW；所有数字都来自 NW。可放在 <head> 里同步加载：主题在此刻就写到 <html>，不闪烁。
+// 只读 NW；所有数字都来自 NW。由 boot.js 在数据就绪后加载；首帧主题已由 boot.js 写到 <html>，不闪烁。
 (function () {
   'use strict';
   const NW = window.NW;
-  if (!NW || !window.frogIcon) { console.warn('[NWK] 需要先引入 data.js、derive.js、icons.js'); }
+  if (!NW || !window.frogIcon) { console.warn('[NWK] 需要先由 assets/boot.js 加载 derive.js、icons.js'); }
   const root = document.documentElement;
   const qs = new URLSearchParams(location.search);
-  const inFrame = false; // 正式站点不嵌在原型外壳里，跳转一律走普通链接
   const mqReduce = matchMedia('(prefers-reduced-motion: reduce)');
   const mqDark = matchMedia('(prefers-color-scheme: dark)');
   const mqHover = matchMedia('(hover: hover) and (pointer: fine)');
@@ -458,8 +457,7 @@
     function toggle(origin) {
       const t = get() === 'dark' ? 'light' : 'dark';
       set(t, { origin, from: 'user' });
-      if (inFrame) { try { window.parent.postMessage({ type: 'nw:theme-changed', theme: t }, '*'); } catch (e) { /* 忽略 */ } }
-      else if (forced || qs.has('theme')) {
+      if (forced || qs.has('theme')) {
         const u = new URL(location.href); u.searchParams.set('theme', t); history.replaceState(history.state, '', u);
         // 顶栏、标签栏等站内链接是加载时按旧参数拼的，一起改成新主题
         $$('a[data-screen]').forEach((a) => {
@@ -595,7 +593,6 @@
   document.addEventListener('click', carryTheme, true);
   document.addEventListener('auxclick', carryTheme, true);
   function navigate(screen, hash = '') {
-    if (inFrame) { window.parent.postMessage({ type: 'nw:navigate', screen, hash }, '*'); return; }
     location.href = `${pageFile(screen)}${keepSearch()}${hash ? `#${hash}` : ''}`;
   }
   function openPerson(login) {
@@ -607,11 +604,6 @@
   }
   // c3 自己处理打开档案（例如在本页抽屉里换人）时注册
   const setPersonHandler = (fn) => { personHandler = fn; };
-  document.addEventListener('click', (e) => {
-    const a = e.target.closest('a[data-screen]');
-    if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
-    if (inFrame) { e.preventDefault(); navigate(a.dataset.screen, a.dataset.hash || ''); }
-  });
 
   // ───────────────────────── 人物卡 ─────────────────────────
   function personCardHTML(p) {
@@ -1818,7 +1810,7 @@
   window.NWK = {
     version: '2.0.0',
     // 环境
-    inFrame, reduced, canHover, isMac, ready,
+    reduced, canHover, isMac, ready,
     // 工具与格式
     $, $$, esc, clamp, hue, rng, fmt, mag,
     // 协议能力
