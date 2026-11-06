@@ -1,5 +1,5 @@
 // 各页主要交互，数字与测试数据逐一核对。
-import { test, expect, open, BOARD, RULES, LAST, THIS_WEEK, weekValue, mag } from './fixtures.mjs';
+import { test, expect, open, BOARD, RULES, LAST, THIS_WEEK, weekValue, mag, oneWeekBoard } from './fixtures.mjs';
 
 const P = BOARD.people;
 const byLogin = new Map(P.map((p) => [p.login, p]));
@@ -289,6 +289,29 @@ test.describe('形态池', () => {
     await expect(page.locator('#headline')).toContainText(String(BOARD.summary.hatched));
     const vacant = BOARD.summary.levelCounts.filter((n) => n === 0).length;
     if (vacant) await expect(page.locator('#ladder')).toContainText('虚位以待');
+  });
+
+  test('只有一周数据时堆叠图坐标有效，滑块停在唯一一周', async ({ page }) => {
+    await page.route('**/data/board.json', (route) => route.fulfill({ json: oneWeekBoard() }));
+    await open(page, '/pond.html');
+    await expect(page.locator('.boot-error')).toHaveCount(0);
+    const svg = page.locator('#chart svg');
+    await expect(svg).toHaveCount(1);
+    expect(await svg.evaluate((el) => el.outerHTML)).not.toMatch(/NaN|Infinity/);
+    await expect(page.locator('#chart .sel-tx')).toHaveText(/^已孵化 \d+ \/ \d+$/);
+    // 唯一一周的面积铺满绘图区，而不是缩成一条看不见的竖线
+    const box = await page.locator('#chart path.ar').first().evaluate((el) => el.getBBox().width);
+    expect(box).toBeGreaterThan(100);
+    const scrub = page.locator('#scrub');
+    await expect(scrub).toHaveAttribute('max', '0');
+    await expect(scrub).toHaveValue('0');
+    expect(await scrub.evaluate((el) => el.style.getPropertyValue('--p'))).toBe('100%');
+    // 悬停与键盘切周都停在这一周
+    await page.locator('#chart').hover();
+    expect(await page.locator('#hovBand').getAttribute('x')).not.toMatch(/NaN|Infinity/);
+    await page.locator('#chart').focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(scrub).toHaveValue('0');
   });
 });
 
