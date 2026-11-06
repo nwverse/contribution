@@ -905,12 +905,13 @@
 
   function newbieHTML(p, f) {
     const nb = p.newbie, days = R.newbie.days;
+    const start = nb.start ?? p.firstAt; // 旧快照没有 start，按首次贡献兜底
     const at = (day) => `${K.clamp(day / days * 100, 0, 100).toFixed(2)}%`;
     const lbAlign = (day) => (day <= 3 ? 'l' : day >= days - 3 ? 'r' : '');
     let tag, fill, marks = '', labels = '', call = '';
     const req = (ok, n, of, label) => `<div class="${ok ? 'ok' : ''}"><span>${label}</span><b>${n}<span class="muted" style="font-weight:500"> / 需 ${of}</span></b><span class="pips ${ok ? '' : 'miss'}">${Array.from({ length: of }, (_, k) => `<i class="${k < n ? 'on' : ''}"></i>`).join('')}</span></div>`;
     const reqs = `<div class="nb-req">${req(nb.merged >= R.newbie.merged, nb.merged, R.newbie.merged, '考核期内合入')}${req(nb.activeWeeks >= R.newbie.activeWeeks, nb.activeWeeks, R.newbie.activeWeeks, '活跃周')}</div>`;
-    labels += `<span class="nb-lb bot l" style="left:0">${fmt.md(p.firstAt)} 首次贡献</span><span class="nb-lb bot r" style="left:100%">${fmt.md(nb.end)} 期满</span>`;
+    labels += `<span class="nb-lb bot l" style="left:0">${fmt.md(start)} ${nb.retake ? '看板上线，补考起' : '首次贡献'}</span><span class="nb-lb bot r" style="left:100%">${fmt.md(nb.end)} 期满</span>`;
     if (nb.status === 'passed') {
       tag = `<span class="tag tag-leaf">${icon('check', 11)}已通过</span>`;
       const day = nb.passDay;
@@ -924,7 +925,7 @@
       fill = `<i class="nb-fill wait" style="width:${at(Math.max(day, 0.6))}"></i>`;
       marks = `<i class="nb-mk now" style="left:${at(day)}"></i>`;
       labels += `<span class="nb-lb top ${lbAlign(day)}" style="left:${at(day)}">今天 · 第 ${day + 1} 天</span>`;
-      call = `<p class="pf-note">考核从首次贡献起算 ${days} 天，期满在 ${fmt.md(nb.end)}。差哪一项、怎么补，见上面的进化进度。</p>`;
+      call = `<p class="pf-note">${nb.retake ? `看板上线前就来了、第一次考核期没通过，从看板上线日（${fmt.md(start)}）起补考 ${days} 天，上线前的合入不算` : `考核从首次贡献起算 ${days} 天`}，期满在 ${fmt.md(nb.end)}。差哪一项、怎么补，见上面的进化进度。</p>`;
     } else {
       const hk = hatchIdx(p);
       fill = `<i class="nb-fill fail" style="width:100%"></i>`;
@@ -941,7 +942,7 @@
     return `<section class="drawer-sec" aria-label="新手考核">
       <div class="drawer-sec-h"><span class="t">${icon('egg', 15)}新手考核 · ${days} 天</span>${tag}</div>
       <div class="nb">
-        <div class="nb-track" role="img" aria-label="${esc(`考核期 ${fmt.md(p.firstAt)} 到 ${fmt.md(nb.end)}`)}">${fill}${marks}${labels}</div>
+        <div class="nb-track" role="img" aria-label="${esc(`${nb.retake ? '补考期' : '考核期'} ${fmt.md(start)} 到 ${fmt.md(nb.end)}`)}">${fill}${marks}${labels}</div>
         ${reqs}${call}
       </div>
     </section>`;

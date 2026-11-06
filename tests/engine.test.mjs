@@ -129,6 +129,8 @@ const activityData = ({ prs = [], issues = [] }) => ({
   org: 'example', members: ['author', 'collaborator'], repos: [{ name: 'project', prs, issues }],
 });
 const collabBonus = weeklyScore(0, 0, RULES.score.collab).bonus;
+// 下面两条用例的时间在 RULES.newbie.since 之前，只测首次贡献起算的考核期，关掉补考
+const NO_SINCE = { ...RULES, newbie: { ...RULES.newbie, since: null } };
 
 for (const scenario of [
   { name: 'PR reviews', prs: [activityPr({ reviews: [review(FIRST), review(LATEST)] })] },
@@ -173,8 +175,8 @@ test('a repeat in a second week completes the activity requirement without extra
   const own = Array.from({ length: RULES.newbie.merged }, (_, i) => ({
     ...activityPr({ mergedAt: FIRST }), number: i + 2, author: collaborator,
   }));
-  const before = computeBoard(activityData({ prs: [...own, activityPr({ reviews: [review(FIRST)] })] }), RULES, NOW);
-  const after = computeBoard(activityData({ prs: [...own, activityPr({ reviews: [review(FIRST), review(second)] })] }), RULES, NOW);
+  const before = computeBoard(activityData({ prs: [...own, activityPr({ reviews: [review(FIRST)] })] }), NO_SINCE, NOW);
+  const after = computeBoard(activityData({ prs: [...own, activityPr({ reviews: [review(FIRST), review(second)] })] }), NO_SINCE, NOW);
   const person = after.people.find((p) => p.login === collaborator.login);
   const previous = before.people.find((p) => p.login === collaborator.login);
   assert.equal(previous.newbie.status, 'failed');
@@ -188,8 +190,117 @@ test('a repeat in a second week completes the activity requirement without extra
 });
 
 test('filing an issue still counts toward personal and assessment activity weeks', () => {
-  const board = computeBoard(activityData({ issues: [activityIssue([])] }), RULES, NOW);
+  const board = computeBoard(activityData({ issues: [activityIssue([])] }), NO_SINCE, NOW);
   const person = board.people.find((p) => p.login === activityAuthor.login);
   assert.equal(person.activeWeeks, 1);
   assert.equal(person.newbie.activeWeeks, 1);
+});
+
+// 新手考核起点：看板上线（RULES.newbie.since）前就有贡献、第一次考核期没通过的人，从 since 起再考一次。
+const SINCE = Date.parse(RULES.newbie.since);
+const at = (days) => new Date(SINCE + days * 86400000).toISOString();
+const newbieOf = (prs, now) => scorePerson(prs, [], Date.parse(now)).newbie;
+const merges = (times) => times.map((t, i) => scorePr(i + 1, t));
+
+test('newbie: a contributor who failed before the board launched retakes from RULES.newbie.since', () => {
+  const nb = newbieOf(merges([at(-60)]), at(4));
+  assert.equal(nb.status, 'pending');
+  assert.equal(nb.retake, true);
+  assert.equal(nb.start, SINCE);
+  assert.equal(nb.end, SINCE + RULES.newbie.days * 86400000);
+  assert.equal(nb.merged, 0); // 上线前的合入不算进补考期
+  const passed = newbieOf(merges([at(-60), at(1), at(2), at(8)]), at(9));
+  assert.equal(passed.status, 'passed');
+  assert.equal(passed.passAt, Date.parse(at(8)));
+  assert.equal(passed.passDay, 9);
+  const failed = newbieOf(merges([at(-60), at(1)]), at(RULES.newbie.days + 1));
+  assert.equal(failed.status, 'failed');
+});
+
+test('newbie: a pass before the board launched is kept', () => {
+  const nb = newbieOf(merges([at(-60), at(-59), at(-50)]), at(4));
+  assert.equal(nb.status, 'passed');
+  assert.equal(nb.retake, false);
+  assert.equal(nb.passAt, Date.parse(at(-50)));
+});
+
+test('newbie: an assessment window still open at launch keeps its earlier merges', () => {
+  // 首次贡献在上线前 10 天，第一次考核期还没结束：上线前的合入照算，在第一次考核期内达标即通过
+  const nb = newbieOf(merges([at(-10), at(-9), at(3)]), at(4));
+  assert.equal(nb.status, 'passed');
+  assert.equal(nb.start, Date.parse(at(-10)));
+  const open = newbieOf(merges([at(-10), at(-9)]), at(4));
+  assert.equal(open.status, 'pending');
+  assert.equal(open.merged, 2);
+  assert.equal(open.end, Date.parse(at(20)));
+  assert.equal(open.retake, false);
+  // 第一次考核期到期没过，换成从 since 起的补考期；上线前的合入不带过去
+  const later = newbieOf(merges([at(-10), at(-9)]), at(21));
+  assert.equal(later.status, 'pending');
+  assert.equal(later.retake, true);
+  assert.equal(later.start, SINCE);
+  assert.equal(later.merged, 0);
+  const retaken = newbieOf(merges([at(-10), at(-9), at(22), at(23), at(29)]), at(29.5));
+  assert.equal(retaken.status, 'passed');
+  assert.equal(retaken.retake, true);
+  assert.equal(retaken.passDay, 30);
+});
+
+test('newbie: a first contribution exactly at since takes the normal assessment', () => {
+  const nb = newbieOf(merges([at(0), at(1), at(8)]), at(9));
+  assert.equal(nb.retake, false);
+  assert.equal(nb.start, SINCE);
+  assert.equal(nb.status, 'passed');
+  const open = newbieOf(merges([at(0)]), at(4));
+  assert.equal(open.retake, false);
+  assert.equal(open.status, 'pending');
+  // 考核期满没过也不补考：since 当刻来的人不算「上线前来的」
+  const failed = newbieOf(merges([at(0)]), at(40));
+  assert.equal(failed.retake, false);
+  assert.equal(failed.status, 'failed');
+});
+
+test('newbie: retake activity weeks count only from since', () => {
+  // 上线前一周（at(-3)）有动作，补考期只算上线后的周
+  const nb = newbieOf(merges([at(-60), at(-3), at(1), at(2)]), at(4));
+  assert.equal(nb.retake, true);
+  assert.equal(nb.merged, 2);
+  assert.equal(nb.activeWeeks, 1);
+  const two = newbieOf(merges([at(-60), at(-3), at(1), at(8)]), at(9));
+  assert.equal(two.activeWeeks, 2);
+  assert.equal(two.status, 'pending'); // 合入 2 个，还差 1 个
+});
+
+test('newbie: retake anomaly counts only PRs opened in the retake window', () => {
+  const open = (n, t) => ({ ...scorePr(n, t), mergedAt: null, closedAt: null });
+  const before = Array.from({ length: RULES.newbie.anomaly.opened }, (_, i) => open(100 + i, at(-50)));
+  const nb = newbieOf([...merges([at(-60)]), ...before], at(10));
+  assert.equal(nb.retake, true);
+  assert.equal(nb.anomaly, false);
+  const inside = Array.from({ length: RULES.newbie.anomaly.opened }, (_, i) => open(200 + i, at(1)));
+  const flagged = newbieOf([...merges([at(-60)]), ...inside], at(10));
+  assert.equal(flagged.retake, true);
+  assert.equal(flagged.anomaly, true);
+});
+
+test('newbie: before since a failed first window does not switch to the retake window', () => {
+  const nb = newbieOf(merges([at(-60)]), at(-5));
+  assert.equal(nb.retake, false);
+  assert.equal(nb.status, 'failed');
+  assert.equal(nb.start, Date.parse(at(-60)));
+  assert.equal(nb.daysLeft, 0);
+});
+
+test('newbie: contributors who arrive after the launch are unaffected', () => {
+  const nb = newbieOf(merges([at(5), at(6), at(13)]), at(14));
+  assert.equal(nb.retake, false);
+  assert.equal(nb.start, Date.parse(at(5)));
+  assert.equal(nb.status, 'passed');
+});
+
+test('newbie: since null restores the first-contribution-only assessment', () => {
+  const rules = { ...RULES, newbie: { ...RULES.newbie, since: null } };
+  const nb = computeBoard({ org: 'example', members: [], repos: [{ name: 'project', prs: merges([at(-60)]), issues: [] }] }, rules, Date.parse(at(4))).people[0].newbie;
+  assert.equal(nb.status, 'failed');
+  assert.equal(nb.retake, false);
 });

@@ -55,6 +55,9 @@ const RULES = {
     days: 30,
     merged: 3,
     activeWeeks: 2,
+    // 看板上线日。首次贡献早于它、且按首次贡献起算的考核期没通过的人，从这一天起再给一次 days 天考核期，只算这段时间里的动作；
+    // 已通过的不受影响，上线时第一次考核期还没结束的先按它考完。设为 null 回到只按首次贡献考一次
+    since: '2026-11-02T00:00:00+08:00',
     // 考核期内开 PR 数达到 opened、合入比低于 rate，标记为「新手异常」；最近 graceHours 内开的 PR 不计
     anomaly: { opened: 10, rate: 0.3, graceHours: 48 },
   },
@@ -343,29 +346,46 @@ function computeBoard(data, rules, now) {
       return { merged, closed, withdrawn, stale, inflight, resolved, rate: resolved ? merged / resolved : null };
     };
 
-    // 新手考核：首次贡献起 nb.days 天内，各项全部达标即通过
-    const end = firstAt + nb.days * DAY;
-    const evalAt = Math.min(now, end);
-    let passAt = null;
-    const windowWeeks = new Set();
-    let windowMerged = 0;
+    // 新手考核：首次贡献起 nb.days 天内各项全部达标即通过。
+    // 首次贡献早于 nb.since 且第一次考核期没通过的，从 nb.since 起再考一次（看板上线前没人知道有考核）。
     const events = [...mergedTimes.map((t) => [t, true]), ...p.activityTimes.map((t) => [t, false])].sort((x, y) => x[0] - y[0]);
-    for (const [t, isMerge] of events) {
-      if (t > evalAt) break;
-      windowWeeks.add(weekStart(t, tz));
-      if (isMerge) windowMerged++;
-      if (passAt === null && windowMerged >= nb.merged && windowWeeks.size >= nb.activeWeeks) passAt = t;
+    const assess = (start) => {
+      const end = start + nb.days * DAY;
+      const evalAt = Math.min(now, end);
+      let passAt = null;
+      const windowWeeks = new Set();
+      let windowMerged = 0;
+      for (const [t, isMerge] of events) {
+        if (t > evalAt) break;
+        if (t < start) continue;
+        windowWeeks.add(weekStart(t, tz));
+        if (isMerge) windowMerged++;
+        if (passAt === null && windowMerged >= nb.merged && windowWeeks.size >= nb.activeWeeks) passAt = t;
+      }
+      return { start, end, evalAt, passAt, windowWeeks, windowMerged };
+    };
+    const sinceAt = nb.since ? Date.parse(nb.since) : null;
+    let w = assess(firstAt);
+    let retake = false;
+    // 补考期还没开始（now 早于 since）时不换，仍按第一次考核期
+    if (!w.passAt && sinceAt !== null && firstAt < sinceAt && now >= sinceAt) {
+      const w2 = assess(sinceAt);
+      // 两次考核期任一通过即通过；都没通过时，第一次考核期还没结束就继续看它，结束了换第二次
+      if (w2.passAt || now >= w.end) { w = w2; retake = true; }
     }
+    const { start, end, evalAt, passAt, windowWeeks } = w;
     const openedCutoff = Math.min(evalAt - nb.anomaly.graceHours * 3600000, end);
-    const opened = p.prs.filter((x) => x.created <= openedCutoff);
+    const opened = p.prs.filter((x) => x.created >= start && x.created <= openedCutoff);
     const openedMerged = opened.filter((x) => x.merged && x.merged <= evalAt).length;
     const anomaly = opened.length >= nb.anomaly.opened && openedMerged / opened.length < nb.anomaly.rate;
     const newbie = {
       status: passAt ? 'passed' : now < end ? 'pending' : 'failed',
+      start,
+      retake,
       end,
       passAt,
-      passDay: passAt ? Math.floor((passAt - firstAt) / DAY) + 1 : null,
-      merged: countUpTo(mergedTimes, evalAt),
+      passDay: passAt ? Math.floor((passAt - start) / DAY) + 1 : null,
+      merged: w.windowMerged,
       activeWeeks: windowWeeks.size,
       daysLeft: Math.max(0, Math.ceil((end - now) / DAY)),
       anomaly,
