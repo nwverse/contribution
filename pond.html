@@ -558,7 +558,7 @@
     const host = $('#chart');
     host.tabIndex = 0;
     host.setAttribute('role', 'img');
-    let G = null, hov = -1, series = null;
+    let G = null, hov = -1, series = null, seriesKey = '';
     // Same pattern as NWK.columns(): role=img hides the layers, so keyboard week moves are read out by a sibling
     // polite live region, created up front because some screen readers ignore a region inserted as it changes.
     // The chart lives as long as the page, so there is no destroy() to remove it from.
@@ -574,15 +574,21 @@
         + (rows.length ? `，${rows.map((r) => `${r.Lr.name} ${r.v}`).join('，')}` : '，还没有贡献者');
     }
     const tw = (s) => [...String(s)].reduce((n, c) => n + (/[　-鿿＀-￯]/.test(c) ? 11 : 6.2), 0);
+    // The series depends only on the filters, not on the selected week, so week changes and resize/theme
+    // redraws reuse it instead of re-running snap() for every week.
     function compute() {
+      const key = `${state.member}|${state.sleep}`;
+      if (series && key === seriesKey) return false;
       const list = pool();
-      return NW.weeks.map((_, i) => {
+      series = NW.weeks.map((_, i) => {
         const s = snap(i, list);
         return { i, v: [...s.lv.map((a) => a.length), s.eggs.length, s.un.length], hatched: s.hatched, total: s.total, lv: s.lv };
       });
+      seriesKey = key;
+      return true;
     }
     function draw() {
-      series = compute();
+      const fresh = compute();
       const sm = matchMedia('(max-width: 720px)').matches;
       const Wd = host.clientWidth || 600, H = host.clientHeight || 216;
       const padL = sm ? 26 : 32, padR = sm ? 10 : 14, padT = 26, padB = 22;
@@ -663,7 +669,7 @@
       wrap.style.marginLeft = `${padL - 9}px`;
       wrap.style.marginRight = `${padR - 9}px`;
       renderLegend();
-      renderTable();
+      if (fresh) renderTable();
       if (hov >= 0) hover(hov, false);
     }
     function renderLegend() {

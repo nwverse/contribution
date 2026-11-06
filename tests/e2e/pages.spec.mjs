@@ -434,6 +434,29 @@ test.describe('形态池', () => {
     await page.keyboard.press('ArrowLeft');
     await expect(scrub).toHaveValue('0');
   });
+
+  test('换周不重算全部历史周的堆叠图，筛选变化时才重算', async ({ page }) => {
+    await open(page, '/pond.html');
+    await page.evaluate(() => {
+      const K = window.NWK, f = K.formOf;
+      window.__formOfCalls = 0;
+      K.formOf = (...a) => { window.__formOfCalls++; return f(...a); };
+    });
+    const before = await page.locator('#srTable').innerHTML();
+    const sel = await page.locator('#chart .sel-tx').textContent();
+    await page.locator('#stPrev').click();
+    await expect(page.locator('#scrub')).toHaveValue(String(LAST - 1));
+    // One snapshot of the new week at most, not weeks x people
+    expect(await page.evaluate(() => window.__formOfCalls)).toBeLessThanOrEqual(P.length);
+    // The chart still follows the selected week and the per-week table is unchanged
+    await expect(page.locator('#chart .sel-tx')).not.toHaveText(sel ?? '');
+    expect(await page.locator('#srTable').innerHTML()).toBe(before);
+    // A filter change still recomputes every week
+    await page.evaluate(() => { window.__formOfCalls = 0; });
+    await page.locator('#swSleep').evaluate((el) => el.click());
+    expect(await page.evaluate(() => window.__formOfCalls)).toBeGreaterThan(P.length);
+    expect(await page.locator('#srTable').innerHTML()).not.toBe(before);
+  });
 });
 
 test('档案页不带 #u= 且没记住账号时停在落地页，不打开任何人', async ({ page }) => {
