@@ -1080,7 +1080,7 @@
         <dt><span class="tag tag-warn">${icon('alert-triangle', 11)}合入率警告</span></dt><dd>已收尾越多，警告线越高。只提醒，不扣魔力，也不影响形态。<div class="gl-warn">${wl}</div></dd>
         <dt><span class="tag tag-sleep">${icon('moon-z', 11)}冬眠</span></dt><dd>${R.dormantDays} 天没有任何动作。只做标记；${N.LV[R.dormantExemptLevel].name}及以上豁免。</dd>
         <dt><span class="tag tag-out">组织外</span></dt><dd>数据更新时不在组织成员名单里的账号。贡献照常计分。</dd>
-        <dt><span class="tag tag-warn">${icon('trending-down', 11)}掉队</span> <span class="tag tag-watch">${icon('eye', 11)}观察</span></dt><dd>按活力（0–100）判断：综合近期产出、持续度、历史信用与最近动作。低于 ${R.vitality.laggard} 为掉队，低于 ${R.vitality.watch} 为观察；首次贡献未满 ${R.newbie.days} 天不评。<a class="link" href="rules.html#vitality">公式</a></dd>
+        <dt><span class="tag tag-warn">${icon('trending-down', 11)}掉队</span> <span class="tag tag-watch">${icon('eye', 11)}观察</span></dt><dd>按活力（0–100）判断：综合近期产出、持续度、历史信用与最近动作。低于 ${R.vitality.laggard} 为掉队，低于 ${R.vitality.watch} 为观察；首次贡献未满 ${R.newbie.days} 天不评。<a class="link" href="rules.html#vitality" data-screen="rules">公式</a></dd>
         <dt><span class="tag tag-warn">${icon('zap', 11)}新手异常</span></dt><dd>考核期内开了 ${R.newbie.anomaly.opened} 个以上 PR，合入的不到 ${fmt.pct(R.newbie.anomaly.rate)}。最近 ${R.newbie.anomaly.graceHours} 小时内开的 PR 不计。只做标记。</dd>
       </dl></div>`;
   })();

@@ -51,6 +51,41 @@ test('?theme=dark 切到暗色，导航时保留', async ({ page }) => {
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 
+// 正文里手写的站内链接（不经顶栏拼接）也带上 ?theme，并保留链接自己的参数和锚点
+const CONTENT_LINKS = [
+  { from: '/index.html?theme=dark', link: '#boardLink', to: /ranking\.html\?win=week&theme=dark$/ },
+  { from: '/index.html?theme=dark', link: '.lag-links a', to: /ranking\.html\?flag=(lag|watch)&theme=dark$/ },
+  { from: '/index.html?theme=dark', link: '#lagFoot a[href^="rules.html"]', to: /rules\.html\?theme=dark#vitality$/ },
+  { from: '/rules.html?theme=dark', link: '.vt-now a', to: /ranking\.html\?flag=(lag|watch)&theme=dark$/ },
+  { from: '/ranking.html?theme=dark', link: '#gloss a[href^="rules.html"]', to: /rules\.html\?theme=dark#vitality$/ },
+  { from: '/profile.html?theme=dark#u=frog-03', link: '.drawer a[href^="rules.html"]', to: /rules\.html\?theme=dark#vitality$/ },
+];
+for (const c of CONTENT_LINKS) {
+  test(`正文链接带上 ?theme：${c.from} ${c.link}`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await open(page, c.from);
+    await page.locator(c.link).first().click();
+    await expect(page).toHaveURL(c.to);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  });
+}
+
+test('正文链接在 ?theme=dark 下切到白天后带上新主题', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await open(page, '/index.html?theme=dark');
+  await page.locator('#appbar [data-theme-toggle]').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.locator('#boardLink').click();
+  await expect(page).toHaveURL(/ranking\.html\?win=week&theme=light$/);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+});
+
+test('没有 ?theme 时正文链接保持原样', async ({ page }) => {
+  await open(page, '/index.html');
+  await page.locator('#boardLink').click();
+  await expect(page).toHaveURL(/ranking\.html\?win=week$/);
+});
+
 const THEME_KEY = 'nwverse:contribution:theme';
 for (const scheme of ['light', 'dark']) {
   const other = scheme === 'dark' ? 'light' : 'dark';

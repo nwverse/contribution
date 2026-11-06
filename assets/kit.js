@@ -579,6 +579,19 @@
   const pageFile = (id) => PAGE_FILES[id] || 'index.html';
   // 跨页只带公共显示参数（theme）；榜单的 win / flag、首页的 week 只属于本页，不带到别的页面
   const keepSearch = () => { const t = new URLSearchParams(location.search).get('theme'); return t === 'light' || t === 'dark' ? `?theme=${t}` : ''; };
+  // 正文里手写的站内链接（如 ranking.html?win=week、rules.html#vitality）不带 theme：
+  // 点击时按当前地址补上，保留链接自己的参数与锚点；捕获阶段执行，也覆盖之后重写过 href 的链接
+  function carryTheme(e) {
+    const a = e.target instanceof Element && e.target.closest('a[data-screen][href]');
+    const t = new URLSearchParams(location.search).get('theme');
+    if (!a || (t !== 'light' && t !== 'dark')) return;
+    const h = new URL(a.getAttribute('href'), location.href);
+    if (h.origin !== location.origin || h.searchParams.has('theme')) return;
+    h.searchParams.set('theme', t);
+    a.setAttribute('href', h.pathname.split('/').pop() + h.search + h.hash);
+  }
+  document.addEventListener('click', carryTheme, true);
+  document.addEventListener('auxclick', carryTheme, true);
   function navigate(screen, hash = '') {
     if (inFrame) { window.parent.postMessage({ type: 'nw:navigate', screen, hash }, '*'); return; }
     location.href = `${pageFile(screen)}${keepSearch()}${hash ? `#${hash}` : ''}`;
