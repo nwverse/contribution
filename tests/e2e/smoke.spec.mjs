@@ -1,4 +1,4 @@
-// 六个页面都能启动：无报错、导航正确、启动无布局偏移、主题参数生效、只请求本站资源、启动脚本与数据并行下载；K.flip 跳过屏外的动画。
+// 六个页面都能启动：无报错、导航正确（含组织主页入口）、启动无布局偏移、主题参数生效、只请求本站资源、启动脚本与数据并行下载；K.flip 跳过屏外的动画。
 import { test, expect, open, PAGES, NAV } from './fixtures.mjs';
 
 for (const pg of PAGES) {
@@ -13,6 +13,11 @@ for (const pg of PAGES) {
     for (const other of NAV) await expect(nav.locator(`a[data-screen="${other.id}"]`)).toHaveAttribute('href', other.file);
     if (pg.nav === false) await expect(nav.locator('[aria-current="page"]')).toHaveCount(0);
     else await expect(nav.locator('[aria-current="page"]')).toHaveAttribute('data-screen', pg.id);
+    // 顶栏右侧的站外入口只指向组织主页，新窗口打开
+    const org = page.locator('#appbar .org-link');
+    await expect(org).toBeVisible();
+    await expect(org).toHaveAttribute('href', 'https://github.com/nwverse');
+    await expect(org).toHaveAttribute('target', '_blank');
     // 外部请求只允许 GitHub 头像（已被拦截）；不允许调用 GitHub API
     expect(external.filter((u) => !/^https:\/\/github\.com\/[^/]+\.png/.test(u))).toEqual([]);
   });

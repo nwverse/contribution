@@ -433,6 +433,12 @@ main[tabindex="-1"]:focus { outline: none; }
 .nav a:hover { color: var(--ink); background: var(--surface-hover); }
 .nav a[aria-current="page"] { color: var(--ink); background: var(--surface); box-shadow: var(--sh-hl), 0 0 0 1px var(--line-soft), var(--sh-1); }
 .nav a[aria-current="page"] .ic { color: var(--leaf); opacity: 1; }
+/* 站外入口：竖线与站内导航分开，箭头表示新窗口打开 */
+.org-link { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; border-radius: var(--r-md); color: var(--ink-3); font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; transition: color var(--dur-1), background-color var(--dur-1); }
+.org-link::before { content: ""; position: absolute; left: calc(var(--s-6) / -2); top: 8px; bottom: 8px; width: 1px; background: var(--line-soft); }
+.org-link .ext { opacity: 0.6; transition: transform var(--dur-1); }
+.org-link:hover { color: var(--ink); background: var(--surface-hover); }
+.org-link:hover .ext { opacity: 1; transform: translate(1px, -1px); }
 .appbar-r { margin-left: auto; display: flex; align-items: center; gap: var(--s-2); }
 .fresh { display: inline-flex; align-items: center; gap: 7px; font-size: var(--fs-xs); color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; margin-right: 4px; }
 .live-dot { position: relative; width: 7px; height: 7px; border-radius: 50%; background: var(--leaf); flex: none; }
@@ -443,10 +449,13 @@ main[tabindex="-1"]:focus { outline: none; }
 
 /* 手机底部标签栏 */
 .tabbar { display: none; }
-@media (max-width: 1100px) { .fresh-label { display: none; } .search-btn { width: auto; } .search-btn .lbl, .search-btn .kbds { display: none; } }
+@media (max-width: 1100px) { .org-link .lbl, .org-link .ext { display: none; } .fresh-label { display: none; } .search-btn { width: auto; } .search-btn .lbl, .search-btn .kbds { display: none; } }
 @media (max-width: 900px) { .nav a { padding: 0 8px; } .nav a .ic { display: none; } }
 @media (max-width: 720px) {
   .appbar-in { gap: var(--s-3); }
+  .org-link { margin-left: auto; width: 40px; height: 40px; padding: 0; justify-content: center; }
+  .org-link + .appbar-r { margin-left: 0; }
+  .org-link::before { display: none; }
   .appbar .nav, .appbar .fresh, .brand-sub { display: none; }
   .tabbar {
     position: fixed;
