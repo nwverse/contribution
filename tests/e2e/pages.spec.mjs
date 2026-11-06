@@ -1,5 +1,5 @@
 // 各页主要交互，数字与测试数据逐一核对。
-import { test, expect, open, BOARD, RULES, LAST, THIS_WEEK, weekValue, mag, oneWeekBoard } from './fixtures.mjs';
+import { test, expect, open, BOARD, RULES, LAST, THIS_WEEK, weekValue, mag, oneWeekBoard, recentWeeksBoard } from './fixtures.mjs';
 
 const P = BOARD.people;
 const byLogin = new Map(P.map((p) => [p.login, p]));
@@ -96,6 +96,40 @@ test.describe('排行榜', () => {
     await expect(chip).toContainText(String(BOARD.summary.anomaly));
     await chip.click();
     await expect(chip).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  for (const n of [1, 2]) {
+    test(`不足 4 周（${n} 周）的看板：近 4 周从第一周算起，不出现 NaN`, async ({ page }) => {
+      const board = recentWeeksBoard(n);
+      await page.route('**/data/board.json', (route) => route.fulfill({ json: board }));
+      await open(page, '/ranking.html');
+      const stats = page.locator('#introStats');
+      await expect(stats.locator('.istat')).toHaveCount(3);
+      await expect(stats).not.toContainText('NaN');
+      const since = await page.evaluate(() => NWK.fmt.md(NW.W[0]));
+      await expect(stats.locator('.istat').nth(2).locator('small')).toHaveText(`${since}起`);
+    });
+  }
+
+  test('只有一周数据的看板：时光机拖动条居中一根柱，布局与键盘都不出现 NaN', async ({ page }) => {
+    await page.route('**/data/board.json', (route) => route.fulfill({ json: oneWeekBoard() }));
+    await open(page, '/ranking.html');
+    const scrub = page.locator('#tmScrub');
+    await expect(scrub.locator('.c')).toHaveCount(1);
+    const styles = await page.locator('#tmCard [style]').evaluateAll((els) => els.map((e) => e.getAttribute('style')));
+    expect(styles.filter((s) => /NaN|Infinity/.test(s))).toEqual([]);
+    const lefts = await scrub.locator('.c').evaluateAll((els) => els.map((e) => e.style.left));
+    for (const l of lefts) {
+      expect(l).not.toBe('');
+      expect(Number.isFinite(parseFloat(l))).toBe(true);
+    }
+    const [sb, cb] = [await scrub.boundingBox(), await scrub.locator('.c').boundingBox()];
+    expect(Math.abs(cb.x + cb.width / 2 - (sb.x + sb.width / 2))).toBeLessThan(2);
+    for (const key of ['Home', 'End', 'ArrowRight']) {
+      await scrub.focus();
+      await page.keyboard.press(key);
+      await expect(scrub).toHaveAttribute('aria-valuenow', '0');
+    }
   });
 });
 

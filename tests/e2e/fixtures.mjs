@@ -11,17 +11,21 @@ export const THIS_WEEK = BOARD.weeks[LAST].start;
 export const weekValue = (p, start) => (p.weekly.find(([w]) => w === start) || [0, 0])[1];
 export const mag = (x) => (Math.round((x || 0) * 10) / 10).toLocaleString('zh-CN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
-// 只有一周数据的看板（组织刚开始统计）：只留最后一周及这周有记录的人，
-// 逐周魔力也只留这一周，firstAt 不早于这一周
-export function oneWeekBoard() {
+// 只有最近 n 周数据的看板（组织刚开始统计）：只留最后 n 周及这几周有记录的人，
+// 逐周魔力也只留这几周，firstAt 不早于其中第一周
+export function recentWeeksBoard(n) {
   const board = structuredClone(BOARD);
-  const week = board.weeks[LAST];
-  board.weeks = [week];
+  board.weeks = board.weeks.slice(-n);
+  const kept = new Set(board.weeks.map((w) => w.start));
+  const first = board.weeks[0].start;
   board.people = board.people
-    .filter((p) => p.weekly.some(([w]) => w === week.start))
-    .map((p) => ({ ...p, weekly: p.weekly.filter(([w]) => w === week.start), firstAt: Math.max(p.firstAt, week.start) }));
+    .filter((p) => p.weekly.some(([w]) => kept.has(w)))
+    .map((p) => ({ ...p, weekly: p.weekly.filter(([w]) => kept.has(w)), firstAt: Math.max(p.firstAt, first) }));
   return board;
 }
+
+// 只有一周数据的看板
+export const oneWeekBoard = () => recentWeeksBoard(1);
 
 export const PAGES = [
   { file: 'index.html', id: 'c1', label: '本周' },
