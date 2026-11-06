@@ -1,5 +1,6 @@
 // 各页主要交互，数字与测试数据逐一核对。
 import fs from 'node:fs';
+import vm from 'node:vm';
 import { test, expect, open, BOARD, RULES, LAST, THIS_WEEK, weekValue, mag, oneWeekBoard, recentWeeksBoard, freshBoard } from './fixtures.mjs';
 
 const P = BOARD.people;
@@ -506,4 +507,75 @@ test.describe('还没有魔力的看板（fresh）', () => {
       expect(bad).toEqual([]);
     });
   }
+});
+
+// 孵化门槛与新手考核的数字只在 RULES 维护：把 engine.js 换成孵化线 60、考核期 21 天的版本，页面上的文案应跟着变
+test.describe('孵化门槛跟随 RULES', () => {
+  const ENGINE = fs.readFileSync(new URL('../../engine.js', import.meta.url), 'utf8');
+  const tweaked = ENGINE
+    .replace(/(\{ name: '小奶蛙',[^}]*bonus: )50( \})/, '$160$2')
+    .replace(/(newbie: \{\s*days: )30,/, '$121,');
+  const useTweakedRules = (page) => page.route('**/engine.js', (route) => route.fulfill({ contentType: 'text/javascript', body: tweaked }));
+  // 门槛相关文案里不应再出现旧数字（「剩 30 天」是数据里的剩余天数，不算）
+  const STALE = /\/ ?50(?![0-9])|到 50(?![0-9])|≥ ?50(?![0-9])|30 天内|考核 30 天/;
+
+  test('改写后的 engine.js 确实改了两处门槛', () => {
+    const r = vm.runInNewContext(`${tweaked}\n;RULES`);
+    expect([r.levels[1].bonus, r.newbie.days]).toEqual([60, 21]);
+    expect([RULES.levels[1].bonus, RULES.newbie.days]).toEqual([50, 30]);
+  });
+
+  test('档案：未孵化的人按 RULES 显示孵化线与考核期', async ({ page }) => {
+    const p = byLogin.get('frog-26');
+    expect([p.level, p.newbie.status]).toEqual([null, 'failed']);
+    await useTweakedRules(page);
+    await open(page, '/profile.html#u=frog-26');
+    const row = page.locator('#rows .lrow[data-login="frog-26"] .fn');
+    await expect(row).toContainText(`魔力 ${mag(p.bonus)}/60`);
+    const body = page.locator('.drawer.on #pfBody');
+    await expect(body).toContainText('frog-26');
+    await expect(body).toContainText('（到 60）');
+    await expect(body).toContainText(`魔力 ${mag(p.bonus)} / 60`);
+    expect(await row.textContent()).not.toMatch(STALE);
+    expect(await body.textContent()).not.toMatch(STALE);
+  });
+
+  test('档案：考核中的蛙卵按 RULES 显示考核期、两项要求与孵化线', async ({ page }) => {
+    const p = byLogin.get('frog-41');
+    expect([p.level, p.newbie.status]).toEqual([null, 'pending']);
+    await useTweakedRules(page);
+    await open(page, '/profile.html#u=frog-41');
+    const body = page.locator('.drawer.on #pfBody');
+    await expect(body).toContainText('frog-41');
+    await expect(body).toContainText('考核 21 天');
+    await expect(body).toContainText(`或魔力攒到 60（现在 ${mag(p.bonus)}）直接孵化`);
+    await expect(body.locator('.evo-check').first()).toContainText(`/${RULES.newbie.merged}合入 PR`);
+    expect(await body.textContent()).not.toMatch(STALE);
+  });
+
+  test('孵化台：蛙卵卡片、未孵化列表与分组说明按 RULES 显示', async ({ page }) => {
+    await useTweakedRules(page);
+    await open(page, '/hatchery.html');
+    // 漏斗节点的悬停说明
+    const tip = page.locator('#nwk-tip');
+    for (const [id, want] of [['egg', '首次贡献 21 天内，还在考核'], ['failed', '考核期满，魔力也不到 60'], ['hatched', '通过新手考核，或魔力 ≥60'],
+      ['passed', `21 天内合入 ≥${RULES.newbie.merged} 且活跃周 ≥${RULES.newbie.activeWeeks}`], ['magic', '没通过考核，魔力攒到 60 孵化']]) {
+      await page.locator(`#funnel .fx-node[data-id="${id}"]`).hover();
+      await expect(tip).toContainText(want);
+      expect(await tip.textContent()).not.toMatch(STALE);
+    }
+    const egg = page.locator('#board article.egg').first();
+    await expect(egg).toHaveAttribute('aria-label', /魔力 [0-9.,]+\/60，/);
+    await expect(egg.locator('.rq.or .v')).toContainText('/60');
+    await expect(egg.locator('.rq.or .l')).toHaveAttribute('data-tip', '魔力 ≥60 不看考核，直接孵化');
+    await page.keyboard.press('u');
+    await expect(page.locator('#foldBtn')).toHaveAttribute('aria-expanded', 'true');
+    const fold = page.locator('#foldIn');
+    await expect(fold.locator('.lrow-head')).toContainText('魔力 · 到 60 补孵化');
+    await expect(fold.locator('.rows .lrow').first()).toContainText('/60');
+    const text = await page.locator('main').textContent();
+    const aria = await page.locator('main [aria-label], main [data-tip], main [data-tip-html]').evaluateAll((els) => els.map((e) => ['aria-label', 'data-tip', 'data-tip-html'].map((a) => e.getAttribute(a) || '').join(' ')).join('\n'));
+    expect(text).not.toMatch(STALE);
+    expect(aria).not.toMatch(STALE);
+  });
 });
