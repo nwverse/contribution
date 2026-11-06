@@ -327,11 +327,41 @@
       + `<span class="c-comp">${K.comp(p, { scale: p.bonus / maxB })}</span>`
       + `<span class="val r">${mag(p.bonus)}</span><span class="r c-spark">${K.sparkline(p.spark, { w: 88, h: 22, max: 25 })}</span></div>`;
   }
-  rowsEl.innerHTML = PEOPLE.map(rowHTML).join('');
-  const rowOf = (login) => rowsEl.querySelector(`.lrow[data-login="${CSS.escape(login)}"]`);
+  // Only the first screen of rows is built during boot; the rest is appended in slices after first paint.
+  // Code that needs every row (non-empty filter, keyboard navigation) calls allRows() first
+  const FIRST_ROWS = 40, SLICE_ROWS = 120;
+  let rowsDone = 0, rowsTimer = 0;
+  function appendRows(n) {
+    const end = Math.min(PEOPLE.length, rowsDone + n);
+    if (end > rowsDone) rowsEl.insertAdjacentHTML('beforeend', PEOPLE.slice(rowsDone, end).map(rowHTML).join(''));
+    rowsDone = end;
+  }
+  function moreRows() {
+    rowsTimer = 0;
+    appendRows(SLICE_ROWS);
+    if (rowsDone < PEOPLE.length) rowsTimer = setTimeout(moreRows, 0);
+  }
+  function allRows() {
+    if (rowsDone >= PEOPLE.length) return;
+    clearTimeout(rowsTimer); rowsTimer = 0;
+    appendRows(PEOPLE.length);
+  }
+  // Reload and back/forward restore the old scroll position at load, which needs the full-height list
+  const navType = (performance.getEntriesByType('navigation')[0] || {}).type;
+  appendRows(navType === 'reload' || navType === 'back_forward' ? PEOPLE.length : FIRST_ROWS);
+  if (rowsDone < PEOPLE.length) rowsTimer = setTimeout(moreRows, 0);
+  // PEOPLE is rank-ordered and #rows holds one child per person, so a login's rank index is its child index
+  const rankIdx = new Map(PEOPLE.map((p, k) => [p.login, k]));
+  const rowOf = (login) => {
+    const k = rankIdx.get(login);
+    if (k === undefined) return null;
+    if (k >= rowsDone) appendRows(k + 1 - rowsDone);
+    return rowsEl.children[k] || null;
+  };
   let kb = -1;
   function filterRows(q) {
-    let n = 0;
+    if (q) allRows();
+    let n = PEOPLE.length - rowsDone; // rows not appended yet are unfiltered (only possible when q is empty)
     rowsEl.querySelectorAll('.lrow').forEach((r) => { const on = !q || r.dataset.login.toLowerCase().includes(q); r.hidden = !on; if (on) n++; });
     document.getElementById('lbCount').textContent = q ? `筛出 ${n} / ${PEOPLE.length} 人` : `总榜 · ${PEOPLE.length} 人`;
     const em = document.getElementById('lbEmpty');
@@ -348,7 +378,7 @@
   filterRows('');
   document.getElementById('lbSearch').addEventListener('input', (e) => filterRows(e.target.value.trim().toLowerCase()));
   document.getElementById('lbSearch').addEventListener('keydown', (e) => { if (e.key === 'ArrowDown') { e.preventDefault(); rowsEl.focus(); moveKb(1); } });
-  const visRows = () => [...rowsEl.querySelectorAll('.lrow:not([hidden])')];
+  const visRows = () => { allRows(); return [...rowsEl.querySelectorAll('.lrow:not([hidden])')]; };
   // Focus stays on the listbox; aria-activedescendant tells screen readers which option is selected
   function selectKb(i) {
     const v = visRows(); if (!v.length) return;
@@ -525,7 +555,9 @@
   K.me.subscribe(() => {
     // 背景榜的「我」标记与底色
     const q = document.getElementById('lbSearch').value.trim().toLowerCase();
+    clearTimeout(rowsTimer); rowsTimer = 0;
     rowsEl.innerHTML = PEOPLE.map(rowHTML).join('');
+    rowsDone = PEOPLE.length;
     filterRows(q);
     if (cur) { const r = rowOf(cur.login); if (r) r.classList.add('is-cur'); }
     if (cur && d.isOpen()) show(cur.login, { keepScroll: true });
