@@ -89,6 +89,35 @@ test.describe('本周', () => {
     expect(labels).toEqual(expected);
     expect(kitWeek.every(Boolean), 'NWK.fmt 与 NW.fmt 同一时区').toBe(true);
   });
+
+  // 其余四页的月份刻度同样取 NW.TZ：把时区从 UTC+8 改成 UTC-5，跨月那周的「N月」刻度必须跟着挪位；
+  // 若页面写死 UTC+8，两次渲染的刻度完全相同。档案页选首贡在 5 月的 frog-33，并切到累计图（页面自己画的刻度）
+  const tickPages = [
+    { path: '/hatchery.html' },
+    { path: '/pond.html' },
+    { path: '/profile.html#u=frog-33', prep: (page) => page.locator('#wkSeg').getByText('累计', { exact: true }).click() },
+    { path: '/ranking.html' },
+  ];
+  for (const { path, prep } of tickPages) {
+    test(`${path.split('#')[0].slice(1)} 月份刻度跟随 RULES.tzOffsetHours`, async ({ page }) => {
+      const src = fs.readFileSync(new URL('../../engine.js', import.meta.url), 'utf8');
+      expect(src).toContain('tzOffsetHours: 8,');
+      let tz = 8;
+      await page.route('**/engine.js', (route) => route.fulfill({ contentType: 'text/javascript', body: src.replace('tzOffsetHours: 8,', `tzOffsetHours: ${tz},`) }));
+      const ticks = async () => {
+        await page.goto('about:blank'); // 同一 URL 只差 hash 时 goto 不会重新加载
+        await open(page, path);
+        if (prep) await prep(page);
+        const loc = page.locator('svg text.ax, #tmMonths span').filter({ hasText: /^\d+月$/ });
+        await expect(loc.first()).toBeAttached();
+        return loc.evaluateAll((els) => els.map((e) => `${e.textContent}@${e.getAttribute('x') ?? e.style.left}`));
+      };
+      const east = await ticks();
+      tz = -5;
+      const west = await ticks();
+      expect(west).not.toEqual(east);
+    });
+  }
 });
 
 test.describe('排行榜', () => {
