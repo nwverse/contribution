@@ -536,7 +536,7 @@
     });
     let lastM = -1;
     W.forEach((t, i) => {
-      const m = new Date(t + 8 * 3600e3).getUTCMonth();
+      const m = new Date(t + NW.TZ).getUTCMonth();
       if (m !== lastM) { lastM = m; s += `<text class="mo" data-i="${i}" x="${cx(i)}" y="${h - 7}" text-anchor="middle">${m + 1}月</text>`; }
     });
     s += '</svg>';

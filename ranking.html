@@ -773,7 +773,7 @@
       scrub._t = (x) => (step ? K.clamp((x - bw / 2) / step, 0, LAST) : 0);
       let lastM = -1, lastX = -99;
       $('#tmMonths').innerHTML = W.map((w0, i) => {
-        const m = new Date(w0 + 8 * 3600000 + 3 * 86400000).getUTCMonth();
+        const m = new Date(w0 + NW.TZ + 3 * 86400000).getUTCMonth();
         if (m === lastM) return '';
         lastM = m;
         const x = scrub._x(i);

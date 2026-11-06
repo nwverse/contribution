@@ -1,4 +1,5 @@
 // 各页主要交互，数字与测试数据逐一核对。
+import fs from 'node:fs';
 import { test, expect, open, BOARD, RULES, LAST, THIS_WEEK, weekValue, mag, oneWeekBoard, recentWeeksBoard, freshBoard } from './fixtures.mjs';
 
 const P = BOARD.people;
@@ -64,6 +65,29 @@ test.describe('本周', () => {
     await expect(first).toContainText(mag(top.v));
     await first.click();
     await expect(page).toHaveURL(new RegExp(`profile\\.html.*#u=${top.p.login}`));
+  });
+
+  test('走势图月份标签跟随 RULES.tzOffsetHours，与周日期一致', async ({ page }) => {
+    // 把时区改成 UTC-5：测试数据里 6 月 1 日（UTC+8）那周在 UTC-5 下仍是 5 月 31 日，
+    // 月份标签必须与 fmt.week 给的日期同一口径，不能写死 UTC+8
+    const src = fs.readFileSync(new URL('../../engine.js', import.meta.url), 'utf8');
+    expect(src).toContain('tzOffsetHours: 8,');
+    await page.route('**/engine.js', (route) => route.fulfill({ contentType: 'text/javascript', body: src.replace('tzOffsetHours: 8,', 'tzOffsetHours: -5,') }));
+    await open(page, '/index.html');
+    const { expected, kitWeek } = await page.evaluate(() => {
+      let last = -1;
+      const out = [];
+      NW.W.forEach((t, i) => {
+        const m = Number(NW.fmt.week(t).slice(0, 2));
+        if (m !== last) { last = m; out.push({ i: String(i), text: `${m}月` }); }
+      });
+      return { expected: out, kitWeek: NW.W.map((t) => NWK.fmt.week(t) === NW.fmt.week(t)) };
+    });
+    // 测试数据里至少有一周的月份随时区改变，否则这条用例测不出写死的偏移
+    expect(BOARD.weeks.some((w) => new Date(w.start + 8 * 3600e3).getUTCMonth() !== new Date(w.start - 5 * 3600e3).getUTCMonth())).toBe(true);
+    const labels = await page.locator('.wk .mo').evaluateAll((els) => els.map((e) => ({ i: e.dataset.i, text: e.textContent })));
+    expect(labels).toEqual(expected);
+    expect(kitWeek.every(Boolean), 'NWK.fmt 与 NW.fmt 同一时区').toBe(true);
   });
 });
 

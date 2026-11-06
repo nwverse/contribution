@@ -16,7 +16,7 @@
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
   const DAY = 86400000;
   const WEEK = 7 * DAY;
-  const TZ = 8 * 3600000;
+  const TZ = NW.TZ;
 
   // ───────────────────────── 工具 ─────────────────────────
   const $ = (s, r = document) => r.querySelector(s);

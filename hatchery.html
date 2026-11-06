@@ -764,7 +764,7 @@
     const selX = cx(coSel), selW = 34;
     let lastM = -1, lastX = -99;
     CO.forEach((c, k) => {
-      const m = new Date(c.w + 8 * 3600000).getUTCMonth();
+      const m = new Date(c.w + NW.TZ).getUTCMonth();
       if (m !== lastM) { lastM = m; if (cx(k) - lastX > 30 && Math.abs(cx(k) - selX) > selW) { s += `<text class="ax" x="${cx(k)}" y="${Hh - 5}" text-anchor="middle">${m + 1}月</text>`; lastX = cx(k); } }
     });
     s += `<text class="ax sel" x="${Math.min(Math.max(selX, padL + 14), Wd - padR - 14)}" y="${Hh - 5}" text-anchor="middle">${K.week.short(coSel)}</text>`;

@@ -626,7 +626,7 @@
       // x 轴：每月第一周标「N月」
       let lastM = -1, lastX = -99;
       NW.W.forEach((t, i) => {
-        const dt = new Date(t + 8 * 3600000), mo = dt.getUTCMonth();
+        const dt = new Date(t + NW.TZ), mo = dt.getUTCMonth();
         if (mo === lastM) return;
         lastM = mo;
         if (dt.getUTCDate() > 7) return; // 序列从月中开始时不标这个月，免得把 05-18 标成「5月」

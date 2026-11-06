@@ -165,6 +165,8 @@ window.RULES = window.RULES || RULES;
 
   window.NW = {
     B, LV, RULES, DAY, WEEK,
+    // 展示时区偏移（毫秒），取自 RULES.tzOffsetHours；kit.js 与各页月份刻度共用，不另写 UTC+8
+    TZ,
     weeks, W, last, people,
     byLogin: new Map(people.map((p) => [p.login, p])),
     levelOf, ranksAt, weekSnapshot, vitalityScore, fmt,
