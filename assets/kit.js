@@ -1123,7 +1123,7 @@
     tb.innerHTML = SCREENS.map((s) => `<a href="${href(s.id)}" data-screen="${s.id}"${s.id === active ? ' aria-current="page"' : ''}>${icon(s.icon, 21)}<span>${s.label}</span></a>`).join('');
     const onScroll = () => el.classList.toggle('is-scrolled', scrollY > 4);
     addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
+    requestAnimationFrame(onScroll); // reading scrollY now would force a layout before the page has rendered
     theme.sync();
     return el;
   }
