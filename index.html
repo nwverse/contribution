@@ -210,7 +210,7 @@
     <div class="hero-kpis kpis" id="heroKpis" style="--n:5"></div>
     <div class="hero-sel">
       <div class="wk-h">
-        <span class="title">25 周 · 选一周回看</span>
+        <span class="title" id="wkTitle">选一周回看</span>
         <span class="legend"><span class="key" style="--k:var(--leaf)">合入 PR</span><span class="key" style="--k:var(--water)">活跃贡献者</span></span>
         <span class="hint only-kbd">点击或拖动，<kbd>←</kbd><kbd>→</kbd> 切周，<kbd>T</kbd> 回本周</span>
       </div>
@@ -249,10 +249,10 @@
     </div>
   </section>
 
-  <!-- 25 周走势：每周活跃贡献者与每周合入 PR -->
+  <!-- 全部周的走势：每周活跃贡献者与每周合入 PR（周数随数据变化，由页面脚本填入标题） -->
   <section class="section trend">
     <div class="sec-h">
-      <div><span class="eyebrow">趋势</span><h2>25 周走势</h2><p>选中的周高亮；点任意一根柱子切到那一周</p></div>
+      <div><span class="eyebrow">趋势</span><h2 id="trendTitle">每周走势</h2><p>选中的周高亮；点任意一根柱子切到那一周</p></div>
     </div>
     <div class="grid">
       <div class="card card-pad span-6">
@@ -298,6 +298,9 @@
   $('#icHealth').innerHTML = icon('activity', 15);
   $('#icArrow1').innerHTML = icon('arrow-right', 13);
   $('#icArrow2').innerHTML = icon('arrow-right', 13);
+  // 周数从第一个活跃周算到本周，每周加一，不能写死在标题里
+  $('#wkTitle').textContent = `${NW.weeks.length} 周 · 选一周回看`;
+  $('#trendTitle').textContent = `${NW.weeks.length} 周走势`;
   $('#lagFoot').innerHTML = `活力 &lt; ${NW.RULES.vitality.laggard} 掉队 · &lt; ${NW.RULES.vitality.watch} 观察 <a class="link" href="rules.html#vitality" data-screen="rules">怎么算</a>`;
 
   // ───────── 派生：某一周的全部事实（缓存） ─────────
@@ -406,7 +409,7 @@
     const pevo = ps ? ps.newlyHatched.length + ps.upgraded.length : 0;
     return [
       { key: 'active', icon: 'users', label: '活跃贡献者', value: s.active, prev: ps ? ps.active : null, ref: ps ? `${prev} ${ps.active}` : null, sub: '提 PR、合入或协作的人' },
-      { key: 'merged', icon: 'git-merge', label: '合入 PR', value: s.merged, prev: ps ? ps.merged : null, ref: ps ? `${prev} ${fmt.int(ps.merged)}` : null, sub: `占 25 周合入的 <b>${share(s.merged, NW.summary.merged)}</b>` },
+      { key: 'merged', icon: 'git-merge', label: '合入 PR', value: s.merged, prev: ps ? ps.merged : null, ref: ps ? `${prev} ${fmt.int(ps.merged)}` : null, sub: `占 ${NW.weeks.length} 周合入的 <b>${share(s.merged, NW.summary.merged)}</b>` },
       { key: 'magic', icon: 'zap', label: '产出魔力', value: f.magic, f: mag, prev: ps ? f.pmagic : null, ref: ps ? `${prev} ${mag(f.pmagic)}` : null, sub: `<b>${s.top.length}</b> 人获得魔力` },
       { key: 'faces', icon: 'user-plus', label: '新面孔', value: k, prev: ps ? f.pfaces : null, ref: ps ? `${prev} ${f.pfaces}` : null, sub: `${stack}<span>${facesSub}</span>` },
       { key: 'evo', icon: 'sparkles', label: '孵化与进化', value: evo, prev: ps ? pevo : null, ref: ps ? `${prev} ${pevo}` : null, sub: `<b>${s.newlyHatched.length}</b> 人孵化 · <b>${s.upgraded.length}</b> 人进化` },
@@ -772,7 +775,7 @@
   }
   $('#evo').addEventListener('click', (e) => { const c = e.target.closest('[data-login]'); if (c && !e.target.closest('[data-person]')) K.openPerson(c.dataset.login); });
 
-  // ───────── 25 周走势（两张周图，联动高亮所选周） ─────────
+  // ───────── 全部周的走势（两张周图，联动高亮所选周） ─────────
   const weeksData = (k) => NW.weeks.map((w, i) => ({ label: `${K.week.range(i)}${i === LAST ? ' · 进行中' : ''}`, v: w[k], t: w.start }));
   function longestZero(k) { let run = [-1, -1], best = [-1, -1]; NW.weeks.forEach((w, i) => { if (w[k] === 0) { run = run[0] < 0 ? [i, i] : [run[0], i]; if (run[1] - run[0] > best[1] - best[0]) best = run.slice(); } else run = [-1, -1]; }); return best; }
   function biggestJump(k) { if (LAST < 1) return -1; let j = 1; for (let i = 2; i <= LAST; i++) if (NW.weeks[i][k] - NW.weeks[i - 1][k] > NW.weeks[j][k] - NW.weeks[j - 1][k]) j = i; return j; }

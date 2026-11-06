@@ -46,6 +46,28 @@ test.describe('本周', () => {
     await expect(kpis).toContainText(String(board.weeks[0].merged));
   });
 
+  test('周数标签跟随数据：测试数据显示实际周数', async ({ page }) => {
+    const n = BOARD.weeks.length;
+    await open(page, '/index.html');
+    await expect(page.locator('.wk-h .title')).toContainText(`${n} 周`);
+    await expect(page.locator('.trend .sec-h h2')).toHaveText(`${n} 周走势`);
+    await expect(page.locator('#heroKpis')).toContainText(`占 ${n} 周合入的`);
+  });
+
+  test('周数标签跟随数据：只剩最近 10 周时写 10 周', async ({ page }) => {
+    // 周数由数据决定（从第一个活跃周到本周），每周加一；页面不能写死
+    const board = structuredClone(BOARD);
+    board.weeks = board.weeks.slice(-10);
+    const kept = new Set(board.weeks.map((w) => w.start));
+    for (const p of board.people) p.weekly = p.weekly.filter(([w]) => kept.has(w));
+    board.summary.merged = board.weeks.reduce((s, w) => s + w.merged, 0);
+    await page.route('**/data/board.json', (route) => route.fulfill({ json: board }));
+    await open(page, '/index.html');
+    await expect(page.locator('.wk-h .title')).toContainText('10 周');
+    await expect(page.locator('.trend .sec-h h2')).toHaveText('10 周走势');
+    await expect(page.locator('#heroKpis')).toContainText('占 10 周合入的');
+  });
+
   test('本周魔力榜按本周魔力排序，名字可进入档案', async ({ page }) => {
     const top = [...P].map((p) => ({ p, v: weekValue(p, THIS_WEEK) })).filter((x) => x.v > 0).sort((a, b) => b.v - a.v)[0];
     await open(page, '/index.html');
