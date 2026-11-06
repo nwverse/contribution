@@ -868,9 +868,8 @@
       + `<span class="tst c-test">合入 <b class="${x(nb.merged >= NB.merged)}">${nb.merged}/${NB.merged}</b> · 活跃周 <b class="${x(nb.activeWeeks >= NB.activeWeeks)}">${nb.activeWeeks}/${NB.activeWeeks}</b></span>`
       + `<div class="mg"><div class="meter water" aria-hidden="true"><i style="width:${Math.min(100, p.bonus / R.hatchBonus * 100).toFixed(1)}%"></i></div><span><b>${mag(p.bonus)}</b>/${R.hatchBonus}</span></div>`
       + `<span class="sm c-last">${p.dormant ? `${p.daysSinceLast} 天无动作` : `${fmt.ago(p.daysSinceLast)}有动作`}</span>`
-      + `<span class="sm c-eta r">${nx && p.pace > 0 ? `${etaShort(nx.eta)}到 ${R.hatchBonus}` : '近 4 周没有新魔力'}</span></div>`;
+      + `<span class="sm c-eta r">${nx && p.pace > 0 ? `${K.etaText(nx.eta)}到 ${R.hatchBonus}` : '近 4 周没有新魔力'}</span></div>`;
   }).join('');
-  function etaShort(eta) { return eta > 52 ? '一年以上才' : K.etaText(eta); }
   $('#foldIn').innerHTML = `<div class="fold-stats">`
     + sumStat('未孵化', failed.length, '人', `占全部贡献者 ${pct(failed.length, TOTAL)}`)
     + sumStat('近 40 天仍有动作', failedActive.length, '人', `另 ${failedSleep.length} 人冬眠`)

@@ -579,3 +579,35 @@ test.describe('孵化门槛跟随 RULES', () => {
     expect(aria).not.toMatch(STALE);
   });
 });
+
+test.describe('预计升级时间', () => {
+  // 超过 52 周的 ETA 不再写成「约 100 周」，各页同一说法
+  const LONG = /约 \d{3,} 周|约 (5[3-9]|[6-9]\d) 周/;
+  const texts = (page) => page.evaluate(() => [document.body.innerText,
+    ...[...document.querySelectorAll('[aria-label],[data-tip-html],[data-tip]')].flatMap((e) => [e.getAttribute('aria-label'), e.getAttribute('data-tip-html'), e.getAttribute('data-tip')])]
+    .filter(Boolean).join('\n'));
+
+  test('档案：一年以上的 ETA 与形态池、孵化台同一说法', async ({ page }) => {
+    await open(page, '/profile.html#u=frog-54');
+    await expect(page.locator('.drawer.on #pfBody')).toContainText('frog-54');
+    const long = await page.evaluate(() => NWK.etaText(53));
+    expect(await page.evaluate(() => NWK.etaText(52))).toBe('约 52 周');
+    const t = await texts(page);
+    expect(t).not.toMatch(LONG);
+    expect(t).toContain(long);
+    await open(page, '/hatchery.html');
+    expect(await texts(page)).not.toMatch(LONG);
+    await expect(page.locator('.c-eta', { hasText: long }).first()).toBeAttached();
+    await open(page, '/pond.html');
+    const pond = await texts(page);
+    expect(pond).not.toMatch(LONG);
+    expect(pond).not.toMatch(/超过 1 年|一年以上才/); // 形态池与孵化台不再各写一套
+  });
+
+  test('排行榜：形态提示与人物卡不出现一年以上的周数', async ({ page }) => {
+    await open(page, '/ranking.html');
+    expect(await texts(page)).not.toMatch(LONG);
+    const cards = await page.evaluate(() => NW.people.map((p) => NWK.personCard.html(p)).join('\n'));
+    expect(cards).not.toMatch(LONG);
+  });
+});

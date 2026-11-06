@@ -322,8 +322,6 @@
     });
   }
   const wkName = (i) => K.week.name(i);
-  // 超过一年的 ETA 没有参考意义（如「约 1623 周」），统一写成「一年以上」
-  const eta = (e) => (e !== null && e > 52 ? '超过 1 年' : K.etaText(e));
 
   // ───────── 计数 ─────────
   $('#nMember').textContent = `${NW.people.filter((p) => p.member).length} 人`;
@@ -387,7 +385,7 @@
     if (k === 0) return `${head}<div class="vac-none">${s.total ? '这时还没有人通过新手考核' : '这时池塘里还没有人'}</div>`;
     const list = challengers(s, k, lowest ? 3 : 1);
     if (!list.length) return head;
-    return `${head}<div class="vac-list"><div class="vac-l">${list.length > 1 ? '离它最近的人' : '离它最近'}</div>${list.map((c) => `<div class="ch">${K.who(c.p, { size: 22, sub: `<span class="nowrap">差 ${K.mag(c.gap)} 魔力</span><span>${eta(c.eta)}</span>` })}<div class="meter sm" role="img" aria-label="到${L.name}进度 ${Math.round(c.pr * 100)}%"><i style="width:${(c.pr * 100).toFixed(1)}%"></i></div></div>`).join('')}</div>`;
+    return `${head}<div class="vac-list"><div class="vac-l">${list.length > 1 ? '离它最近的人' : '离它最近'}</div>${list.map((c) => `<div class="ch">${K.who(c.p, { size: 22, sub: `<span class="nowrap">差 ${K.mag(c.gap)} 魔力</span><span>${K.etaText(c.eta)}</span>` })}<div class="meter sm" role="img" aria-label="到${L.name}进度 ${Math.round(c.pr * 100)}%"><i style="width:${(c.pr * 100).toFixed(1)}%"></i></div></div>`).join('')}</div>`;
   }
 
   function nestHTML(s) {
@@ -451,7 +449,7 @@
     const lowK = s.hatched ? (s.vacTop ? NL - s.vacTop : -1) : -1;
     if (lowK > 0) {
       const c = challengers(s, lowK, 1)[0];
-      if (c) t += `离${LV[lowK].name}最近的是 ${K.pname(c.p.login)}，<span class="nowrap">还差 <span class="n">${K.mag(c.gap)}</span> 魔力</span>，<span class="nowrap">${c.eta === null ? '近 4 周没有新魔力' : c.eta > 52 ? '按近 4 周均速要超过 1 年' : `按近 4 周均速${K.etaText(c.eta)}`}</span>。`;
+      if (c) t += `离${LV[lowK].name}最近的是 ${K.pname(c.p.login)}，<span class="nowrap">还差 <span class="n">${K.mag(c.gap)}</span> 魔力</span>，<span class="nowrap">${c.eta === null ? '近 4 周没有新魔力' : `按近 4 周均速${K.etaText(c.eta)}`}</span>。`;
     }
     const ev = [];
     if (s.hatchedNow.length) ev.push(`<span class="n">${s.hatchedNow.length}</span> 人孵化`);

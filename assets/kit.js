@@ -153,7 +153,8 @@
     const L = NW.LV[p.next.level];
     return { name: L.name, kind: L.icon, gap: p.gap, pace: p.pace, eta: p.eta };
   }
-  const etaText = (eta) => (eta === null || eta === undefined ? '近 4 周没有新魔力' : eta <= 1 ? '约 1 周' : `约 ${eta} 周`);
+  // Past a year the week count means little (e.g. 1623 weeks), so every page shows the same wording.
+  const etaText = (eta) => (eta === null || eta === undefined ? '近 4 周没有新魔力' : eta > 52 ? '要一年以上' : eta <= 1 ? '约 1 周' : `约 ${eta} 周`);
 
   // 孵化提示：只差一项时给一句能照做的话（活跃周 = 有合入或协作的不同自然周）
   function hatchHint(p) {
