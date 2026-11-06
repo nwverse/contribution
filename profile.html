@@ -318,7 +318,7 @@
     const fo = K.formOf(p), nx = K.nextInfo(p);
     const form = fo.hatched
       ? `<div class="fm">${K.frogOf(p, 20)}<div style="min-width:0"><div class="fn">${fo.name}<span>${nx ? `差 ${mag(nx.gap)}` : '最高'}</span></div><div class="meter"><i style="width:${(p.progress * 100).toFixed(1)}%"></i></div></div></div>`
-      : `<div class="fm">${K.frogOf(p, 20)}<div style="min-width:0"><div class="fn">${fo.name}<span>魔力 ${mag(p.bonus)}/50</span></div><div class="meter yolk"><i style="width:${(p.progress * 100).toFixed(1)}%"></i></div></div></div>`;
+      : `<div class="fm">${K.frogOf(p, 20)}<div style="min-width:0"><div class="fn">${fo.name}<span>魔力 ${mag(p.bonus)}/${R.hatchBonus}</span></div><div class="meter yolk"><i style="width:${(p.progress * 100).toFixed(1)}%"></i></div></div></div>`;
     const tags = `${p.member ? '' : '<span class="tag tag-out">组织外</span>'}${p.dormant ? `<span class="tag tag-sleep">${icon('moon-z', 11)}冬眠</span>` : ''}`;
     const sub = `合入 ${fmt.int(p.merged)} · 协作 ${fmt.int(p.collab)}${p.resolved ? ` · 合入率 ${fmt.pct(p.rate)}` : ''}`;
     return `<div class="lrow is-click ${K.me.is(p) ? 'is-me' : ''}" role="option" tabindex="-1" id="pf-opt-${esc(p.login)}" aria-selected="false" data-login="${esc(p.login)}">`
@@ -810,7 +810,7 @@
     ro.observe(host);
     render();
     const evTxt = events.length ? `形态变化 ${events.length} 次，最近一次是 ${fmt.week(W[events[events.length - 1].i])} 这一周${events[events.length - 1].text}。` : '';
-    note.innerHTML = `${evTxt}${nx ? (projW ? `按近 4 周均速 <b>${mag(p.pace)}</b>/周，虚线是预计走势。` : `${nx.hatch ? '孵化线 50' : `${LV[p.next.level].name} ${fmt.int(p.next.bonus)}`}还差 <b>${mag(nx.gap)}</b>，${K.etaText(eta)}，超出图的范围。`) : '已是最高形态。'}`;
+    note.innerHTML = `${evTxt}${nx ? (projW ? `按近 4 周均速 <b>${mag(p.pace)}</b>/周，虚线是预计走势。` : `${nx.hatch ? `孵化线 ${R.hatchBonus}` : `${LV[p.next.level].name} ${fmt.int(p.next.bonus)}`}还差 <b>${mag(nx.gap)}</b>，${K.etaText(eta)}，超出图的范围。`) : '已是最高形态。'}`;
     return {
       destroy() {
         ro.disconnect();
@@ -932,10 +932,10 @@
       labels += `<span class="nb-lb top r" style="left:100%">期满未达标</span>`;
       if (p.level !== null) {
         tag = `<span class="tag">${icon('sparkle', 11)}未通过 · 靠魔力孵化</span>`;
-        call = `<div class="callout leaf">${icon('sparkles', 15)}<span>考核期内没达标，但魔力在 <b>${hk >= 0 ? (hk >= LAST - 1 ? weekName(hk) : K.week.range(hk)) : '后来'}</b>${hk >= 0 && hk < LAST - 1 ? ' 这一周' : ''}攒到了 50，直接孵化。</span></div>`;
+        call = `<div class="callout leaf">${icon('sparkles', 15)}<span>考核期内没达标，但魔力在 <b>${hk >= 0 ? (hk >= LAST - 1 ? weekName(hk) : K.week.range(hk)) : '后来'}</b>${hk >= 0 && hk < LAST - 1 ? ' 这一周' : ''}攒到了 ${R.hatchBonus}，直接孵化。</span></div>`;
       } else {
         tag = '<span class="tag">未通过 · 未孵化</span>';
-        call = `<div class="callout plain">${icon('info', 15)}<span>考核期已过，还差 <b>${mag(Math.max(0, R.hatchBonus - p.bonus))}</b> 魔力（到 50）就能直接孵化${p.pace > 0 ? `，按近 4 周均速${K.etaText(Math.ceil((R.hatchBonus - p.bonus) / p.pace))}` : '；近 4 周没有新魔力'}。</span></div>`;
+        call = `<div class="callout plain">${icon('info', 15)}<span>考核期已过，还差 <b>${mag(Math.max(0, R.hatchBonus - p.bonus))}</b> 魔力（到 ${R.hatchBonus}）就能直接孵化${p.pace > 0 ? `，按近 4 周均速${K.etaText(Math.ceil((R.hatchBonus - p.bonus) / p.pace))}` : '；近 4 周没有新魔力'}。</span></div>`;
       }
     }
     return `<section class="drawer-sec" aria-label="新手考核">

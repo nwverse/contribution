@@ -57,7 +57,7 @@ window.RULES = window.RULES || RULES;
     p.prevLevel = p.levels[last - 1];
     p.gap = p.next ? p.next.bonus - p.bonus : null; // 距下一级还差
     p.eta = p.next && p.pace > 0 ? Math.ceil(p.gap / p.pace) : null; // 按近 4 周均速预计周数
-    // 到下一级的进度 0–1；未孵化时为到「魔力补孵化（50）」的进度
+    // 到下一级的进度 0–1；未孵化时为到「魔力补孵化（RULES.hatchBonus）」的进度
     p.progress = p.level === null
       ? Math.min(1, p.bonus / RULES.hatchBonus)
       : p.next ? (p.bonus - LV[p.level].bonus) / (p.next.bonus - LV[p.level].bonus) : 1;

@@ -124,7 +124,7 @@
 
   // ───────────────────────── 形态 ─────────────────────────
   const frog = (kind, size = 20, cls = '') => `<span class="frog ${cls}" style="width:${size}px;height:${size}px">${window.frogIcon ? window.frogIcon(kind, size) : ''}</span>`;
-  // 第 i 周末的形态。未孵化时按「当时」是否仍在 30 天考核期内区分蛙卵 / 未孵化（不用当前 status 反推历史）
+  // 第 i 周末的形态。未孵化时按「当时」是否仍在 newbie.days 天考核期内区分蛙卵 / 未孵化（不用当前 status 反推历史）
   function formOf(p, i = NW.last) {
     const l = p.levels[i];
     if (l !== null && l !== undefined) return { level: l, kind: NW.LV[l].icon, name: NW.LV[l].name, hatched: true };
@@ -164,7 +164,7 @@
     const needW = Math.max(0, R.activeWeeks - nb.activeWeeks);
     const toMagic = Math.max(0, NW.RULES.hatchBonus - p.bonus);
     if (nb.status !== 'pending') {
-      return { status: 'failed', missing: [], oneLeft: false, text: `考核期已过；魔力再攒 ${mag(toMagic)}（到 50）就能直接孵化` };
+      return { status: 'failed', missing: [], oneLeft: false, text: `考核期已过；魔力再攒 ${mag(toMagic)}（到 ${NW.RULES.hatchBonus}）就能直接孵化` };
     }
     const activeNow = p.tw > 0; // 本周已有合入或协作 = 本周已算一个活跃周
     const nextWeek = NW.W[NW.last] + WEEK;
@@ -178,7 +178,7 @@
     else if (needW === 1 && activeNow) {
       text = nextWeek <= nb.end
         ? `${fmt.md(nextWeek)}起的那一周再有一次合入或协作${needM ? `，并再合入 ${needM} 个 PR` : ''}，就能孵化`
-        : `考核期内已来不及再补一个活跃周；魔力攒到 50 也能孵化（还差 ${mag(toMagic)}）`;
+        : `考核期内已来不及再补一个活跃周；魔力攒到 ${NW.RULES.hatchBonus} 也能孵化（还差 ${mag(toMagic)}）`;
     } else text = `还差${missing.join('、')}，剩 ${nb.daysLeft} 天`;
     return { status: 'pending', missing, oneLeft: missing.length === 1, needM, needW, toMagic, daysLeft: nb.daysLeft, text };
   }
@@ -610,13 +610,14 @@
     let formBody;
     if (f.egg) {
       const nb = p.newbie;
-      const m = Math.min(nb.merged, 3), w = Math.min(nb.activeWeeks, 2);
+      const NB = NW.RULES.newbie;
+      const m = Math.min(nb.merged, NB.merged), w = Math.min(nb.activeWeeks, NB.activeWeeks);
       const pips = (n, of) => `<span class="pips">${Array.from({ length: of }, (_, k) => `<i class="${k < n ? 'on' : ''}"></i>`).join('')}</span>`;
       formBody = `<div class="pc-fname">蛙卵<span>考核剩 ${nb.daysLeft} 天</span></div>`
-        + `<div class="pc-req"><span>合入 ${pips(m, 3)}<b>${m}/3</b></span><span>活跃周 ${pips(w, 2)}<b>${w}/2</b></span></div>`;
+        + `<div class="pc-req"><span>合入 ${pips(m, NB.merged)}<b>${m}/${NB.merged}</b></span><span>活跃周 ${pips(w, NB.activeWeeks)}<b>${w}/${NB.activeWeeks}</b></span></div>`;
     } else if (f.unhatched) {
       formBody = `<div class="pc-fname">未孵化<span>考核期已过</span></div><div class="meter yolk"><i style="width:${(p.progress * 100).toFixed(1)}%"></i></div>`
-        + `<div class="pc-fnext">魔力 <b>${mag(p.bonus)}</b> / 50，攒满直接孵化</div>`;
+        + `<div class="pc-fnext">魔力 <b>${mag(p.bonus)}</b> / ${NW.RULES.hatchBonus}，攒满直接孵化</div>`;
     } else {
       formBody = `<div class="pc-fname">${f.name}${nx ? `<span>→ ${nx.name}</span>` : ''}</div><div class="meter"><i style="width:${(p.progress * 100).toFixed(1)}%"></i></div>`
         + `<div class="pc-fnext">${nx ? `差 <b>${mag(nx.gap)}</b> · ${etaText(nx.eta)}` : '已是最高形态'}</div>`;
@@ -1603,7 +1604,7 @@
       const emptyTop = c === 0 && k > 0;
       const names = d.members[k].map((p) => p.login);
       const tipTxt = k === 0
-        ? `蛙卵 ${c} 人：首次贡献 30 天内、还在新手考核期`
+        ? `蛙卵 ${c} 人：首次贡献 ${NW.RULES.newbie.days} 天内、还在新手考核期`
         : emptyTop ? `${m.name}：虚位以待（魔力 ${m.th}）` : `${m.name} ${c} 人${names.length <= 4 ? `：${names.join('、')}` : ''}${arr && k > 0 ? `；${i === NW.last ? '本周' : '这一周'}新到 ${arr} 人` : ''}`;
       const screen = k === 0 ? 'c4' : 'c5';
       return `<a class="st hop-host ${emptyTop ? 'is-vacant' : ''}" href="${pageFile(screen)}${keepSearch()}${k ? `#lv=${k - 1}` : ''}" data-screen="${screen}" data-hash="${k ? `lv=${k - 1}` : ''}" data-tip="${esc(tipTxt)}" aria-label="${esc(tipTxt)}">`
@@ -1622,24 +1623,25 @@
     const f = formOf(p);
     const L = p.level;
     const N = NW.LV.length; // 5
-    const nodes = [{ name: f.unhatched ? '未孵化' : '蛙卵', icon: f.unhatched ? 'unhatched' : 'egg', th: f.unhatched ? '考核期已过' : '考核 30 天' }, ...NW.LV.map((x, k) => ({ name: x.name, icon: x.icon, th: k ? `≥${x.bonus.toLocaleString('zh-CN')}` : '孵化即得' }))];
+    const nodes = [{ name: f.unhatched ? '未孵化' : '蛙卵', icon: f.unhatched ? 'unhatched' : 'egg', th: f.unhatched ? '考核期已过' : `考核 ${NW.RULES.newbie.days} 天` }, ...NW.LV.map((x, k) => ({ name: x.name, icon: x.icon, th: k ? `≥${x.bonus.toLocaleString('zh-CN')}` : '孵化即得' }))];
     const nb = p.newbie;
     let pos, curK, call, checks = '';
     if (L === null) {
       curK = 0;
       const route = Math.min(1, p.bonus / NW.RULES.hatchBonus);
-      const test = f.egg ? (Math.min(nb.merged, 3) / 3 + Math.min(nb.activeWeeks, 2) / 2) / 2 : 0;
+      const NB = NW.RULES.newbie;
+      const test = f.egg ? (Math.min(nb.merged, NB.merged) / NB.merged + Math.min(nb.activeWeeks, NB.activeWeeks) / NB.activeWeeks) / 2 : 0;
       pos = Math.max(route, test) * (1 / N) * 0.88;
       const h = hatchHint(p);
       if (f.egg) {
         const ok = (a, b) => (a >= b ? ' ok' : '');
         checks = `<div class="evo-checks">`
-          + `<div class="evo-check${ok(nb.merged, 3)}"><b>${Math.min(nb.merged, 3)}/3</b>合入 PR<div class="pips" style="margin-top:6px">${[0, 1, 2].map((k) => `<i class="${k < nb.merged ? 'on' : ''}"></i>`).join('')}</div></div>`
-          + `<div class="evo-check${ok(nb.activeWeeks, 2)}"><b>${Math.min(nb.activeWeeks, 2)}/2</b>活跃周<div class="pips" style="margin-top:6px">${[0, 1].map((k) => `<i class="${k < nb.activeWeeks ? 'on' : ''}"></i>`).join('')}</div></div>`
+          + `<div class="evo-check${ok(nb.merged, NB.merged)}"><b>${Math.min(nb.merged, NB.merged)}/${NB.merged}</b>合入 PR<div class="pips" style="margin-top:6px">${Array.from({ length: NB.merged }, (_, k) => k).map((k) => `<i class="${k < nb.merged ? 'on' : ''}"></i>`).join('')}</div></div>`
+          + `<div class="evo-check${ok(nb.activeWeeks, NB.activeWeeks)}"><b>${Math.min(nb.activeWeeks, NB.activeWeeks)}/${NB.activeWeeks}</b>活跃周<div class="pips" style="margin-top:6px">${Array.from({ length: NB.activeWeeks }, (_, k) => k).map((k) => `<i class="${k < nb.activeWeeks ? 'on' : ''}"></i>`).join('')}</div></div>`
           + `<div class="evo-check"><b>${nb.daysLeft} 天</b>考核剩余<div class="meter ${nb.daysLeft <= 10 ? 'rust' : 'yolk'} sm" style="margin-top:7px"><i style="width:${(nb.daysLeft / NW.RULES.newbie.days * 100).toFixed(1)}%"></i></div></div></div>`;
-        call = `<b>新手考核中</b> · ${esc(h.text)}；或魔力攒到 50（现在 ${mag(p.bonus)}）直接孵化`;
+        call = `<b>新手考核中</b> · ${esc(h.text)}；或魔力攒到 ${NW.RULES.hatchBonus}（现在 ${mag(p.bonus)}）直接孵化`;
       } else {
-        call = `<b>考核期已过</b> · 魔力 ${mag(p.bonus)} / 50，攒满直接孵化${p.pace > 0 ? `，按近 4 周均速${etaText(Math.ceil((NW.RULES.hatchBonus - p.bonus) / p.pace))}` : ''}`;
+        call = `<b>考核期已过</b> · 魔力 ${mag(p.bonus)} / ${NW.RULES.hatchBonus}，攒满直接孵化${p.pace > 0 ? `，按近 4 周均速${etaText(Math.ceil((NW.RULES.hatchBonus - p.bonus) / p.pace))}` : ''}`;
       }
     } else {
       curK = L + 1;
