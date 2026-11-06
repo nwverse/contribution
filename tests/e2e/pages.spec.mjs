@@ -532,20 +532,20 @@ test.describe('还没有魔力的看板（fresh）', () => {
   }
 });
 
-// 孵化门槛与新手考核的数字只在 RULES 维护：把 engine.js 换成孵化线 60、考核期 21 天的版本，页面上的文案应跟着变
+// 孵化门槛与新手考核的数字只在 RULES 维护：把 engine.js 换成孵化线 60、考核期 21 天、合入 4、活跃周 5 的版本，页面上的文案应跟着变
 test.describe('孵化门槛跟随 RULES', () => {
   const ENGINE = fs.readFileSync(new URL('../../engine.js', import.meta.url), 'utf8');
   const tweaked = ENGINE
     .replace(/(\{ name: '小奶蛙',[^}]*bonus: )50( \})/, '$160$2')
-    .replace(/(newbie: \{\s*days: )30,/, '$121,');
+    .replace(/(newbie: \{\s*days: )30,(\s*merged: )3,(\s*activeWeeks: )2,/, '$121,$24,$35,');
   const useTweakedRules = (page) => page.route('**/engine.js', (route) => route.fulfill({ contentType: 'text/javascript', body: tweaked }));
   // 门槛相关文案里不应再出现旧数字（「剩 30 天」是数据里的剩余天数，不算）
   const STALE = /\/ ?50(?![0-9])|到 50(?![0-9])|≥ ?50(?![0-9])|30 天内|考核 30 天/;
 
-  test('改写后的 engine.js 确实改了两处门槛', () => {
+  test('改写后的 engine.js 确实改了四处门槛', () => {
     const r = vm.runInNewContext(`${tweaked}\n;RULES`);
-    expect([r.levels[1].bonus, r.newbie.days]).toEqual([60, 21]);
-    expect([RULES.levels[1].bonus, RULES.newbie.days]).toEqual([50, 30]);
+    expect([r.levels[1].bonus, r.newbie.days, r.newbie.merged, r.newbie.activeWeeks]).toEqual([60, 21, 4, 5]);
+    expect([RULES.levels[1].bonus, RULES.newbie.days, RULES.newbie.merged, RULES.newbie.activeWeeks]).toEqual([50, 30, 3, 2]);
   });
 
   test('档案：未孵化的人按 RULES 显示孵化线与考核期', async ({ page }) => {
@@ -572,7 +572,15 @@ test.describe('孵化门槛跟随 RULES', () => {
     await expect(body).toContainText('frog-41');
     await expect(body).toContainText('考核 21 天');
     await expect(body).toContainText(`或魔力攒到 60（现在 ${mag(p.bonus)}）直接孵化`);
-    await expect(body.locator('.evo-check').first()).toContainText(`/${RULES.newbie.merged}合入 PR`);
+    const checks = body.locator('.evo-check');
+    await expect(checks.nth(0)).toContainText(`${Math.min(p.newbie.merged, 4)}/4合入 PR`);
+    await expect(checks.nth(1)).toContainText(`${Math.min(p.newbie.activeWeeks, 5)}/5活跃周`);
+    await expect(checks.nth(0).locator('.pips i')).toHaveCount(4);
+    await expect(checks.nth(1).locator('.pips i')).toHaveCount(5);
+    const reqs = body.locator('.nb-req > div');
+    await expect(reqs.nth(0)).toContainText(`${p.newbie.merged} / 需 4`);
+    await expect(reqs.nth(1)).toContainText(`${p.newbie.activeWeeks} / 需 5`);
+    await expect(reqs.nth(1).locator('.pips i')).toHaveCount(5);
     expect(await body.textContent()).not.toMatch(STALE);
   });
 
@@ -582,13 +590,15 @@ test.describe('孵化门槛跟随 RULES', () => {
     // 漏斗节点的悬停说明
     const tip = page.locator('#nwk-tip');
     for (const [id, want] of [['egg', '首次贡献 21 天内，还在考核'], ['failed', '考核期满，魔力也不到 60'], ['hatched', '通过新手考核，或魔力 ≥60'],
-      ['passed', `21 天内合入 ≥${RULES.newbie.merged} 且活跃周 ≥${RULES.newbie.activeWeeks}`], ['magic', '没通过考核，魔力攒到 60 孵化']]) {
+      ['passed', '21 天内合入 ≥4 且活跃周 ≥5'], ['magic', '没通过考核，魔力攒到 60 孵化']]) {
       await page.locator(`#funnel .fx-node[data-id="${id}"]`).hover();
       await expect(tip).toContainText(want);
       expect(await tip.textContent()).not.toMatch(STALE);
     }
+    await expect(page.locator('#fxFoot')).toContainText('首次贡献起 21 天内合入 ≥4 且活跃周 ≥5');
     const egg = page.locator('#board article.egg').first();
     await expect(egg).toHaveAttribute('aria-label', /魔力 [0-9.,]+\/60，/);
+    await expect(egg).toHaveAttribute('aria-label', /合入 \d+\/4，活跃周 \d+\/5，/);
     await expect(egg.locator('.rq.or .v')).toContainText('/60');
     await expect(egg.locator('.rq.or .l')).toHaveAttribute('data-tip', '魔力 ≥60 不看考核，直接孵化');
     await page.keyboard.press('u');
@@ -600,6 +610,28 @@ test.describe('孵化门槛跟随 RULES', () => {
     const aria = await page.locator('main [aria-label], main [data-tip], main [data-tip-html]').evaluateAll((els) => els.map((e) => ['aria-label', 'data-tip', 'data-tip-html'].map((a) => e.getAttribute(a) || '').join(' ')).join('\n'));
     expect(text).not.toMatch(STALE);
     expect(aria).not.toMatch(STALE);
+  });
+
+  test('人物卡：蛙卵的两项要求与圆点数按 RULES 显示', async ({ page }) => {
+    const p = byLogin.get('frog-41');
+    await useTweakedRules(page);
+    await open(page, '/ranking.html');
+    const html = await page.evaluate((login) => NWK.personCard.html(NW.people.find((x) => x.login === login)), p.login);
+    const box = page.locator('body');
+    await box.evaluate((b, h) => { const d = document.createElement('div'); d.id = 'pc-probe'; d.innerHTML = h; b.append(d); }, html);
+    const req = page.locator('#pc-probe .pc-req > span');
+    await expect(req.nth(0)).toContainText(`${Math.min(p.newbie.merged, 4)}/4`);
+    await expect(req.nth(1)).toContainText(`${Math.min(p.newbie.activeWeeks, 5)}/5`);
+    await expect(req.nth(0).locator('.pips i')).toHaveCount(4);
+    await expect(req.nth(1).locator('.pips i')).toHaveCount(5);
+  });
+
+  test('本周：形态池蛙卵的悬停说明按 RULES 显示考核期', async ({ page }) => {
+    await useTweakedRules(page);
+    await open(page, '/index.html');
+    const egg = page.locator('a.st[data-screen="c4"]').first();
+    await expect(egg).toHaveAttribute('data-tip', /首次贡献 21 天内/);
+    expect(await egg.getAttribute('data-tip')).not.toMatch(STALE);
   });
 });
 
