@@ -110,15 +110,20 @@ window.RULES = window.RULES || RULES;
   }
 
   // 第 i 周末的排名（1 起）：只排该周结束前已有首次贡献的人。
-  // 最后一周直接用线上排名；历史周按累计魔力降序、账号名升序。
+  // 最后一周直接用线上排名；历史周按累计魔力降序，并列时按线上名次、再按账号名。
+  // Cumulative sums of rounded weekly values carry float drift, so compare them at 0.01.
+  // Ties fall back to the current rank: board.json has no per-week merged count, and the
+  // current rank already encodes the engine's bonus/merged/login order, so a tie that
+  // persists to this week keeps the same order and does not show a fake rank move.
   const rankCache = new Map();
+  const cents = (x) => Math.round(x * 100);
   function ranksAt(i) {
     if (rankCache.has(i)) return rankCache.get(i);
     const m = new Map();
     if (i === last) for (const p of people) m.set(p.login, p.rank);
     else {
       people.filter((p) => p.started[i])
-        .sort((a, b) => b.cum[i] - a.cum[i] || a.login.localeCompare(b.login))
+        .sort((a, b) => cents(b.cum[i]) - cents(a.cum[i]) || a.rank - b.rank || a.login.localeCompare(b.login))
         .forEach((p, k) => m.set(p.login, k + 1));
     }
     rankCache.set(i, m);

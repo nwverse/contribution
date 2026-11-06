@@ -148,6 +148,26 @@ test.describe('档案', () => {
     await page.keyboard.press('Escape');
     await expect(page.locator('.drawer.on')).toHaveCount(0);
   });
+
+  test('魔力并列时上周名次沿用线上的先后，不出现假的名次变化', async ({ page }) => {
+    // frog-79 与 frog-80 魔力相同且这两周都没有新魔力；让 frog-80 合入更多，线上排在前面
+    const board = structuredClone(BOARD);
+    const get = (login) => board.people.find((p) => p.login === login);
+    const a = get('frog-79'), b = get('frog-80');
+    expect(a.bonus).toBe(b.bonus);
+    b.merged = a.merged + 2;
+    [a.rank, b.rank] = [b.rank, a.rank];
+    board.people.sort((x, y) => x.rank - y.rank);
+    await page.route('**/data/board.json', (route) => route.fulfill({ json: board }));
+    await open(page, '/profile.html#u=frog-80');
+    const ranks = await page.evaluate(() => ['frog-79', 'frog-80'].map((l) => {
+      const p = NW.byLogin.get(l);
+      return { rank: p.rank, prank: p.prank, move: p.move };
+    }));
+    expect(ranks[1].prank).toBeLessThan(ranks[0].prank);
+    expect(ranks[0].move).toBe(ranks[1].move);
+    await expect(page.locator('.drawer.on #pfBody')).toContainText(`上周 #${ranks[1].prank}`);
+  });
 });
 
 // 背景榜首屏只建前 40 行，其余用 setTimeout(moreRows) 分片追加。这里把分片扣住，检查分片未完成时的各条路径
