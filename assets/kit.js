@@ -897,6 +897,8 @@
     });
   }
 
+  // Read document.fonts.ready once: every read flushes style and layout
+  const fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
   // 分段控件：options = [{value, label, icon?, count?}]；省略 options 时沿用 el 内已有的 button[data-value]
   function segmented(el, options, onChange, { value, size } = {}) {
     if (typeof options === 'function') { onChange = options; options = null; }
@@ -919,6 +921,9 @@
       ind.style.transform = `translateX(${b.offsetLeft}px)`;
       if (!anim) { void ind.offsetWidth; requestAnimationFrame(() => el.classList.remove('no-anim')); }
     }
+    // Deferred placement for callers outside a ResizeObserver callback: measure once in the next frame
+    let raf = 0;
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; place(false); }); };
     function mark() {
       btns.forEach((b) => { const on = b.dataset.value === cur; b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; });
     }
@@ -947,10 +952,11 @@
       set(btns[n].dataset.value);
     });
     mark();
-    place(false);
+    // No synchronous place(): the ResizeObserver's first report comes after layout, so measuring there
+    // does not force a layout while the page is still rendering
     new ResizeObserver(() => place(false)).observe(el);
-    if (document.fonts) document.fonts.ready.then(() => place(false));
-    return { get value() { return cur; }, set, el, refresh: () => place(false) };
+    fontsReady.then(schedule);
+    return { get value() { return cur; }, set, el, refresh: schedule };
   }
 
   // ───────────────────────── 我：这个浏览器记住的账号 ─────────────────────────
