@@ -273,7 +273,6 @@
   --z-tip: 1000;
   --z-cmdk: 1050;
   --z-toast: 1100;
-  --z-annot: 1150;
   --z-confetti: 1200;
 }
 
@@ -1070,57 +1069,6 @@ kbd, .kbd {
 .toast.on { transform: translate(-50%, 0) scale(1); opacity: 1; }
 @media (max-width: 720px) { .toast { bottom: calc(var(--tabbar-h) + 22px + env(safe-area-inset-bottom)); } }
 
-/* ---------- 19. 标注（原型外壳协议 §4） ---------- */
-.annot-layer { position: fixed; inset: 0; z-index: var(--z-annot); pointer-events: none; }
-.annot-dot {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 22px;
-  height: 22px;
-  margin: -11px 0 0 -11px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--tip-bg);
-  color: var(--tip-ink);
-  font: 700 11px/1 var(--font-mono);
-  box-shadow: 0 0 0 2px var(--yolk), 0 4px 12px -2px rgba(0, 0, 0, 0.35);
-  pointer-events: auto;
-  cursor: pointer;
-  transform: translate3d(var(--x), var(--y), 0) scale(1);
-  transition: transform var(--dur-3) var(--ease-spring), box-shadow var(--dur-2);
-  animation: annot-in var(--dur-5) var(--ease-spring) both;
-}
-.annot-dot::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--yolk); opacity: 0; animation: annot-ping 2.6s var(--ease-out) 600ms infinite; }
-.annot-dot:hover, .annot-dot[aria-expanded="true"] { transform: translate3d(var(--x), var(--y), 0) scale(1.12); box-shadow: 0 0 0 2px var(--yolk), 0 0 0 6px var(--yolk-wash), 0 6px 16px -2px rgba(0, 0, 0, 0.35); }
-.annot-dot:focus-visible { outline-offset: 3px; border-radius: 50%; }
-@keyframes annot-in { from { opacity: 0; transform: translate3d(var(--x), var(--y), 0) scale(0.3); } }
-@keyframes annot-ping { 0% { transform: scale(1); opacity: 0.7; } 70%, 100% { transform: scale(1.9); opacity: 0; } }
-.annot-hl { position: absolute; left: 0; top: 0; border-radius: var(--r-lg); outline: 1.5px dashed var(--yolk-deep); outline-offset: 3px; background: var(--yolk-wash); opacity: 0; transition: opacity var(--dur-2); pointer-events: none; }
-.annot-hl.on { opacity: 0.55; }
-.annot-pop {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: min(300px, calc(100vw - 24px));
-  padding: 12px 14px 13px;
-  border-radius: var(--r-lg);
-  background: var(--surface-raised);
-  border: 1px solid var(--line);
-  box-shadow: var(--sh-hl), var(--sh-3);
-  pointer-events: auto;
-  opacity: 0;
-  transform: translate3d(var(--x), var(--y), 0) scale(0.97);
-  transform-origin: var(--ox, 0) var(--oy, 0);
-  transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-4) var(--ease-spring);
-  visibility: hidden;
-}
-.annot-pop.on { opacity: 1; visibility: visible; transform: translate3d(var(--x), var(--y), 0) scale(1); }
-.annot-pop h4 { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); font-weight: 680; line-height: 1.35; color: var(--ink); }
-.annot-pop h4 i { display: inline-grid; place-items: center; width: 18px; height: 18px; flex: none; border-radius: 50%; background: var(--tip-bg); color: var(--tip-ink); font: 700 10px/1 var(--font-mono); font-style: normal; box-shadow: 0 0 0 1.5px var(--yolk); }
-.annot-pop p { margin-top: 6px; font-size: var(--fs-xs); line-height: 1.65; color: var(--ink-2); }
-
 /* ---------- 20. 空状态 ---------- */
 .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: var(--s-8) var(--s-4); text-align: center; }
 .empty-art { position: relative; margin-bottom: 6px; isolation: isolate; }
@@ -1252,7 +1200,7 @@ kbd, .kbd {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; scroll-behavior: auto !important; }
   .fireflies i { animation: none !important; opacity: 0.6; }
-  .live-dot::after, .annot-dot::after, .is-next .evo-dot::after { display: none; }
+  .live-dot::after, .is-next .evo-dot::after { display: none; }
 }
 
 /* 启动期间正文先隐藏但保留占位，页面脚本填好内容后一次显示，避免启动时的布局偏移；出错时 boot.js 同样会去掉 is-booting */

@@ -709,140 +709,6 @@
     return { show: (a, login) => show(a, login || a.dataset.person), hide, html: personCardHTML };
   })();
 
-  // ───────────────────────── 标注（?annot=1 / nw:annot） ─────────────────────────
-  const annot = (() => {
-    let on = false; // 设计标注只用于原型评审，正式站点不开启
-    let layer = null, hl = null, pop = null, dots = [], openK = -1, pinned = false, raf = 0, mo = null, ro = null, refreshT = 0, hideT = 0;
-    function build() {
-      if (layer) return;
-      layer = document.createElement('div');
-      layer.className = 'annot-layer';
-      layer.setAttribute('aria-label', '设计标注');
-      hl = document.createElement('div'); hl.className = 'annot-hl';
-      pop = document.createElement('div'); pop.className = 'annot-pop'; pop.setAttribute('role', 'dialog');
-      pop.addEventListener('pointerenter', () => clearTimeout(hideT));
-      pop.addEventListener('pointerleave', () => { if (!pinned) scheduleClose(); });
-      layer.append(hl, pop);
-      document.body.appendChild(layer);
-    }
-    function collect() {
-      dots.forEach((d) => d.btn.remove());
-      dots = $$('[data-annot]').filter((el) => !layer.contains(el))
-        .map((el) => ({ el, n: el.getAttribute('data-annot'), title: el.getAttribute('data-annot-title') || '', body: el.getAttribute('data-annot-body') || '' }))
-        .sort((a, b) => (parseFloat(a.n) || 0) - (parseFloat(b.n) || 0));
-      dots.forEach((d, k) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'annot-dot';
-        b.textContent = d.n;
-        b.setAttribute('aria-label', `标注 ${d.n}：${d.title}`);
-        b.setAttribute('aria-expanded', 'false');
-        b.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse' && !pinned) open(k, false); });
-        b.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !pinned) scheduleClose(); });
-        b.addEventListener('click', () => { if (openK === k && pinned) close(); else open(k, true); });
-        b.addEventListener('focus', () => { if (b.matches(':focus-visible') && !pinned) open(k, false); });
-        layer.insertBefore(b, pop);
-        d.btn = b;
-      });
-      if (ro) { ro.disconnect(); dots.forEach((d) => ro.observe(d.el)); }
-      position();
-    }
-    function position() {
-      raf = 0;
-      if (!on || !layer) return;
-      const taken = [];
-      dots.forEach((d) => {
-        const r = d.el.getBoundingClientRect();
-        const show = visible(d.el) && r.width + r.height > 0 && !d.el.closest('[hidden],[aria-hidden="true"]');
-        d.btn.style.display = show ? '' : 'none';
-        if (!show) return;
-        let x = clamp(r.right - 4, 14, innerWidth - 14);
-        let y = r.top + 4;
-        // 元素部分可见时，圆点贴在视口内（向上滚出时吸附在顶部）
-        if (r.bottom > 14 && r.top < innerHeight) y = clamp(y, 14, Math.min(innerHeight - 14, r.bottom - 4));
-        // 与已放置的圆点重叠时向左错开
-        for (let guard = 0; guard < 6 && taken.some((t) => Math.abs(t.x - x) < 24 && Math.abs(t.y - y) < 24); guard++) x -= 28;
-        taken.push({ x, y });
-        d.x = x; d.y = y; d.r = r;
-        d.btn.style.setProperty('--x', `${x}px`);
-        d.btn.style.setProperty('--y', `${y}px`);
-      });
-      if (openK >= 0) placePop();
-    }
-    const schedule = () => { if (on && !raf) raf = requestAnimationFrame(position); };
-    function placePop() {
-      const d = dots[openK];
-      if (!d || !d.r) return;
-      const r = d.r;
-      hl.style.cssText = `transform:translate3d(${r.left}px,${r.top}px,0);width:${r.width}px;height:${r.height}px`;
-      const pw = pop.offsetWidth, ph = pop.offsetHeight;
-      let x = d.x + 16, y = d.y + 14, ox = '0', oy = '0';
-      if (x + pw > innerWidth - 10) { x = d.x - pw - 16; ox = '100%'; }
-      if (x < 10) x = clamp(d.x - pw / 2, 10, innerWidth - pw - 10);
-      if (y + ph > innerHeight - 10) { y = d.y - ph - 14; oy = '100%'; }
-      y = clamp(y, 10, Math.max(10, innerHeight - ph - 10));
-      pop.style.setProperty('--x', `${x}px`);
-      pop.style.setProperty('--y', `${y}px`);
-      pop.style.setProperty('--ox', ox);
-      pop.style.setProperty('--oy', oy);
-    }
-    function open(k, pin) {
-      clearTimeout(hideT);
-      const d = dots[k];
-      if (!d) return;
-      if (openK >= 0 && dots[openK]) dots[openK].btn.setAttribute('aria-expanded', 'false');
-      openK = k;
-      pinned = !!pin;
-      d.btn.setAttribute('aria-expanded', 'true');
-      pop.innerHTML = `<h4><i>${esc(d.n)}</i>${esc(d.title)}</h4>${d.body ? `<p>${esc(d.body)}</p>` : ''}`;
-      position();
-      pop.classList.add('on');
-      hl.classList.add('on');
-    }
-    function close() {
-      clearTimeout(hideT);
-      if (openK >= 0 && dots[openK]) dots[openK].btn.setAttribute('aria-expanded', 'false');
-      openK = -1;
-      pinned = false;
-      if (pop) pop.classList.remove('on');
-      if (hl) hl.classList.remove('on');
-    }
-    function scheduleClose() { clearTimeout(hideT); hideT = setTimeout(close, 180); }
-    function set(v) {
-      on = !!v;
-      root.toggleAttribute('data-annot-on', on);
-      if (!document.body) return;
-      if (on) {
-        build();
-        layer.hidden = false;
-        if (!ro) ro = new ResizeObserver(schedule);
-        if (!mo) {
-          mo = new MutationObserver((list) => {
-            if (list.every((m) => layer.contains(m.target))) return;
-            clearTimeout(refreshT);
-            refreshT = setTimeout(() => { if (on) collect(); }, 120);
-          });
-          mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-annot', 'data-annot-title', 'data-annot-body', 'hidden'] });
-        }
-        collect();
-      } else {
-        close();
-        if (layer) layer.hidden = true;
-        if (mo) { mo.disconnect(); mo = null; }
-        if (ro) { ro.disconnect(); ro = null; }
-      }
-      $$('[data-annot-toggle]').forEach((b) => { if ('checked' in b) b.checked = on; else b.setAttribute('aria-pressed', String(on)); });
-      document.dispatchEvent(new CustomEvent('nwk:annot', { detail: on }));
-    }
-    addEventListener('scroll', schedule, { passive: true, capture: true });
-    addEventListener('resize', schedule, { passive: true });
-    document.addEventListener('pointerdown', (e) => { if (pinned && layer && !layer.contains(e.target)) close(); });
-    document.addEventListener('change', (e) => { if (e.target.matches && e.target.matches('input[data-annot-toggle]')) set(e.target.checked); });
-    document.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('button[data-annot-toggle]'); if (b) set(!on); });
-    ready(() => set(on));
-    return { get on() { return on; }, set, toggle: () => set(!on), refresh: () => { if (on) collect(); }, close, isOpen: () => openK >= 0 };
-  })();
-
   // ───────────────────────── 行为助手 ─────────────────────────
   // 数字滚动：从当前值（或 opts.from）缓动到 to；减少动效时直接落位。format 默认魔力一位小数 / 整数
   function countUp(el, to, { from, dur = 800, delay = 0, format } = {}) {
@@ -1507,7 +1373,7 @@
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); if (cmdk.isOpen()) cmdk.close(); else cmdk.open(); return; }
       const top = layers[layers.length - 1];
       if (top) { if (top.key && top.key(e)) e.preventDefault(); return; }
-      if (e.key === 'Escape') { personCard.hide(); tip.hide(); if (annot.isOpen()) annot.close(); return; }
+      if (e.key === 'Escape') { personCard.hide(); tip.hide(); return; }
       if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
       for (let k = defs.length - 1; k >= 0; k--) {
         const d = defs[k];
@@ -1809,7 +1675,7 @@
     // 工具与格式
     $, $$, esc, clamp, hue, rng, fmt, mag,
     // 协议能力
-    theme, annot, tip, personCard, openPerson, setPersonHandler, navigate, SCREENS,
+    theme, tip, personCard, openPerson, setPersonHandler, navigate, SCREENS,
     // 我：本地记住的账号
     me, mePicker, meEntry,
     // 渲染助手（返回字符串）
