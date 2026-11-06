@@ -4,18 +4,6 @@ import { test, expect, open, BOARD, RULES, LAST, THIS_WEEK, weekValue, mag, oneW
 const P = BOARD.people;
 const byLogin = new Map(P.map((p) => [p.login, p]));
 
-// A consistent board that only has the fixture's last week: people and their weekly
-// series are limited to that week, and firstAt never predates it.
-function oneWeekBoard() {
-  const board = structuredClone(BOARD);
-  const week = board.weeks[LAST];
-  board.weeks = [week];
-  board.people = board.people
-    .filter((p) => p.weekly.some(([w]) => w === week.start))
-    .map((p) => ({ ...p, weekly: p.weekly.filter(([w]) => w === week.start), firstAt: Math.max(p.firstAt, week.start) }));
-  return board;
-}
-
 test.describe('本周', () => {
   test('KPI 显示本周值，周选择器可切到前一周再回来 @mobile', async ({ page }) => {
     await open(page, '/index.html');
