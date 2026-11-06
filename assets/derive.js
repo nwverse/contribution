@@ -153,23 +153,13 @@ window.RULES = window.RULES || RULES;
     };
   }
 
-  const fmt = {
-    f1: (x) => (Math.round(x * 10) / 10).toLocaleString('zh-CN'),
-    int: (x) => Math.round(x).toLocaleString('zh-CN'),
-    pct: (x, d = 0) => `${(x * 100).toFixed(d)}%`,
-    // 周一日期 MM-DD（UTC+8）
-    week: (start) => new Date(start + TZ).toISOString().slice(5, 10),
-    date: (t) => new Date(t + TZ).toISOString().slice(0, 10),
-    datetime: (t) => new Date(t + TZ).toISOString().slice(0, 16).replace('T', ' '),
-  };
-
   window.NW = {
     B, LV, RULES, DAY, WEEK,
     // 展示时区偏移（毫秒），取自 RULES.tzOffsetHours；kit.js 与各页月份刻度共用，不另写 UTC+8
     TZ,
     weeks, W, last, people,
     byLogin: new Map(people.map((p) => [p.login, p])),
-    levelOf, ranksAt, weekSnapshot, vitalityScore, fmt,
+    levelOf, ranksAt, weekSnapshot, vitalityScore,
     // 当前活力不达标的人：掉队在前，同档按活力升序
     lowVitality: () => people.filter((p) => p.vit && p.vit.status !== 'ok').sort((a, b) => (a.vit.status === b.vit.status ? 0 : a.vit.status === 'laggard' ? -1 : 1) || a.vit.v - b.vit.v),
     avatar: (login, size = 64) => `https://github.com/${encodeURIComponent(login)}.png?size=${size}`,

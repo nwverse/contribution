@@ -69,25 +69,28 @@ test.describe('本周', () => {
 
   test('走势图月份标签跟随 RULES.tzOffsetHours，与周日期一致', async ({ page }) => {
     // 把时区改成 UTC-5：测试数据里 6 月 1 日（UTC+8）那周在 UTC-5 下仍是 5 月 31 日，
-    // 月份标签必须与 fmt.week 给的日期同一口径，不能写死 UTC+8
+    // 月份标签与 NWK.fmt.week 给的日期都必须跟随 RULES.tzOffsetHours，不能写死 UTC+8
     const src = fs.readFileSync(new URL('../../engine.js', import.meta.url), 'utf8');
     expect(src).toContain('tzOffsetHours: 8,');
     await page.route('**/engine.js', (route) => route.fulfill({ contentType: 'text/javascript', body: src.replace('tzOffsetHours: 8,', 'tzOffsetHours: -5,') }));
     await open(page, '/index.html');
-    const { expected, kitWeek } = await page.evaluate(() => {
+    const { expected, kitWeek } = await page.evaluate((offsetHours) => {
+      // Computed independently of NW.TZ: UTC shifted by the offset injected into engine.js above
+      const local = (t) => new Date(t + offsetHours * 3600e3);
       let last = -1;
       const out = [];
       NW.W.forEach((t, i) => {
-        const m = Number(NW.fmt.week(t).slice(0, 2));
+        const m = local(t).getUTCMonth() + 1;
         if (m !== last) { last = m; out.push({ i: String(i), text: `${m}月` }); }
       });
-      return { expected: out, kitWeek: NW.W.map((t) => NWK.fmt.week(t) === NW.fmt.week(t)) };
-    });
+      const mmdd = (d) => `${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+      return { expected: out, kitWeek: NW.W.map((t) => NWK.fmt.week(t) === mmdd(local(t))) };
+    }, -5);
     // 测试数据里至少有一周的月份随时区改变，否则这条用例测不出写死的偏移
     expect(BOARD.weeks.some((w) => new Date(w.start + 8 * 3600e3).getUTCMonth() !== new Date(w.start - 5 * 3600e3).getUTCMonth())).toBe(true);
     const labels = await page.locator('.wk .mo').evaluateAll((els) => els.map((e) => ({ i: e.dataset.i, text: e.textContent })));
     expect(labels).toEqual(expected);
-    expect(kitWeek.every(Boolean), 'NWK.fmt 与 NW.fmt 同一时区').toBe(true);
+    expect(kitWeek.every(Boolean), 'NWK.fmt.week 跟随 RULES.tzOffsetHours').toBe(true);
   });
 
   // 其余四页的月份刻度同样取 NW.TZ：把时区从 UTC+8 改成 UTC-5，跨月那周的「N月」刻度必须跟着挪位；
