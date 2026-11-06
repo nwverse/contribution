@@ -81,7 +81,102 @@ test.describe('档案', () => {
   });
 });
 
+// 背景榜首屏只建前 40 行，其余用 setTimeout(moreRows) 分片追加。这里把分片扣住，检查分片未完成时的各条路径
+const holdRowSlices = (page) => page.addInitScript(() => {
+  const held = new Map(), st = window.setTimeout, ct = window.clearTimeout;
+  let seq = 1e6;
+  window.setTimeout = function (fn, ...a) {
+    if (typeof fn === 'function' && fn.name === 'moreRows') { held.set(++seq, fn); return seq; }
+    return st.call(this, fn, ...a);
+  };
+  window.clearTimeout = function (t) { held.delete(t); return ct.call(this, t); };
+  window.__heldSlices = () => held.size;
+  window.__releaseSlices = () => { while (held.size) { const [k, fn] = held.entries().next().value; held.delete(k); fn(); } };
+});
+const RANKED = [...P].sort((a, b) => a.rank - b.rank).map((p) => p.login);
+const rowLogins = (page) => page.locator('#rows .lrow').evaluateAll((rs) => rs.map((r) => r.dataset.login));
+const heldSlices = (page) => page.evaluate(() => window.__heldSlices());
+
+test.describe('档案背景榜分片', () => {
+  test('#u= 指向第 60 名：按需补到该行并标记，补齐后按名次排列、人数不变', async ({ page }) => {
+    const target = RANKED[59];
+    await holdRowSlices(page);
+    await open(page, `/profile.html#u=${target}`);
+    await expect(page.locator('#rows .lrow.is-cur')).toHaveAttribute('data-login', target);
+    expect(await rowLogins(page)).toEqual(RANKED.slice(0, 60));
+    expect(await heldSlices(page)).toBe(1);
+    await expect(page.locator('#lbCount')).toHaveText(`总榜 · ${P.length} 人`);
+    await page.evaluate(() => window.__releaseSlices());
+    expect(await rowLogins(page)).toEqual(RANKED);
+    await expect(page.locator('#rows .lrow.is-cur')).toHaveCount(1);
+    await expect(page.locator('#rows .lrow.is-cur')).toHaveAttribute('data-login', target);
+  });
+
+  test('分片未完成时输入筛选：先补齐全部行再计数，清空后回到总榜', async ({ page }) => {
+    await holdRowSlices(page);
+    await open(page, '/profile.html');
+    await expect(page.locator('#rows .lrow')).toHaveCount(40);
+    await expect(page.locator('#lbCount')).toHaveText(`总榜 · ${P.length} 人`);
+    const q = '8';
+    const n = P.filter((p) => p.login.toLowerCase().includes(q)).length;
+    await page.locator('#lbSearch').fill(q);
+    await expect(page.locator('#lbCount')).toHaveText(`筛出 ${n} / ${P.length} 人`);
+    expect(await rowLogins(page)).toEqual(RANKED);
+    await expect(page.locator('#rows .lrow:not([hidden])')).toHaveCount(n);
+    expect(await heldSlices(page)).toBe(0);
+    await page.locator('#lbSearch').fill('');
+    await expect(page.locator('#lbCount')).toHaveText(`总榜 · ${P.length} 人`);
+    await expect(page.locator('#rows .lrow:not([hidden])')).toHaveCount(P.length);
+  });
+
+  test('分片未完成时用键盘进入榜单：先补齐全部行', async ({ page }) => {
+    await holdRowSlices(page);
+    await open(page, '/profile.html');
+    await expect(page.locator('#rows .lrow')).toHaveCount(40);
+    await page.locator('#lbSearch').focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.locator('#rows')).toBeFocused();
+    expect(await rowLogins(page)).toEqual(RANKED);
+    expect(await heldSlices(page)).toBe(0);
+  });
+
+  test('分片未完成时「记为我的账号」重建榜单：取消剩余分片，不重复不缺行', async ({ page }) => {
+    const target = RANKED[2];
+    await holdRowSlices(page);
+    await open(page, `/profile.html#u=${target}`);
+    expect(await heldSlices(page)).toBe(1);
+    await page.locator(`.drawer.on [data-me-remember="${target}"]`).click();
+    await expect(page.locator('#rows .lrow.is-me')).toHaveAttribute('data-login', target);
+    expect(await heldSlices(page)).toBe(0);
+    expect(await rowLogins(page)).toEqual(RANKED);
+    await expect(page.locator('#rows .lrow.is-cur')).toHaveAttribute('data-login', target);
+  });
+
+  test('刷新时一次建好全部行，滚动恢复落在完整列表上', async ({ page }) => {
+    await holdRowSlices(page);
+    await open(page, '/profile.html');
+    await expect(page.locator('#rows .lrow')).toHaveCount(40);
+    await page.reload();
+    await expect(page.locator('html')).not.toHaveClass(/is-booting/);
+    expect(await rowLogins(page)).toEqual(RANKED);
+    expect(await heldSlices(page)).toBe(0);
+  });
+});
+
 test.describe('孵化台', () => {
+  test('漏斗启动时只画一次，入场动画不被重绘打断', async ({ page }) => {
+    // 漏斗画出后 #funnel 从 min-height 120px 长到 300px，ResizeObserver 会再报一次；宽度没变就不该重画
+    await page.addInitScript(() => {
+      window.__funnelDraws = 0;
+      new MutationObserver((ms) => { for (const m of ms) if (m.target.id === 'funnel' && m.addedNodes.length) window.__funnelDraws++; })
+        .observe(document, { childList: true, subtree: true });
+    });
+    await open(page, '/hatchery.html');
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await expect(page.locator('#funnel > svg')).toHaveClass(/fx-in/);
+    expect(await page.evaluate(() => window.__funnelDraws)).toBe(1);
+  });
+
   test('零贡献者看板显示空图表且仍可交互 @mobile', async ({ page }) => {
     const board = structuredClone(BOARD);
     board.people = [];
