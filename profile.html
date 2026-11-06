@@ -747,7 +747,7 @@
       if (projW) {
         const x1 = x(n - 1), y1 = y(p.bonus), x2 = x(n - 1 + projW), y2 = y(Math.min(target, p.bonus + p.pace * projW));
         s += `<path class="pj" d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${x2.toFixed(1)} ${y2.toFixed(1)}"/><circle class="anno-dot" cx="${x2.toFixed(1)}" cy="${y2.toFixed(1)}" r="2.5"/>`
-          + `<text class="anno-tx" x="${Math.min(x2, Wd - padR).toFixed(1)}" y="${(y2 - 8).toFixed(1)}" text-anchor="end">${K.etaText(eta)}到${nx.hatch ? '孵化线' : LV[p.next.level].name}</text>`;
+          + `<text class="anno-tx" x="${Math.min(x2, Wd - padR).toFixed(1)}" y="${(y2 - 8).toFixed(1)}" text-anchor="end">${K.etaUntil(eta)}到${nx.hatch ? '孵化线' : LV[p.next.level].name}</text>`;
         // 预测区的 x 刻度：「+N 周」
         s += `<text class="ax" x="${x2.toFixed(1)}" y="${H - 6}" text-anchor="middle">+${projW} 周</text>`;
       }
@@ -767,7 +767,7 @@
       idx.forEach((i, k) => { const m = new Date(W[i] + NW.TZ).getUTCMonth(); if (m !== lastM) { lastM = m; if (x(k) - lastX > 34) { s += `<text class="ax" x="${x(k)}" y="${H - 6}" text-anchor="middle">${m + 1}月</text>`; lastX = x(k); } } });
       s += `<circle class="hv" r="4.5" cx="0" cy="0"/></svg>`;
       host.innerHTML = s;
-      host.setAttribute('aria-label', `${p.login} 累计魔力曲线，现在 ${mag(p.bonus)}${projW ? `，按近 4 周均速${K.etaText(eta)}到 ${target}` : ''}`);
+      host.setAttribute('aria-label', `${p.login} 累计魔力曲线，现在 ${mag(p.bonus)}${projW ? `，按近 4 周均速${K.etaUntil(eta)}到 ${target}` : ''}`);
       if (k0 < 0) return;
     }
     function hover(k) {

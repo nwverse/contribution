@@ -606,6 +606,8 @@ test.describe('孵化门槛跟随 RULES', () => {
 test.describe('预计升级时间', () => {
   // 超过 52 周的 ETA 不再写成「约 100 周」，各页同一说法
   const LONG = /约 \d{3,} 周|约 (5[3-9]|[6-9]\d) 周/;
+  // 「…到 N」句式里不能直接拼「要一年以上」
+  const BROKEN = /要一年以上到/;
   const texts = (page) => page.evaluate(() => [document.body.innerText,
     ...[...document.querySelectorAll('[aria-label],[data-tip-html],[data-tip]')].flatMap((e) => [e.getAttribute('aria-label'), e.getAttribute('data-tip-html'), e.getAttribute('data-tip')])]
     .filter(Boolean).join('\n'));
@@ -616,11 +618,16 @@ test.describe('预计升级时间', () => {
     const long = await page.evaluate(() => NWK.etaText(53));
     expect(await page.evaluate(() => NWK.etaText(52))).toBe('约 52 周');
     const t = await texts(page);
+    expect(await page.evaluate(() => [NWK.etaUntil(53), NWK.etaUntil(52), NWK.etaUntil(null)]))
+      .toEqual(['一年以上才', '约 52 周', '近 4 周没有新魔力']);
     expect(t).not.toMatch(LONG);
+    expect(t).not.toMatch(BROKEN);
     expect(t).toContain(long);
     await open(page, '/hatchery.html');
-    expect(await texts(page)).not.toMatch(LONG);
-    await expect(page.locator('.c-eta', { hasText: long }).first()).toBeAttached();
+    const hatch = await texts(page);
+    expect(hatch).not.toMatch(LONG);
+    expect(hatch).not.toMatch(BROKEN);
+    await expect(page.locator('.c-eta', { hasText: `一年以上才到 ${RULES.levels[1].bonus}` }).first()).toBeAttached();
     await open(page, '/pond.html');
     const pond = await texts(page);
     expect(pond).not.toMatch(LONG);

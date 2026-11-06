@@ -155,6 +155,8 @@
   }
   // Past a year the week count means little (e.g. 1623 weeks), so every page shows the same wording.
   const etaText = (eta) => (eta === null || eta === undefined ? '近 4 周没有新魔力' : eta > 52 ? '要一年以上' : eta <= 1 ? '约 1 周' : `约 ${eta} 周`);
+  // Lead-in for "...到 X" phrases: "要一年以上到 50" does not read, so past a year it becomes "一年以上才到 50".
+  const etaUntil = (eta) => (eta > 52 ? '一年以上才' : etaText(eta));
 
   // 孵化提示：只差一项时给一句能照做的话（活跃周 = 有合入或协作的不同自然周）
   function hatchHint(p) {
@@ -1682,7 +1684,7 @@
     // 我：本地记住的账号
     me, mePicker, meEntry,
     // 渲染助手（返回字符串）
-    icon, frog, frogOf, formOf, levelBadge, nextInfo, etaText, hatchHint,
+    icon, frog, frogOf, formOf, levelBadge, nextInfo, etaText, etaUntil, hatchHint,
     avatar, who, pname, people, delta, change,
     sparkline, ring, countdown, stackedBar, compParts, comp, dotRange, empty,
     pond, pondData, evoAxis, kpi, themeToggleHTML,
