@@ -911,8 +911,9 @@
   renderChips();
   renderBoard(false);
   renderCoPanel(false);
+  // The observer's first report (after layout, before paint) draws the funnel; a direct call here would
+  // force a layout of the whole board just to read the width, then draw a second time
   new ResizeObserver(() => drawFunnel()).observe($('#funnel'));
-  drawFunnel();
   document.addEventListener('nwk:theme', () => { drawFunnel(); drawCohort(); });
   if (location.hash === '#failed') setFold(true);
   $('#soonGo')?.addEventListener('click', () => goNode('due'));
