@@ -462,10 +462,16 @@
     const hd = $('#headline'), ld = $('#lede');
     if (hd.innerHTML !== h) {
       hd.innerHTML = h;
-      hd.classList.remove('is-in', 'swap-in'); void hd.offsetWidth;
+      // Reflow only to restart an animation that is already applied; on first render it would just force a layout
+      const restart = hd.classList.contains('is-in') || hd.classList.contains('swap-in');
+      hd.classList.remove('is-in', 'swap-in'); if (restart) void hd.offsetWidth;
       if (animate) hd.classList.add('swap-in'); hd.classList.add('is-in');
     }
-    if (ld.innerHTML !== t) { ld.innerHTML = t; ld.classList.remove('swap-in'); void ld.offsetWidth; if (animate) ld.classList.add('swap-in'); }
+    if (ld.innerHTML !== t) {
+      ld.innerHTML = t;
+      if (ld.classList.contains('swap-in')) { ld.classList.remove('swap-in'); void ld.offsetWidth; }
+      if (animate) ld.classList.add('swap-in');
+    }
   }
 
   // ───────── 周控制 ─────────
