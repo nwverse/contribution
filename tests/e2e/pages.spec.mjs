@@ -4,6 +4,18 @@ import { test, expect, open, BOARD, RULES, LAST, THIS_WEEK, weekValue, mag } fro
 const P = BOARD.people;
 const byLogin = new Map(P.map((p) => [p.login, p]));
 
+// A consistent board that only has the fixture's last week: people and their weekly
+// series are limited to that week, and firstAt never predates it.
+function oneWeekBoard() {
+  const board = structuredClone(BOARD);
+  const week = board.weeks[LAST];
+  board.weeks = [week];
+  board.people = board.people
+    .filter((p) => p.weekly.some(([w]) => w === week.start))
+    .map((p) => ({ ...p, weekly: p.weekly.filter(([w]) => w === week.start), firstAt: Math.max(p.firstAt, week.start) }));
+  return board;
+}
+
 test.describe('本周', () => {
   test('KPI 显示本周值，周选择器可切到前一周再回来 @mobile', async ({ page }) => {
     await open(page, '/index.html');
@@ -19,6 +31,19 @@ test.describe('本周', () => {
     await page.keyboard.press('t');
     await expect(page).not.toHaveURL(/[?&]week=/);
     await expect(kpis).toContainText(String(BOARD.weeks[LAST].merged));
+  });
+
+  test('只有一周数据的看板正常启动，周选择器停在本周 @mobile', async ({ page }) => {
+    const board = oneWeekBoard();
+    await page.route('**/data/board.json', (route) => route.fulfill({ json: board }));
+    await open(page, '/index.html');
+    await expect(page.locator('.boot-error')).toHaveCount(0);
+    const kpis = page.locator('#heroKpis');
+    await expect(kpis).toContainText(String(board.weeks[0].merged));
+    await page.locator('#wk').focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(page).not.toHaveURL(/[?&]week=/);
+    await expect(kpis).toContainText(String(board.weeks[0].merged));
   });
 
   test('本周魔力榜按本周魔力排序，名字可进入档案', async ({ page }) => {

@@ -775,7 +775,7 @@
   // ───────── 25 周走势（两张周图，联动高亮所选周） ─────────
   const weeksData = (k) => NW.weeks.map((w, i) => ({ label: `${K.week.range(i)}${i === LAST ? ' · 进行中' : ''}`, v: w[k], t: w.start }));
   function longestZero(k) { let run = [-1, -1], best = [-1, -1]; NW.weeks.forEach((w, i) => { if (w[k] === 0) { run = run[0] < 0 ? [i, i] : [run[0], i]; if (run[1] - run[0] > best[1] - best[0]) best = run.slice(); } else run = [-1, -1]; }); return best; }
-  function biggestJump(k) { let j = 1; for (let i = 2; i <= LAST; i++) if (NW.weeks[i][k] - NW.weeks[i - 1][k] > NW.weeks[j][k] - NW.weeks[j - 1][k]) j = i; return j; }
+  function biggestJump(k) { if (LAST < 1) return -1; let j = 1; for (let i = 2; i <= LAST; i++) if (NW.weeks[i][k] - NW.weeks[i - 1][k] > NW.weeks[j][k] - NW.weeks[j - 1][k]) j = i; return j; }
   function trendTip(k, unit, color) {
     return (d, i) => {
       const v = NW.weeks[i][k], pv = i > 0 ? NW.weeks[i - 1][k] : null;
@@ -791,7 +791,7 @@
     tip: trendTip('active', '活跃贡献者', 'var(--water)'),
     annotations: [
       ...(zA[0] >= 0 && zA[1] > zA[0] ? [{ type: 'bracket', from: zA[0], to: zA[1], text: `连续 ${zA[1] - zA[0] + 1} 周没有人活跃` }] : []),
-      { type: 'note', at: jA, side: 'left', dx: 14, dy: 24, text: `${K.week.short(jA)} 这一周，从 ${NW.weeks[jA - 1].active} 人跳到 ${NW.weeks[jA].active} 人` },
+      ...(jA >= 1 ? [{ type: 'note', at: jA, side: 'left', dx: 14, dy: 24, text: `${K.week.short(jA)} 这一周，从 ${NW.weeks[jA - 1].active} 人跳到 ${NW.weeks[jA].active} 人` }] : []),
     ],
     onSelect: (i) => setWeek(i),
   });
@@ -800,7 +800,7 @@
     tip: trendTip('merged', '合入 PR', 'var(--leaf)'),
     annotations: [
       ...(zM[0] >= 0 && zM[1] > zM[0] ? [{ type: 'bracket', from: zM[0], to: zM[1], text: `连续 ${zM[1] - zM[0] + 1} 周没有合入` }] : []),
-      { type: 'note', at: jM, side: 'left', dx: 14, dy: 24, text: `${K.week.short(jM)} 这一周，从 ${NW.weeks[jM - 1].merged} 个跳到 ${NW.weeks[jM].merged} 个` },
+      ...(jM >= 1 ? [{ type: 'note', at: jM, side: 'left', dx: 14, dy: 24, text: `${K.week.short(jM)} 这一周，从 ${NW.weeks[jM - 1].merged} 个跳到 ${NW.weeks[jM].merged} 个` }] : []),
     ],
     onSelect: (i) => setWeek(i),
   });
