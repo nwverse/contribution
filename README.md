@@ -10,7 +10,7 @@ https://nwverse.github.io/contribution/
 node scripts/upload.mjs
 ```
 
-脚本完整拉取组织数据（约 40 点 GraphQL 额度、十几秒），在本机计算贡献度，再把 `index.html`、`engine.js` 与 `data/board.json` 一次提交到 `gh-pages`。内容没变时不提交，失败时退出码非 0。
+脚本完整拉取组织数据（约 40 点 GraphQL 额度、十几秒），在本机计算贡献度，再把 `scripts/upload.mjs` 中 `SITE_FILES` 列出的站点文件（六个页面、`engine.js`、`assets/` 下的脚本与 `tokens.css`、`.nojekyll` 和图标）与 `data/board.json` 一次提交到 `gh-pages`。内容没变时不提交，失败时退出码非 0。
 
 加 `--dry-run` 只拉取和计算，结果写到 `dist/board.json`，不发布。
 
@@ -44,11 +44,11 @@ node scripts/serve.mjs              # http://127.0.0.1:8080/
 
 `serve.mjs` 依次取 `BOARD_FILE`、`data/board.json`、`dist/board.json` 作为页面数据。
 
-`npm test` 用合成数据验证计分行为，无需安装依赖。端到端测试用脱敏的 `tests/fixtures/board.json`，不读取组织数据：
+`npm run test:engine` 用合成数据验证计分行为，与 CI 运行的用例相同，无需安装依赖；`npm test` 只运行其中的 `tests/engine.test.mjs`。端到端测试用脱敏的 `tests/fixtures/board.json`，不读取组织数据：
 
 ```bash
 npm ci
-npm test
+npm run test:engine
 npx playwright install chromium
 npm run test:e2e
 ```
