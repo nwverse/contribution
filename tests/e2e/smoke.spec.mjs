@@ -1,4 +1,4 @@
-// 六个页面都能启动：无报错、导航正确、启动无布局偏移、主题参数生效、只请求本站资源、启动脚本与数据并行下载。
+// 六个页面都能启动：无报错、导航正确、启动无布局偏移、主题参数生效、只请求本站资源、启动脚本与数据并行下载；K.flip 跳过屏外的动画。
 import { test, expect, open, PAGES, NAV } from './fixtures.mjs';
 
 for (const pg of PAGES) {
@@ -130,4 +130,35 @@ test('⌘K 搜索贡献者并打开档案', async ({ page }) => {
   await box.fill('frog-07');
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/profile\.html.*#u=frog-07/);
+});
+
+test('K.flip 只给视口里看得见的移动做动画，屏外删除的行不留残影', async ({ page }) => {
+  await open(page, '/index.html');
+  const res = await page.evaluate(() => {
+    // 60 rows of 40px starting 800px above the viewport (900px tall): rows 20-42 are on screen
+    const box = document.createElement('div');
+    Object.assign(box.style, { position: 'absolute', top: '-800px', left: '0', width: '300px' });
+    box.innerHTML = Array.from({ length: 60 }, (_, i) => `<div data-key="r${i}" style="height:40px">r${i}</div>`).join('');
+    document.body.appendChild(box);
+    const row = (k) => box.querySelector(`[data-key="${k}"]`);
+    const moving = (k) => row(k).getAnimations().length > 0;
+    // Reverse each block: 0-9 stay above, 10-49 straddle the viewport, 50-59 stay below
+    NWK.flip(box, () => {
+      const els = [...box.children];
+      const order = [...els.slice(0, 10).reverse(), ...els.slice(10, 50).reverse(), ...els.slice(50).reverse()];
+      box.append(...order);
+    });
+    const moved = { above: moving('r3'), below: moving('r52'), crossing: moving('r10'), visible: moving('r30') };
+    document.getAnimations().forEach((a) => a.cancel());
+    NWK.flip(box, () => {
+      row('r1').remove(); // above the viewport
+      row('r30').remove(); // on screen
+      box.insertAdjacentHTML('beforeend', '<div data-key="r60" style="height:40px">r60</div>'); // enters below the viewport
+    });
+    const ghosts = box.querySelectorAll('[aria-hidden="true"]').length;
+    const entered = moving('r60');
+    box.remove();
+    return { moved, ghosts, entered };
+  });
+  expect(res).toEqual({ moved: { above: false, below: false, crossing: true, visible: true }, ghosts: 1, entered: false });
 });

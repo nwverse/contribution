@@ -29,9 +29,13 @@
   const cssVar = (name) => getComputedStyle(root).getPropertyValue(name).trim();
   const typing = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
   const visible = (el) => !!(el && el.isConnected && el.getClientRects().length);
+  // --ease-spring is theme-independent: resolve and validate it once instead of on every FLIP
+  let spring = null;
   function springEasing() {
+    if (spring) return spring;
     const v = cssVar('--ease-spring');
-    try { document.createElement('div').animate([{ opacity: 1 }], { easing: v }); return v; } catch (e) { return 'cubic-bezier(.3,1.25,.5,1)'; }
+    try { document.createElement('div').animate([{ opacity: 1 }], { easing: v }); spring = v; } catch (e) { spring = 'cubic-bezier(.3,1.25,.5,1)'; }
+    return spring;
   }
 
   // ───────────────────────── 格式（全站口径） ─────────────────────────
@@ -869,11 +873,18 @@
     const easing = springEasing();
     const after = $$(selector, container);
     const seen = new Set();
+    // Read every new position before starting any animation: animate() dirties style, so interleaving
+    // reads and writes would force one layout per element
+    const rects = after.map((el) => el.getBoundingClientRect());
+    const inView = (top, bottom, left, right) => bottom > 0 && top < innerHeight && right > 0 && left < innerWidth;
+    const onScreen = (r) => inView(r.top, r.bottom, r.left, r.right);
     after.forEach((el, k) => {
       const key = keyOf(el);
       seen.add(key);
       const b = before.get(key);
-      const r = el.getBoundingClientRect();
+      const r = rects[k];
+      // Skip motion that never crosses the viewport: the slide covers the box spanning both positions
+      if (!(b ? inView(Math.min(b.r.top, r.top), Math.max(b.r.bottom, r.bottom), Math.min(b.r.left, r.left), Math.max(b.r.right, r.right)) : onScreen(r))) return;
       if (!b) {
         el.animate([{ opacity: 0, transform: 'translateY(6px) scale(.985)' }, { opacity: 1, transform: 'none' }], { duration: 280, delay: 140 + k * stagger, easing: 'cubic-bezier(.16,1,.3,1)', fill: 'backwards' });
         return;
@@ -887,7 +898,7 @@
     if (cs.isolation !== 'isolate') container.style.isolation = 'isolate'; // 让淡出的残影垫在行下面
     const cr1 = container.getBoundingClientRect();
     before.forEach((b, key) => {
-      if (seen.has(key)) return;
+      if (seen.has(key) || !onScreen(b.r)) return;
       const g = b.el.cloneNode(true);
       g.removeAttribute('data-key');
       g.setAttribute('aria-hidden', 'true');
