@@ -1,5 +1,5 @@
 // 各页主要交互，数字与测试数据逐一核对。
-import { test, expect, open, BOARD, RULES, LAST, THIS_WEEK, weekValue, mag, oneWeekBoard, recentWeeksBoard } from './fixtures.mjs';
+import { test, expect, open, BOARD, RULES, LAST, THIS_WEEK, weekValue, mag, oneWeekBoard, recentWeeksBoard, freshBoard } from './fixtures.mjs';
 
 const P = BOARD.people;
 const byLogin = new Map(P.map((p) => [p.login, p]));
@@ -417,4 +417,18 @@ test('档案页显示活力分与四项构成', async ({ page }) => {
   const sec = page.locator('.drawer.on section[aria-label="活力"]');
   await expect(sec.locator('.vit-score')).toHaveText((Math.round(x.r.v * 10) / 10).toFixed(1));
   await expect(sec.locator('.vit-row')).toHaveCount(4);
+});
+
+// 还没有人拿到魔力时，魔力构成条的比例是 0/0：样式里不能出现 NaN/Infinity
+test.describe('还没有魔力的看板（fresh）', () => {
+  // 排行榜只查构成条：只有一周数据时走势图的 NaN 另行处理
+  for (const [file, sel] of [['profile.html', '[style]'], ['ranking.html', '.sbar[style]']]) {
+    test(`${file} 不出现 NaN 宽度`, async ({ page }) => {
+      await page.route('**/data/board.json', (route) => route.fulfill({ json: freshBoard() }));
+      await open(page, `/${file}`);
+      await expect(page.locator('.boot-error')).toHaveCount(0);
+      const bad = await page.locator(sel).evaluateAll((els) => els.map((e) => e.getAttribute('style')).filter((s) => /NaN|Infinity/.test(s)));
+      expect(bad).toEqual([]);
+    });
+  }
 });

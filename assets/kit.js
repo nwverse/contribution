@@ -288,8 +288,10 @@
     const pos = parts.filter((x) => x.value > 0.005);
     const sum = total ?? parts.reduce((s, x) => s + Math.max(0, x.value), 0);
     const aria = `${label ? `${label}：` : ''}${parts.map((x) => `${x.label} ${f(x.value)}`).join('，')}`;
-    if (!pos.length) return `<div class="sbar is-empty" style="width:${(scale * 100).toFixed(2)}%" role="img" aria-label="${esc(aria)}"></div>`;
-    return `<div class="sbar" style="--h:${h}px;width:${(clamp(scale, 0, 1) * 100).toFixed(2)}%" role="img" aria-label="${esc(aria)}">`
+    // 调用方按 bonus / 最大 bonus 传比例，没人拿到魔力时是 0/0，统一归到 [0, 1]
+    const w = ((Number.isFinite(scale) ? clamp(scale, 0, 1) : 0) * 100).toFixed(2);
+    if (!pos.length) return `<div class="sbar is-empty" style="width:${w}%" role="img" aria-label="${esc(aria)}"></div>`;
+    return `<div class="sbar" style="--h:${h}px;width:${w}%" role="img" aria-label="${esc(aria)}">`
       + pos.map((x) => `<i style="--c:${x.color};flex-grow:${x.value}" data-tip-html="${esc(`<div class='t-row'><span class='t-key box' style='--k:${x.color}'></span><span class='t-v'>${f(x.value)}</span><span class='t-l'>${esc(x.label)}${sum > 0 ? ` · ${fmt.pct(x.value / sum)}` : ''}</span></div>${x.note ? `<div class='t-l'>${esc(x.note)}</div>` : ''}`)}"></i>`).join('')
       + '</div>';
   }

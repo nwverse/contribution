@@ -27,6 +27,18 @@ export function recentWeeksBoard(n) {
 // 只有一周数据的看板
 export const oneWeekBoard = () => recentWeeksBoard(1);
 
+// 刚开始统计、还没有人拿到魔力的看板：5 人只开过 PR，魔力全为 0、未定级、新人期进行中
+export function freshBoard() {
+  const board = oneWeekBoard();
+  board.weeks[0] = { ...board.weeks[0], merged: 0 };
+  board.people = board.people.slice(0, 5).map((p, i) => ({
+    ...p, merged: 0, resolved: 0, rate: 0, bonus: 0, bonusPr: 0, bonusModel: 0, bonusCollab: 0,
+    weekly: [], activeWeeks: 0, level: null, rank: i + 1,
+    newbie: { ...p.newbie, status: 'pending', passAt: null, passDay: null, merged: 0, activeWeeks: 0 },
+  }));
+  return board;
+}
+
 export const PAGES = [
   { file: 'index.html', id: 'c1', label: '本周' },
   { file: 'ranking.html', id: 'c2', label: '排行榜' },
