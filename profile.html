@@ -593,8 +593,8 @@
       <div class="drawer-sec-h"><span class="t">${icon('layers', 15)}魔力构成</span><span>合计 ${mag(p.bonus)}</span></div>
       ${K.comp(p, { h: 10 })}
       ${empty ? '' : `<div class="comp3">
-        <div><span class="key" style="--k:var(--series-pr)">PR 分</span><div class="cv">${mag(neg ? p.bonusPr + p.bonusModel : p.bonusPr)}</div><div class="cd">合入 <b>${fmt.int(p.merged)}</b> 个 PR · 改动 <b>${fmt.int(p.lines)}</b> 行 · <b>${fmt.int(p.commits)}</b> 个 commit</div></div>
-        <div><span class="key" style="--k:var(--series-model)">模型加成</span><div class="cv ${neg ? 'neg' : ''}">${neg ? '−' : '+'}${mag(Math.abs(p.bonusModel))}</div><div class="cd">${ai ? `<b>${fmt.int(ai)}</b> 个 PR 有 AI 署名${neg ? `；${esc(cut.join('、'))} 系数低于 1，扣分已从 PR 分里减掉` : '，按模型系数加分'}` : '没有带 AI 署名的 PR'}</div></div>
+        <div><span class="key" style="--k:var(--series-pr)">PR 分</span><div class="cv">${mag(neg ? p.bonusPr + p.bonusModel : p.bonusPr)}</div><div class="cd">合入 <b>${fmt.int(p.merged)}</b> 个 PR · 改动 <b>${fmt.int(p.lines)}</b> 行 · <b>${fmt.int(p.commits)}</b> 个 commit${p.directCommits ? ` · 直接推送 <b>${fmt.int(p.directCommits)}</b> 个 commit` : ''}</div></div>
+        <div><span class="key" style="--k:var(--series-model)">模型加成</span><div class="cv ${neg ? 'neg' : ''}">${neg ? '−' : '+'}${mag(Math.abs(p.bonusModel))}</div><div class="cd">${ai ? `<b>${fmt.int(ai)}</b> 个 PR 有 AI 署名${neg ? `；${esc(cut.join('、'))} 系数低于 1，扣分已从 PR 分里减掉` : '，按模型系数加分'}` : '没有带 AI 署名的 PR'}${p.directCommits ? '；直接推送的 commit 按各自署名计' : ''}</div></div>
         <div><span class="key" style="--k:var(--series-collab)">协作</span><div class="cv">${mag(p.bonusCollab)}</div><div class="cd">参与他人 PR / issue 与自提有效 issue 共 <b>${fmt.int(p.collab)}</b> 次${p.issuesFiled ? `，其中自提 issue <b>${fmt.int(p.issuesFiled)}</b> 个` : ''}</div></div>
       </div>`}
       <p class="pf-note">${empty ? '还没有魔力：合入第一个 PR 或参与一次协作后就会出现。' : `每个合入 PR 的原始分为 1 + ${R.score.lines}·log₁₀(1+改动行) + ${R.score.commits}·log₂(1+commit 数)，再乘模型系数；每周 PR 原始分按 ${R.weeklyScoreCaps.pr}P/(${R.weeklyScoreCaps.pr}+P) 递减，协作按 ${R.weeklyScoreCaps.collab}C/(${R.weeklyScoreCaps.collab}+C) 递减（P 为当周含模型系数的 PR 原始总分，C 为协作次数 × ${R.score.collab}）。两项分别计分，贡献越多单次增量越小。`}</p>
@@ -888,6 +888,7 @@
     const mix = p.modelMix.slice().sort((a, b) => (a.label === AI_NONE) - (b.label === AI_NONE) || b.count - a.count);
     const total = mix.reduce((s, m) => s + m.count, 0);
     const ai = mix.filter((m) => m.label !== AI_NONE).reduce((s, m) => s + m.count, 0);
+    const pushNote = p.directCommits ? '直接推送的 commit 按各自的署名乘系数。' : '';
     const mx = Math.max(1, ...mix.map((m) => m.count));
     const rows = mix.map((m) => {
       const w = modelW.get(m.label) ?? 1;
@@ -898,7 +899,7 @@
     }).join('');
     return `<section class="drawer-sec" aria-label="模型使用">
       <div class="drawer-sec-h"><span class="t">${icon('sparkles', 15)}模型使用</span><span>${total ? `${fmt.int(total)} 个合入 PR · AI 署名 ${fmt.pct(ai / total)}` : ''}</span></div>
-      ${total ? `<div class="mdl">${rows}</div><p class="pf-note">${ai ? `按 PR 里的 AI 署名识别模型，每个 PR 的得分乘以对应系数（×1 不加不减）。这些系数带来的加减合计 <b>${p.bonusModel < 0 ? '−' : '+'}${mag(Math.abs(p.bonusModel))}</b>，已算进魔力。` : '合入的 PR 都没有 AI 署名，系数都是 ×1，不加不减。'}</p>`
+      ${total ? `<div class="mdl">${rows}</div><p class="pf-note">${ai ? `按 PR 里的 AI 署名识别模型，每个 PR 的得分乘以对应系数（×1 不加不减）。${pushNote}这些系数带来的加减合计 <b>${p.bonusModel < 0 ? '−' : '+'}${mag(Math.abs(p.bonusModel))}</b>，已算进魔力。` : `合入的 PR 都没有 AI 署名，系数都是 ×1，不加不减。${pushNote}`}</p>`
         : '<p class="pf-note" style="margin-top:0">还没有合入的 PR，暂无模型数据。</p>'}
     </section>`;
   }
@@ -973,10 +974,10 @@
       txt = `<b>奶蛙及以上豁免冬眠</b>，多久不来都不会被标记。最近一次动作在 ${fmt.md(p.lastAt)}（${fmt.ago(p.daysSinceLast)}）。`;
     } else if (p.dormant) {
       art = `<span class="zz-ic">${icon('moon-z', 20)}</span>`;
-      txt = `<b>冬眠中</b>：最近一次动作在 ${fmt.md(p.lastAt)}，已经 <b>${p.daysSinceLast}</b> 天没有动作。再提 PR、合入或参与协作就会醒来；冬眠只是标记，不影响形态和魔力。`;
+      txt = `<b>冬眠中</b>：最近一次动作在 ${fmt.md(p.lastAt)}，已经 <b>${p.daysSinceLast}</b> 天没有动作。再提 PR、合入、直接推送或参与协作就会醒来；冬眠只是标记，不影响形态和魔力。`;
     } else {
       art = K.countdown(left, { total: R.dormantDays, size: 48 });
-      txt = `距冬眠还有 <b>${left}</b> 天。连续 ${R.dormantDays} 天没有任何动作（提 PR、合入、协作）会被标记冬眠；最近一次动作在 ${fmt.md(p.lastAt)}（${fmt.ago(p.daysSinceLast)}）。长到奶蛙就豁免。`;
+      txt = `距冬眠还有 <b>${left}</b> 天。连续 ${R.dormantDays} 天没有任何动作（提 PR、合入、直接推送、协作）会被标记冬眠；最近一次动作在 ${fmt.md(p.lastAt)}（${fmt.ago(p.daysSinceLast)}）。长到奶蛙就豁免。`;
     }
     return `<section class="drawer-sec" aria-label="冬眠">
       <div class="drawer-sec-h"><span class="t">${icon('moon', 15)}冬眠</span><span>${R.dormantDays} 天无动作</span></div>

@@ -160,7 +160,7 @@
   // Lead-in for "...到 X" phrases: "要一年以上到 50" does not read, so past a year it becomes "一年以上才到 50".
   const etaUntil = (eta) => (eta > 52 ? '一年以上才' : etaText(eta));
 
-  // 孵化提示：只差一项时给一句能照做的话（活跃周 = 有合入或协作的不同自然周）
+  // 孵化提示：只差一项时给一句能照做的话（活跃周 = 有合入、直接推送或协作的不同自然周）
   function hatchHint(p) {
     if (p.level !== null) return null;
     const nb = p.newbie;
@@ -171,7 +171,7 @@
     if (nb.status !== 'pending') {
       return { status: 'failed', missing: [], oneLeft: false, text: `考核期已过；魔力再攒 ${mag(toMagic)}（到 ${NW.RULES.hatchBonus}）就能直接孵化` };
     }
-    const activeNow = p.tw > 0; // 本周已有合入或协作 = 本周已算一个活跃周
+    const activeNow = p.tw > 0; // 本周已有合入、直接推送或协作 = 本周已算一个活跃周
     const nextWeek = NW.W[NW.last] + WEEK;
     const missing = [];
     if (needM) missing.push(`合入 ${needM} 个 PR`);

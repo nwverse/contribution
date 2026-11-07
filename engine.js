@@ -96,7 +96,7 @@ const RULES = {
   // 不计为有效 issue 的关闭原因
   invalidIssueReasons: ['NOT_PLANNED', 'DUPLICATE'],
   // GitHub 类型为 User、但实际是自动化的账号
-  ignoreLogins: [],
+  ignoreLogins: ['codex', 'cursoragent'],
   includeArchived: false,
   includeForks: false,
   // 不参与统计的仓库：看板仓库本身的 PR、issue 与数据提交都不算贡献
@@ -179,7 +179,8 @@ function detectModel(pr, rules) {
   return best || rules.modelNone;
 }
 
-// data: { org, members: [login], repos: [{ name, prs: [PR node], issues: [Issue node] }] }
+// data: { org, members: [login], repos: [{ name, prs: [PR node], issues: [Issue node], direct?: [Direct] }] }
+// Direct：一个不属于任何 PR 的直接推送 commit，{ author: { login, __typename }, committedAt, lines, commit: { authors: { nodes: [{ name }] } } }
 // 节点字段与页面 GraphQL 查询一致。返回值只依赖 data、rules、now。
 function computeBoard(data, rules, now) {
   const tz = rules.tzOffsetHours;
@@ -199,7 +200,7 @@ function computeBoard(data, rules, now) {
   const get = (login) => {
     let p = people.get(login);
     if (!p) {
-      p = { login, member: members.has(login), prs: [], threads: new Map(), activityTimes: [], issuesFiled: 0 };
+      p = { login, member: members.has(login), prs: [], direct: [], threads: new Map(), activityTimes: [], issuesFiled: 0 };
       people.set(login, p);
     }
     return p;
@@ -264,6 +265,28 @@ function computeBoard(data, rules, now) {
         weekMerged.set(w, (weekMerged.get(w) || 0) + 1);
       }
     }
+    // 直接推送：每人在每个仓库的全部直接推送合起来按一个合入 PR 计分；没有改动文件明细，不乘样式系数，也不计入合入数与合入率。
+    // 按提交时间逐个计入：每个 commit 记它让这份原始分增加的部分、算一次动作，模型系数看它自己的署名，新的推送不改动之前各周的分数
+    const pushes = new Map();
+    for (const c of repo.direct || []) {
+      const owner = human(c.author);
+      const t = toTime(c.committedAt);
+      if (!owner || t == null) continue;
+      if (!pushes.has(owner)) pushes.set(owner, []);
+      pushes.get(owner).push({ t, lines: c.lines, model: detectModel({ commits: { nodes: [c] } }, rules) });
+    }
+    for (const [owner, list] of pushes) {
+      const p = get(owner);
+      let lines = 0;
+      let prev = 0;
+      list.sort((a, b) => a.t - b.t).forEach((c, k) => {
+        lines += c.lines;
+        const raw = prRawScore(lines, k + 1, rules);
+        p.direct.push({ t: c.t, model: c.model, raw: raw - prev });
+        p.activityTimes.push(c.t);
+        prev = raw;
+      });
+    }
     for (const issue of repo.issues) {
       stats.issues++;
       const owner = human(issue.author);
@@ -286,9 +309,10 @@ function computeBoard(data, rules, now) {
     const mergedPrs = p.prs.filter((x) => x.merged);
     const mergedTimes = mergedPrs.map((x) => x.merged).sort((a, b) => a - b);
     const threadTimes = [...p.threads.values()].sort((a, b) => a - b);
-    // 动作：合入 PR 得分拆成规模部分 pr 与模型加减 model（扣分工具为负）；协作得分 collab
+    // 动作：合入 PR 与直接推送的得分拆成规模部分 pr 与模型加减 model（扣分工具为负）；协作得分 collab
     const acts = [
       ...mergedPrs.map((x) => ({ t: x.merged, pr: x.raw, model: x.raw * (x.model.weight - 1), collab: 0 })),
+      ...p.direct.map((x) => ({ t: x.t, pr: x.raw, model: x.raw * (x.model.weight - 1), collab: 0 })),
       ...threadTimes.map((t) => ({ t, pr: 0, model: 0, collab: rules.score.collab })),
     ].sort((a, b) => a.t - b.t);
     const allTimes = [...p.prs.map((x) => x.created), ...acts.map((a) => a.t), ...p.activityTimes];
@@ -421,6 +445,7 @@ function computeBoard(data, rules, now) {
       activeWeeks: new Set([...mergedTimes, ...p.activityTimes].map((t) => weekStart(t, tz))).size,
       lines: mergedPrs.reduce((n, x) => n + x.lines, 0),
       commits: mergedPrs.reduce((n, x) => n + x.commits, 0),
+      directCommits: p.direct.length,
       modelMix,
       newbie,
       level,

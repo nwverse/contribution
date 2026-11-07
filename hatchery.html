@@ -577,7 +577,7 @@
   }
 
   // 可执行提示：在 kit.hatchHint 的判断上按日历给出确切窗口。
-  // 活跃周 = 有合入或协作的不同自然周；本周已有动作（tw>0）时本周已算一周，再补一周只能落在 W1（下周一）之后。
+  // 活跃周 = 有合入、直接推送或协作的不同自然周；本周已有动作（tw>0）时本周已算一周，再补一周只能落在 W1（下周一）之后。
   const W1 = W0 + NW.WEEK;
   function hintText(p) {
     const h = H.get(p.login), nb = p.newbie;
@@ -611,7 +611,7 @@
       + `<div class="egg-top">${K.who(p, { size: 34, sub, tags })}${K.countdown(nb.daysLeft, { size: 46 })}</div>`
       + `<div class="egg-req">`
       + `<div class="rq"><span class="l">合入 PR</span>${pips(Math.min(nb.merged, NB.merged), NB.merged, lane === 'one' && needM)}<span class="v">${okV(nb.merged, NB.merged)}</span></div>`
-      + `<div class="rq"><span class="l" tabindex="0" data-tip="活跃周 = 有合入或协作的不同自然周（周一到周日）">活跃周</span>${pips(Math.min(nb.activeWeeks, NB.activeWeeks), NB.activeWeeks, lane === 'one' && needW)}<span class="v">${okV(nb.activeWeeks, NB.activeWeeks)}</span></div>`
+      + `<div class="rq"><span class="l" tabindex="0" data-tip="活跃周 = 有合入、直接推送或协作的不同自然周（周一到周日）">活跃周</span>${pips(Math.min(nb.activeWeeks, NB.activeWeeks), NB.activeWeeks, lane === 'one' && needW)}<span class="v">${okV(nb.activeWeeks, NB.activeWeeks)}</span></div>`
       + `<div class="rq or"><span class="l" tabindex="0" data-tip="魔力 ≥${R.hatchBonus} 不看考核，直接孵化"><em>或</em>魔力</span><div class="meter water" aria-hidden="true"><i style="width:${Math.min(100, p.bonus / R.hatchBonus * 100).toFixed(1)}%"></i></div><span class="v"><b>${mag(p.bonus)}</b>/${R.hatchBonus}</span></div>`
       + `</div>${hint}`
       + `<div class="egg-foot"><span class="${nb.daysLeft <= DUE ? 'due' : ''}">${fmt.md(nb.end)}${nb.daysLeft <= DUE ? ` ${fmt.hm(nb.end)}` : ''} 截止</span><span class="spacer"></span>${activeNow(p) ? `<span class="act">${icon('activity', 11)}本周 +${mag(p.tw)}</span>` : '<span>本周还没有动作</span>'}</div>`
@@ -888,7 +888,7 @@
   // ───────── 口径 ─────────
   $('#rules').innerHTML = [
     ['calendar', '考核窗口', `从首次贡献那一刻起 ${NB.days} 天。卡片上的合入、活跃周都只数窗口内的；剩余天数到 0 还没达标就转为未孵化。`],
-    ['activity', '活跃周', '有合入或协作的不同自然周（周一到周日）。同一周里做多少次都只算一周，所以要跨两周各做一次。'],
+    ['activity', '活跃周', '有合入、直接推送或协作的不同自然周（周一到周日）。同一周里做多少次都只算一周，所以要跨两周各做一次。'],
     ['zap', '魔力补孵化', `魔力 ≥${R.hatchBonus} 不看考核直接孵化，考核期过了也有效。魔力只增不减，形态不降级。`],
   ].map(([ic, t, d]) => `<div><h4>${icon(ic, 15)}${t}</h4><p>${d}</p></div>`).join('');
 
