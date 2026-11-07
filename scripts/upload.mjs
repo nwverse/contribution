@@ -53,7 +53,7 @@ const ISSUE_FIELDS = `
   author { login __typename }
   comments(first: ${NESTED_LIMIT}) { totalCount nodes { author { login __typename } createdAt } }`;
 
-// 成员、仓库与各仓库最新的 PR / issue 编号一次取回
+// 成员、仓库与各仓库最新的 PR / issue 编号、默认分支的 head 与 commit 总数一次取回
 const META_QUERY = `query($org: String!, $memberCursor: String, $repoCursor: String, $needMembers: Boolean!, $needRepos: Boolean!) {
   organization(login: $org) {
     membersWithRole(first: 100, after: $memberCursor) @include(if: $needMembers) {
@@ -63,9 +63,10 @@ const META_QUERY = `query($org: String!, $memberCursor: String, $repoCursor: Str
     repositories(first: 100, after: $repoCursor, orderBy: {field: NAME, direction: ASC}) @include(if: $needRepos) {
       pageInfo { hasNextPage endCursor }
       nodes {
-        name isArchived isFork
+        name isArchived isFork createdAt
         pullRequests(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) { totalCount nodes { number } }
         issues(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) { totalCount nodes { number } }
+        defaultBranchRef { target { ... on Commit { oid history { totalCount } } } }
       }
     }
   }
@@ -89,6 +90,19 @@ const FILES_QUERY = `query($ids: [ID!]!) {
   }
 }`;
 
+// 直接推送：默认分支的 commit 用 REST 按页列出（每页 100 个，各页并发）；GraphQL 的 history 只能按游标逐页翻，大仓库要几十分钟。
+// 非合并、关联到 GitHub 账号的 commit 再用 nodes 分批查是否属于 PR：associatedPullRequests 是嵌套连接，每批 100 个计 1 点。
+// 改动行服务端算得慢，只对不属于 PR 的 commit 查，每批同样计 1 点。
+const COMMIT_PAGE = 100;
+const COMMIT_BATCH = 100;
+const COMMIT_CONCURRENCY = 8;
+const COMMIT_PR_QUERY = `query($ids: [ID!]!) {
+  nodes(ids: $ids) { ... on Commit { id associatedPullRequests(first: 1) { totalCount } } }
+}`;
+const COMMIT_LINES_QUERY = `query($ids: [ID!]!) {
+  nodes(ids: $ids) { ... on Commit { id additions deletions } }
+}`;
+
 function batchQuery(numbers) {
   const items = numbers.map((n) => `n${n}: issueOrPullRequest(number: ${n}) { __typename ... on PullRequest { ${PR_FIELDS} } ... on Issue { ${ISSUE_FIELDS} } }`).join('\n');
   return `query($org: String!, $repo: String!) { repository(owner: $org, name: $repo) { ${items} } }`;
@@ -96,13 +110,14 @@ function batchQuery(numbers) {
 
 // 把提交说明里的 Co-Authored-By 转成引擎使用的 commit.authors 结构，并丢弃说明正文
 const CO_AUTHOR = /^co-authored-by:\s*(.+?)\s*(?:<[^>]*>)?\s*$/gim;
+function commitAuthors(author, message) {
+  const names = author ? [author] : [];
+  for (const m of (message || '').matchAll(CO_AUTHOR)) names.push(m[1]);
+  return { commit: { authors: { nodes: names.map((name) => ({ name })) } } };
+}
 function normalizeItem(item) {
   if (item.__typename !== 'PullRequest' || !item.commits) return item;
-  const nodes = item.commits.nodes.map(({ commit }) => {
-    const names = commit.author?.name ? [commit.author.name] : [];
-    for (const m of (commit.message || '').matchAll(CO_AUTHOR)) names.push(m[1]);
-    return { commit: { authors: { nodes: names.map((name) => ({ name })) } } };
-  });
+  const nodes = item.commits.nodes.map(({ commit }) => commitAuthors(commit.author?.name, commit.message));
   return { ...item, commits: { totalCount: item.commits.totalCount, nodes } };
 }
 
@@ -195,6 +210,9 @@ async function fetchAll(token, org) {
   const meta = await fetchMeta(token, org);
   const loaded = meta.repos.map((r) => ({
     name: r.name,
+    createdAt: r.createdAt,
+    head: r.defaultBranchRef?.target?.oid,
+    commitTotal: r.defaultBranchRef?.target?.history?.totalCount || 0,
     prTotal: r.pullRequests.totalCount,
     issueTotal: r.issues.totalCount,
     maxNumber: Math.max(0, r.pullRequests.nodes[0]?.number || 0, r.issues.nodes[0]?.number || 0),
@@ -233,7 +251,8 @@ async function fetchAll(token, org) {
   }
   await fetchClosers(token, loaded.flatMap((r) => r.prs.filter((p) => p.state === 'CLOSED')));
   await fetchFiles(token, loaded.flatMap((r) => r.prs.filter((p) => p.mergedAt)));
-  return { org, members: meta.members, repos: loaded.map(({ name, prs, issues }) => ({ name, prs, issues })) };
+  await fetchDirect(token, org, loaded);
+  return { org, members: meta.members, repos: loaded.map(({ name, prs, issues, direct }) => ({ name, prs, issues, direct })) };
 }
 
 // 给关闭未合入的 PR 补上关闭人 closedBy（{ login, __typename }）；查不到时保持缺失，引擎按被他人关闭计
@@ -271,6 +290,70 @@ async function fetchFiles(token, prs) {
   log(`查询了 ${ids.length} 个合入 PR 的改动文件，共 ${tasks.length} 批`);
 }
 
+// 给每个仓库补上直接推送 direct：默认分支上不属于任何 PR 的非合并 commit，每个一条，由引擎按人按仓库合并计分。
+// 只看提交时间在仓库创建之后的 commit，创建时导入的历史不算；没有关联到 GitHub 账号的 commit 无法归属，跳过。
+// commit 说明只用于解析 Co-Authored-By，不写入 board.json。
+async function fetchDirect(token, org, repos) {
+  // 翻页固定在开始时的 head 上，拉取期间有新推送也不会错位。页数按全部历史估算，创建前的部分返回空页。
+  const pages = repos.flatMap((repo) => (repo.head
+    ? Array.from({ length: Math.ceil(repo.commitTotal / COMMIT_PAGE) }, (_, k) => ({ repo, page: k + 1 }))
+    : []));
+  const listed = new Map(repos.map((repo) => [repo, []]));
+  let scanned = 0;
+  await runPool(pages.map(({ repo, page }) => async () => {
+    const q = new URLSearchParams({ sha: repo.head, since: repo.createdAt, per_page: COMMIT_PAGE, page });
+    const list = await rest(token, 'GET', `/repos/${org}/${repo.name}/commits?${q}`);
+    scanned += list.length;
+    listed.get(repo)[page - 1] = list.filter((c) => c.parents.length <= 1 && c.author).map((c) => ({
+      repo,
+      id: c.node_id,
+      author: { login: c.author.login, __typename: c.author.type },
+      at: c.commit.committer.date,
+      same: [repo.name, c.author.login, c.commit.author.date, c.commit.committer.date, c.commit.message.split('\n')[0]].join('\n'),
+      ...commitAuthors(c.commit.author.name, c.commit.message),
+    }));
+  }), CONCURRENCY);
+  const candidates = [...listed.values()].flatMap((list) => list.flat());
+  log(`列出默认分支 commit ${pages.length} 页，仓库创建之后的 ${scanned} 个`);
+
+  // nodes(ids) 分批查询，返回 id → 节点
+  const lookup = async (query, ids) => {
+    const found = new Map();
+    const tasks = [];
+    for (let i = 0; i < ids.length; i += COMMIT_BATCH) {
+      const chunk = ids.slice(i, i + COMMIT_BATCH);
+      tasks.push(async () => {
+        const d = await gql(token, query, { ids: chunk }, { allowMissing: true });
+        for (const n of d.nodes) if (n) found.set(n.id, n);
+      });
+    }
+    await runPool(tasks, COMMIT_CONCURRENCY);
+    return found;
+  };
+  const prs = await lookup(COMMIT_PR_QUERY, candidates.map((c) => c.id));
+  const unlinked = candidates.filter((c) => prs.get(c.id)?.associatedPullRequests.totalCount === 0);
+  // 历史被改写过的仓库里，同一个 commit 会换个 SHA 再出现一次，副本关联不到 PR：作者、作者时间、提交时间和标题都相同的只算一份，其中一份属于 PR 就都不算。
+  // squash、rebase 合入生成的 commit 有时也关联不到 PR：提交时间与本人在同仓库合入 PR 的时间相差不超过 2 秒的，视为合入时生成，不算。
+  const seen = new Set(candidates.filter((c) => prs.get(c.id)?.associatedPullRequests.totalCount !== 0).map((c) => c.same));
+  const merges = new Map(repos.map((repo) => [repo, repo.prs.filter((p) => p.mergedAt).map((p) => [p.author?.login, Date.parse(p.mergedAt)])]));
+  const pushed = [];
+  for (const c of unlinked) {
+    if (seen.has(c.same)) continue;
+    seen.add(c.same);
+    const t = Date.parse(c.at);
+    if (!merges.get(c.repo).some(([login, at]) => login === c.author.login && Math.abs(at - t) <= 2000)) pushed.push(c);
+  }
+  log(`查询了 ${candidates.length} 个非合并 commit 是否属于 PR，共 ${Math.ceil(candidates.length / COMMIT_BATCH)} 批；不属于 PR 的 ${unlinked.length} 个，去掉重复的副本和合入时生成的之后，直接推送 ${pushed.length} 个`);
+  const lines = await lookup(COMMIT_LINES_QUERY, pushed.map((c) => c.id));
+  log(`查询了 ${pushed.length} 个直接推送 commit 的改动行，共 ${Math.ceil(pushed.length / COMMIT_BATCH)} 批`);
+
+  for (const repo of repos) repo.direct = [];
+  for (const { repo, id, author, at, commit } of pushed) {
+    const n = lines.get(id);
+    repo.direct.push({ author, committedAt: at, lines: (n?.additions || 0) + (n?.deletions || 0), commit });
+  }
+}
+
 // ---------- 输出 ----------
 
 const round = (x, digits = 2) => (typeof x === 'number' ? Math.round(x * 10 ** digits) / 10 ** digits : x);
@@ -299,8 +382,9 @@ function serialize(board) {
   };
 }
 
-// ---------- 发布 ----------
+// ---------- GitHub REST ----------
 
+// 拉取默认分支 commit 列表与发布共用。网络中断、5xx、二级限流（403/429）会等待后重试。
 async function rest(token, method, url, body) {
   for (let attempt = 1; ; attempt++) {
     let res;
@@ -325,6 +409,13 @@ async function rest(token, method, url, body) {
       continue;
     }
     const text = await res.text();
+    const limited = (res.status === 403 || res.status === 429) && /rate limit/i.test(text);
+    if (limited && attempt < MAX_ATTEMPTS) {
+      const seconds = Number(res.headers.get('Retry-After') || 60);
+      log(`HTTP ${res.status}，${seconds} 秒后重试（第 ${attempt} 次）`);
+      await sleep(seconds * 1000);
+      continue;
+    }
     if (!res.ok) {
       const err = new Error(`${method} ${url} 返回 HTTP ${res.status}：${text.slice(0, 300)}`);
       err.status = res.status;
@@ -333,6 +424,8 @@ async function rest(token, method, url, body) {
     return text ? JSON.parse(text) : null;
   }
 }
+
+// ---------- 发布 ----------
 
 // 在发布分支上做一次快进提交；内容没变时不提交，返回 null
 async function publish(token, files, message) {
