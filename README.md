@@ -44,11 +44,11 @@ node scripts/serve.mjs              # http://127.0.0.1:8080/
 
 `serve.mjs` 依次取 `BOARD_FILE`、`data/board.json`、`dist/board.json` 作为页面数据。
 
-`npm run test:engine` 用合成数据验证计分行为，与 CI 运行的用例相同，无需安装依赖；`npm test` 只运行其中的 `tests/engine.test.mjs`。端到端测试用脱敏的 `tests/fixtures/board.json`，不读取组织数据：
+`npm test` 运行 `test:engine` 和 `test:upload`，与 CI 运行的用例相同，无需安装依赖：前者用合成数据验证计分行为，后者用模拟的 GitHub 响应运行上传脚本的 `--dry-run`，不访问网络。端到端测试用脱敏的 `tests/fixtures/board.json`，不读取组织数据：
 
 ```bash
 npm ci
-npm run test:engine
+npm test
 npx playwright install chromium
 npm run test:e2e
 ```
@@ -57,7 +57,7 @@ npm run test:e2e
 
 ## CI
 
-CI checks the scoring engine, upload script and page script syntax, runs scoring behavior tests, and runs
+CI checks the scoring engine, upload script and page script syntax, runs scoring and upload behavior tests, and runs
 the Playwright end-to-end tests against the anonymized fixture, without reading
 or publishing organization data. `CI_LINUX_RUNNER` selects the HomeLab executor
 only for trusted default-branch runs. Pull requests use hosted runners.
