@@ -439,7 +439,7 @@
   const wMax = Math.max(...allModels.map((m) => m.weight));
   const wMin = Math.min(...allModels.map((m) => m.weight));
   const resolvedPeople = PEOPLE.filter((p) => p.resolved > 0);
-  $('#lede').innerHTML = `合入 PR 按改动行、commit 数和署名的模型计分，协作每次原始分 <span class="n">+${S.collab}</span>；PR 与协作每周分别按递减曲线计分，分别趋近 ${CAPS.pr} / ${CAPS.collab} 分；新增贡献不会稀释另一项得分。`
+  $('#lede').innerHTML = `合入 PR 按改动行、commit 数和署名的模型计分（不经 PR 直接推送的 commit 每人每个仓库合起来算一个），协作每次原始分 <span class="n">+${S.collab}</span>；PR 与协作每周分别按递减曲线计分，分别趋近 ${CAPS.pr} / ${CAPS.collab} 分；新增贡献不会稀释另一项得分。`
     + `下面的图表和明细都由当前数据快照里 <span class="n">${K.fmt.int(SUM.contributors)}</span> 位贡献者、<span class="n">${K.fmt.int(SUM.merged)}</span> 个合入 PR 算出，规则改了这一页会跟着变。`;
   $('#dateline').innerHTML = `<span class="asof">数据快照 ${K.fmt.datetime(NW.now)}（UTC+8）</span>`;
   $('#introStats').innerHTML = [
@@ -505,7 +505,7 @@
       </div>
       <dl class="fdefs">
         <dt><span class="key" style="--k:var(--series-pr)">PR 分</span></dt>
-        <dd><span class="nw">P = Σ[(1 + <span class="k">${S.lines}</span>·log₁₀(1+改动行)</span> <span class="nw">+ <span class="k">${S.commits}</span>·log₂(1+commit 数))</span> <span class="nw">× 模型系数]</span><span class="fn">当周所有已合入 PR 的原始分相加，P 越大仍会增加得分，但单个新增 PR 的增量会变小</span></dd>
+        <dd><span class="nw">P = Σ[(1 + <span class="k">${S.lines}</span>·log₁₀(1+改动行)</span> <span class="nw">+ <span class="k">${S.commits}</span>·log₂(1+commit 数))</span> <span class="nw">× 模型系数]</span><span class="fn">当周所有已合入 PR 与直接推送的原始分相加，P 越大仍会增加得分，但单个新增 PR 的增量会变小</span></dd>
         <dt><span class="key" style="--k:var(--series-collab)">协作分</span></dt>
         <dd><span class="nw">C = 协作次数 × ${S.collab}</span><span class="fn">每参与一个他人的 PR 或 issue（review、评论、代合入），或提一个有效 issue；C 越大仍会增加得分，但单次增量会变小</span></dd>
         <dt><span class="key" style="--k:var(--series-model)">模型系数</span></dt>
@@ -707,8 +707,8 @@
   // ───────── 05 M-Team 对照（手写映射与理由照抄旧版，修改 RULES 时同步检查） ─────────
   (() => {
     const rows = [
-      ['注册时间', '首次贡献', '首次开 PR、review、评论或提 issue 的时间。GitHub 不向普通成员开放入组时间。'],
-      ['上传量', 'PR 分', '合入 PR 按改动行、commit 数（对数压缩）和模型系数计分；修改、删除已有样式的改动按占比打折，新增的文件和追加的样式不打折。'],
+      ['注册时间', '首次贡献', '首次开 PR、review、评论、提 issue 或直接推送的时间。GitHub 不向普通成员开放入组时间。'],
+      ['上传量', 'PR 分', '合入 PR 按改动行、commit 数（对数压缩）和模型系数计分；修改、删除已有样式的改动按占比打折，新增的文件和追加的样式不打折。不经 PR 直接推送的 commit，每人每个仓库合起来算一个 PR。'],
       ['下载量', '不考核', 'GitHub 上 review 和评论极少，考核协作会误伤大多数人；协作只计入魔力。', true],
       ['分享率', '合入率', '「给出 ÷ 收到 review」对所有人都是 0/0。合入率看 PR 是否收尾，作用接近 H&R。'],
       ['做种魔力', `魔力（PR 与协作分别按递减曲线）`, '贡献越多仍会增加得分，但单次增量变小；两类贡献互不稀释。'],
@@ -808,7 +808,7 @@
     'Codex CLI 默认署名「Codex」、Cursor 默认署名「Cursor」，都不含型号，分别按「GPT 其他」和 ×1 计。需要按型号计分时，在工具里把署名配置成带型号的名字（如 Codex 的 commit_attribution）。TRAE CLI 默认署名「TRAE CLI」，按扣分计。',
     '模型系数按组织偏好整体定档：Claude 强于 GPT；DeepSeek 胜在速度、Gemini 胜在成本，系数低于前两家。不区分版本，也不对应具体的基准测试分数；出现新的型号名或代号时需要更新识别规则。',
     '没有 AI 署名的 PR 绝大多数也由 agent 编写，署名与否主要取决于工具配置，所以各档系数与「无 AI 标注」的 ×1 只拉开小幅差距，PR 分主要由改动行和 commit 数决定。',
-    '直接推送到默认分支的 commit 不计入；仓库要求「所有改动走 PR」之前的贡献会被低估。',
+    '直接推送到默认分支、不属于任何 PR 的 commit 也计入：每人在每个仓库的全部直接推送合起来按一个合入 PR 计分，不读改动文件，所以不按样式打折。这份分数按提交时间逐个计入：每个 commit 记它让分数增加的部分，算在它提交的那一周，模型系数看它自己的署名。有推送的周算活跃周，但直接推送不是合入 PR：不计入合入数、合入率，也不满足新手考核的合入要求。只有关联到 GitHub 账号的 commit 才能归属；合并 commit 和仓库创建之前的历史不算。历史改写后换了 SHA 重复出现的 commit（作者、作者时间、提交时间和标题都相同）只算一份，其中一份属于 PR 就都不算；squash、rebase 合入生成但没有关联到 PR 的 commit，按提交时间与本人在同仓库合入 PR 相差不超过 2 秒识别，不算直接推送。',
     'AI 生成的 PR 记在开 PR 的账号名下，账号持有人对内容负责。',
     `每个 PR 和 issue 只读取前 ${LIM.nested} 条 review 和前 ${LIM.nested} 条评论。`,
     `活力里的产出只看魔力；只开 PR 未合入只体现在「最近动作」。线下讨论、组织外的工作都不计。本周还没结束时，本周只算到数据更新时刻。从未贡献的组织成员不在任何名单里，只以人数出现在首页。`,

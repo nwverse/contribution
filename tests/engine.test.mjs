@@ -193,3 +193,50 @@ test('filing an issue still counts toward personal and assessment activity weeks
   assert.equal(person.activeWeeks, 1);
   assert.equal(person.newbie.activeWeeks, 1);
 });
+
+test('direct pushes score as one PR per person and repo, credited commit by commit', () => {
+  const lastWeek = '2026-10-28T00:00:00Z';
+  const thisWeek = '2026-11-04T00:00:00Z';
+  const push = (login, committedAt, model = '') => ({
+    author: { login, __typename: 'User' }, committedAt, lines: 999,
+    commit: { authors: { nodes: [{ name: model }] } },
+  });
+  const raw = (lines, commits) => 1 + RULES.score.lines * Math.log10(1 + lines) + RULES.score.commits * Math.log2(1 + commits);
+  const repo = (direct, prs = [], name = 'project') => ({ name, prs, issues: [], direct });
+  const board = (repos) => computeBoard({ org: 'example', members: [], repos }, RULES, Date.parse(thisWeek));
+
+  // A direct push adds PR score but does not count as a merged PR.
+  const both = board([repo([push('contributor', thisWeek)], [scorePr(1)])]).people[0];
+  close(both.bonusPr, weeklyScore(2 * raw(999, 1), 0, 0).pr);
+  assert.equal(both.merged, 1);
+  assert.equal(both.opened, 1);
+  assert.equal(both.rate, 1);
+  assert.equal(both.lines, 999);
+  assert.equal(both.commits, 1);
+  assert.equal(both.directCommits, 1);
+
+  // All pushes to one repo add up to one PR. Each commit adds its increment in the week it was committed,
+  // so a later push leaves earlier weeks and the first contribution unchanged.
+  const once = board([repo([push('pusher', lastWeek)])]).people[0];
+  const twice = board([repo([push('pusher', thisWeek), push('pusher', lastWeek)])]).people[0];
+  close(twice.bonusPr, weeklyScore(raw(999, 1), 0, 0).pr + weeklyScore(raw(1998, 2) - raw(999, 1), 0, 0).pr);
+  for (const [week, value] of once.weekly) close(twice.weekly.get(week), value);
+  assert.ok(twice.bonus > once.bonus);
+  assert.equal(twice.firstAt, Date.parse(lastWeek));
+  assert.equal(twice.activeWeeks, 2);
+  assert.equal(twice.directCommits, 2);
+
+  // Each repo counts as a separate PR.
+  const twoRepos = board([repo([push('pusher', thisWeek)]), repo([push('pusher', thisWeek)], [], 'other')]).people[0];
+  close(twoRepos.bonusPr, weeklyScore(2 * raw(999, 1), 0, 0).pr);
+
+  // Someone with only direct pushes is listed, but nothing counts as merged.
+  const only = board([repo([push('pusher', thisWeek, 'Claude Opus')])]).people[0];
+  assert.equal(only.login, 'pusher');
+  assert.equal(only.merged, 0);
+  assert.ok(only.bonusModel > 0);
+  assert.notEqual(only.newbie.status, 'passed');
+
+  // Direct pushes by bots and ignored automation accounts are not counted.
+  assert.equal(board([repo([push('github-actions[bot]', thisWeek), push('codex', thisWeek)])]).people.length, 0);
+});
