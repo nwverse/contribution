@@ -273,6 +273,18 @@
   const K = NWK;
   const $ = (s) => document.querySelector(s);
   K.appHeader($('#appbar'), { active: 'c5' });
+  if (!NW.W.length) {
+    $('main').innerHTML = `<section class="intro"><div><span class="eyebrow">形态池</span><h1 class="headline is-in">暂无贡献记录</h1></div></section>
+      <section class="card card-pad">
+        <div class="card-head"><span class="muted">暂无可回放的周</span><div class="btn-group" role="group" aria-label="切换周">
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="前一周" disabled>${K.icon('chevron-left', 16)}</button>
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="后一周" disabled>${K.icon('chevron-right', 16)}</button>
+          <button type="button" class="btn btn-ghost btn-sm" aria-label="回放形态变化" disabled>${K.icon('play', 16)}回放</button>
+        </div></div>
+        ${K.empty({ art: 'egg', title: '池塘还很安静', body: '有贡献记录后，这里会显示大家的形态和每周变化。' })}
+      </section>`;
+    return;
+  }
 
   const LAST = NW.last;
   const LV = NW.LV;

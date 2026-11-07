@@ -354,7 +354,7 @@
       + '<div class="soon-m">当前没有考核中的蛙卵</div>'
       + '<div class="soon-s">有新的贡献者参与后，这里会显示最先到期的考核。</div></div>';
   }
-  $('#fxFoot').innerHTML = `<span>新手考核：首次贡献起 <b>${NB.days}</b> 天内合入 ≥<b>${NB.merged}</b> 且活跃周 ≥<b>${NB.activeWeeks}</b></span><span>或魔力 ≥<b>${R.hatchBonus}</b> 直接孵化</span><span id="fxRate"></span>`;
+  $('#fxFoot').innerHTML = `<span>新手考核：首次贡献起 <b>${NB.days}</b> 天内合入 ≥<b>${NB.merged}</b> 且活跃周 ≥<b>${NB.activeWeeks}</b>${NB.since ? '（看板上线前来的、没通过的从上线日起补考一次）' : ''}</span><span>或魔力 ≥<b>${R.hatchBonus}</b> 直接孵化</span><span id="fxRate"></span>`;
 
   // ───────── 孵化漏斗（桑基；手机端重排为三段条） ─────────
   const C = {
@@ -602,7 +602,7 @@
     const h = H.get(p.login);
     const needM = h.needM > 0, needW = h.needW > 0;
     const tags = isNewThisWeek(p) ? '<span class="tag tag-new" title="本周首次贡献">新</span>' : '';
-    const sub = `${p.member ? '组织成员' : '组织外'} · ${fmt.md(p.firstAt)}首次贡献`;
+    const sub = `${p.member ? '组织成员' : '组织外'} · ${fmt.md(p.firstAt)}首次贡献${NB.since && nb.retake ? ' · 补考中' : ''}`;
     const txt = hintText(p);
     const hint = lane === 'one'
       ? `<div class="callout leaf">${icon('target', 14)}<span>${esc(txt)}</span></div>`

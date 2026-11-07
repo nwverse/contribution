@@ -131,7 +131,9 @@
     const l = p.levels[i];
     if (l !== null && l !== undefined) return { level: l, kind: NW.LV[l].icon, name: NW.LV[l].name, hatched: true };
     const t = i === NW.last ? NW.now : NW.W[i] + WEEK;
-    const egg = i === NW.last ? p.newbie.status === 'pending' : t < p.newbie.end;
+    const nb = p.newbie;
+    const gap = nb.retake && t < nb.start && t >= p.firstAt + NW.RULES.newbie.days * DAY; // 两次考核期之间
+    const egg = i === NW.last ? nb.status === 'pending' : t < nb.end && !gap;
     return egg ? { level: null, kind: 'egg', name: '蛙卵', hatched: false, egg: true } : { level: null, kind: 'unhatched', name: '未孵化', hatched: false, unhatched: true };
   }
   const frogOf = (p, size = 20, { i = NW.last, cls = '' } = {}) => frog(formOf(p, i).kind, size, `${p.dormant && i === NW.last ? 'sleep ' : ''}${cls}`);
@@ -1611,7 +1613,7 @@
       const emptyTop = c === 0 && k > 0;
       const names = d.members[k].map((p) => p.login);
       const tipTxt = k === 0
-        ? `蛙卵 ${c} 人：首次贡献 ${NW.RULES.newbie.days} 天内、还在新手考核期`
+        ? `蛙卵 ${c} 人：首次贡献 ${NW.RULES.newbie.days} 天内、还在新手考核期${NW.RULES.newbie.since ? '（看板上线前来的、没通过的从上线日起补考）' : ''}`
         : emptyTop ? `${m.name}：虚位以待（魔力 ${m.th}）` : `${m.name} ${c} 人${names.length <= 4 ? `：${names.join('、')}` : ''}${arr && k > 0 ? `；${i === NW.last ? '本周' : '这一周'}新到 ${arr} 人` : ''}`;
       const screen = k === 0 ? 'c4' : 'c5';
       return `<a class="st hop-host ${emptyTop ? 'is-vacant' : ''}" href="${pageFile(screen)}${keepSearch()}${k ? `#lv=${k - 1}` : ''}" data-screen="${screen}" data-hash="${k ? `lv=${k - 1}` : ''}" data-tip="${esc(tipTxt)}" aria-label="${esc(tipTxt)}">`
