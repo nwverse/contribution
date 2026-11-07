@@ -4,7 +4,8 @@ import vm from 'node:vm';
 import { test as base, expect } from '@playwright/test';
 
 // 计分规则直接取 engine.js，测试与页面同一来源
-export const RULES = vm.runInNewContext(`${fs.readFileSync(new URL('../../engine.js', import.meta.url), 'utf8')}\n;RULES`);
+const engine = vm.runInNewContext(`${fs.readFileSync(new URL('../../engine.js', import.meta.url), 'utf8')}\n;({ RULES, computeBoard })`);
+export const RULES = engine.RULES;
 export const BOARD = JSON.parse(fs.readFileSync(new URL('../fixtures/board.json', import.meta.url), 'utf8'));
 export const LAST = BOARD.weeks.length - 1;
 export const THIS_WEEK = BOARD.weeks[LAST].start;
@@ -26,6 +27,12 @@ export function recentWeeksBoard(n) {
 
 // 只有一周数据的看板
 export const oneWeekBoard = () => recentWeeksBoard(1);
+
+// 没有任何贡献时，引擎合法返回空人员和空周历史，不补造日期或贡献者。
+export function emptyBoard() {
+  const { people, weeks, summary } = engine.computeBoard({ org: BOARD.org, members: [], repos: [] }, RULES, BOARD.now);
+  return { ...structuredClone(BOARD), people, weeks, summary };
+}
 
 // 刚开始统计、还没有人拿到魔力的看板：5 人只开过 PR，魔力全为 0、未定级、新人期进行中
 export function freshBoard() {

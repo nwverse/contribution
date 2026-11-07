@@ -375,6 +375,16 @@
   const $ = (s, r = document) => r.querySelector(s);
   const W = N.W, LAST = N.last, PEOPLE = N.people;
   K.appHeader($('#appbar'), { active: 'c2' });
+  if (!W.length) {
+    $('main').innerHTML = `<section class="intro"><div><span class="eyebrow">排行榜</span><h1 class="headline is-in">暂无贡献记录</h1></div></section>
+      <section class="card card-pad">
+        <div class="card-head"><span class="muted">暂无可回放的周</span>
+          <button type="button" class="btn btn-primary" aria-label="播放" disabled>${icon('play', 16)}播放</button>
+        </div>
+        ${K.empty({ art: 'egg', title: '池塘还很安静', body: '有贡献记录后，这里会显示贡献度排行和历史回放。' })}
+      </section>`;
+    return;
+  }
   // 模板里的 ${图标} 占位
   document.querySelectorAll('.eyebrow, .search, .card-title, .tm-play').forEach((el) => {
     el.innerHTML = el.innerHTML.replace(/\$\{(\w+)\}/g, (_, n) => icon({ trophy: 'trophy', search: 'search', clock: 'rotate-ccw', play: 'play', zap: 'zap', book: 'book-open' }[n], n === 'search' ? 15 : n === 'play' ? 18 : 14));
