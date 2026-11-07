@@ -155,7 +155,7 @@ test.describe('排行榜', () => {
     await expect(chip).toHaveAttribute('aria-pressed', 'true');
   });
 
-  for (const n of [1, 2]) {
+  for (const n of [1, 2, 3]) {
     test(`不足 4 周（${n} 周）的看板：近 4 周从第一周算起，不出现 NaN`, async ({ page }) => {
       const board = recentWeeksBoard(n);
       await page.route('**/data/board.json', (route) => route.fulfill({ json: board }));
@@ -166,6 +166,28 @@ test.describe('排行榜', () => {
       const since = await page.evaluate(() => NWK.fmt.md(NW.W[0]));
       await expect(stats.locator('.istat').nth(2).locator('small')).toHaveText(`${since}起`);
     });
+  }
+
+  for (const n of [1, 2, 3, 4, BOARD.weeks.length]) {
+    for (const direct of [true, false]) {
+      test(`${n} 周看板的近 4 周日期：${direct ? '直接打开' : '从总榜切换'}`, async ({ page }) => {
+        const board = recentWeeksBoard(n);
+        await page.route('**/data/board.json', (route) => route.fulfill({ json: board }));
+        await open(page, direct ? '/ranking.html?win=l4' : '/ranking.html');
+        const meta = page.locator('#lbMeta');
+        if (!direct) {
+          await expect(meta).toContainText('累计魔力');
+          await page.locator('#winSeg').getByRole('radio', { name: '近 4 周', exact: true }).click();
+        }
+        const windowWeeks = board.weeks.slice(-4);
+        const range = await page.evaluate(([start, end]) => `${NWK.fmt.md(start)} – ${NWK.fmt.md(end)}`, [
+          windowWeeks[0].start, windowWeeks.at(-1).start + 6 * 86400e3,
+        ]);
+        await expect(meta).not.toContainText('NaN');
+        await expect(meta.locator('b').first()).toHaveText(range);
+        await expect(page.locator('#introStats .istat').nth(2).locator('small')).toHaveText(`${range.split(' – ')[0]}起`);
+      });
+    }
   }
 
   test('只有一周数据的看板：时光机拖动条居中一根柱，布局与键盘都不出现 NaN', async ({ page }) => {

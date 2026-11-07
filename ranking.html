@@ -544,7 +544,7 @@
     const parts = [];
     if (st.win === 'all') parts.push('<b>累计魔力</b>', '名次变化对比上周末');
     else if (st.win === 'week') parts.push(`<b>${K.week.range(LAST)}</b>`, K.week.asOf(), '只排本周有魔力的人', '对比上周全周');
-    else parts.push(`<b>${fmt.md(W[LAST - 3])} – ${fmt.md(W[LAST] + 6 * N.DAY)}</b>`, '含进行中的本周', '只排有魔力的人', '对比上周时的近 4 周榜');
+    else parts.push(`<b>${fmt.md(W[Math.max(0, LAST - 3)])} – ${fmt.md(W[LAST] + 6 * N.DAY)}</b>`, '含进行中的本周', '只排有魔力的人', '对比上周时的近 4 周榜');
     parts.push(n === total ? `${total} 人` : `符合条件 <b>${n}</b> / ${total} 人`);
     return parts.join('<i class="dot"></i>');
   }
