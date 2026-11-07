@@ -900,7 +900,7 @@
     function side(wk, s) {
       const top = s.top.slice(0, 3);
       const ev = [...s.newlyHatched.map((p) => [p, '孵化']), ...s.upgraded.map((p) => [p, '进化'])];
-      const facts = [['活跃', fmt.int(s.active), '人', '提 PR、合入或协作的人'], ['合入', fmt.int(s.merged), '个', '这一周合入的 PR'], ['有魔力', fmt.int(s.top.length), '人', '这一周拿到魔力的人；只开了 PR 的人算活跃，但没有魔力']];
+      const facts = [['活跃', fmt.int(s.active), '人', '提 PR、合入、直接推送或协作的人'], ['合入', fmt.int(s.merged), '个', '这一周合入的 PR'], ['有魔力', fmt.int(s.top.length), '人', '这一周拿到魔力的人；只开了 PR 的人算活跃，但没有魔力']];
       const el = $('#tmSide');
       el.innerHTML = `<div class="tm-facts-wrap"><div class="dateline" style="margin-bottom:10px"><span class="range">${K.weekLabel(wk)}</span>${K.week.status(wk)}</div>`
         + `<div class="tm-facts">${facts.map(([l, v, u, tip]) => `<div class="tm-fact" data-tip="${tip}" tabindex="0"><span class="label">${l}</span><b>${v}<span class="muted" style="font-size:var(--fs-xs);font-weight:600;margin-left:2px">${u}</span></b></div>`).join('')}</div></div>`
@@ -1046,7 +1046,7 @@
     }
     const sPR = PEOPLE.reduce((a, p) => a + p.bonusPr + p.bonusModel, 0), sM = PEOPLE.reduce((a, p) => a + p.merged, 0);
     const avgPR = sPR / sM;
-    $('#fxRef').innerHTML = `对照：组织里 ${fmt.int(sM)} 个合入 PR 平均每个累计折算 <b>${mag(avgPR)}</b> 魔力；PR 与协作分开递减，不会因另一项贡献增加而被稀释。`;
+    $('#fxRef').innerHTML = `对照：组织里 ${fmt.int(sM)} 个合入 PR 平均每个累计折算 <b>${mag(avgPR)}</b> 魔力（含直接推送的得分）；PR 与协作分开递减，不会因另一项贡献增加而被稀释。`;
     [L, C, Nn].forEach((el) => el.addEventListener('input', calc));
     const chipsM = () => [...$('#fxModels').querySelectorAll('.chip')];
     const syncTab = () => chipsM().forEach((x, k) => x.tabIndex = k === m ? 0 : -1);
@@ -1074,9 +1074,9 @@
       <div class="gl-sec"><div class="label">形态 · 只看魔力，不降级</div><div class="gl-ladder">${ladder}</div>
         <p class="footnote" style="margin-top:10px">${icon('egg', 13)}<span>首次贡献起 ${R.newbie.days} 天内合入 ≥ ${R.newbie.merged} 且活跃周 ≥ ${R.newbie.activeWeeks} 即孵化，或魔力 ≥ ${R.hatchBonus} 直接孵化。考核期内叫<b class="strong">蛙卵</b>（${N.summary.pending} 人），期满未达标叫<b class="strong">未孵化</b>（${N.summary.failed} 人）。</span></p></div>
       <div class="gl-sec"><dl class="gl-dl">
-        <dt>魔力</dt><dd>合入 PR 分（已乘模型系数）与协作分按周累计；当周 PR 原始分 P 按 ${R.weeklyScoreCaps.pr}P/(${R.weeklyScoreCaps.pr}+P) 递减，协作分 C 按 ${R.weeklyScoreCaps.collab}C/(${R.weeklyScoreCaps.collab}+C) 递减，两者分别计分。</dd>
+        <dt>魔力</dt><dd>合入 PR 分（含直接推送，已乘模型系数）与协作分按周累计；当周 PR 原始分 P 按 ${R.weeklyScoreCaps.pr}P/(${R.weeklyScoreCaps.pr}+P) 递减，协作分 C 按 ${R.weeklyScoreCaps.collab}C/(${R.weeklyScoreCaps.collab}+C) 递减，两者分别计分。</dd>
         <dt>协作</dt><dd>参与别人的 PR 或 issue：review、评论、帮人合入。同一个只算一次；自己提的有效 issue 也算。每次贡献原始分 +${R.score.collab}，再按当周协作总量递减计入魔力。</dd>
-        <dt>活跃周</dt><dd>有合入或协作的不同自然周（周一 0 点起，UTC+8）。</dd>
+        <dt>活跃周</dt><dd>有合入、直接推送或协作的不同自然周（周一 0 点起，UTC+8）。</dd>
         <dt>合入率</dt><dd>合入 ÷ 已收尾。已收尾 = 合入 + 被他人关闭 + 打开超 ${R.staleOpenDays} 天未合；自己关闭的算撤回，不计入。</dd>
         <dt><span class="tag tag-warn">${icon('alert-triangle', 11)}合入率警告</span></dt><dd>已收尾越多，警告线越高。只提醒，不扣魔力，也不影响形态。<div class="gl-warn">${wl}</div></dd>
         <dt><span class="tag tag-sleep">${icon('moon-z', 11)}冬眠</span></dt><dd>${R.dormantDays} 天没有任何动作。只做标记；${N.LV[R.dormantExemptLevel].name}及以上豁免。</dd>
