@@ -469,7 +469,7 @@
     lag: `活力低于 ${N.RULES.vitality.laggard}：近期产出、持续度、历史信用、最近动作综合得分很低。只做提醒，不影响魔力与形态。`,
     watch: `活力在 ${N.RULES.vitality.laggard} 到 ${N.RULES.vitality.watch} 之间：贡献在变少，还没到掉队。`,
     a: `考核期内开了 ${N.RULES.newbie.anomaly.opened} 个以上 PR，合入的不到 ${fmt.pct(N.RULES.newbie.anomaly.rate)}。最近 ${N.RULES.newbie.anomaly.graceHours} 小时内开的 PR 不计。`,
-    egg: `首次贡献起 ${N.RULES.newbie.days} 天内的考核期，还没孵化。`,
+    egg: `首次贡献起 ${N.RULES.newbie.days} 天内的考核期，还没孵化。${N.RULES.newbie.since ? '看板上线前来的、第一次没通过的，从上线日起补考一次。' : ''}`,
     unhatched: `考核期已过仍未达标；魔力攒到 ${N.RULES.hatchBonus} 也能直接孵化。`,
   };
   const formTip = (k) => {
@@ -1082,7 +1082,7 @@
     const wl = R.warnLines.map((x) => `<div><span>已收尾 &gt;${x.resolved}</span><b>${fmt.pct(x.rate)}</b><div class="meter sm"><i style="width:${x.rate * 100}%"></i></div></div>`).join('');
     $('#gloss').innerHTML = `
       <div class="gl-sec"><div class="label">形态 · 只看魔力，不降级</div><div class="gl-ladder">${ladder}</div>
-        <p class="footnote" style="margin-top:10px">${icon('egg', 13)}<span>首次贡献起 ${R.newbie.days} 天内合入 ≥ ${R.newbie.merged} 且活跃周 ≥ ${R.newbie.activeWeeks} 即孵化，或魔力 ≥ ${R.hatchBonus} 直接孵化。考核期内叫<b class="strong">蛙卵</b>（${N.summary.pending} 人），期满未达标叫<b class="strong">未孵化</b>（${N.summary.failed} 人）。</span></p></div>
+        <p class="footnote" style="margin-top:10px">${icon('egg', 13)}<span>首次贡献起 ${R.newbie.days} 天内合入 ≥ ${R.newbie.merged} 且活跃周 ≥ ${R.newbie.activeWeeks} 即孵化，或魔力 ≥ ${R.hatchBonus} 直接孵化${R.newbie.since ? '；看板上线前来的、第一次没通过的，从上线日起补考一次' : ''}。考核期内叫<b class="strong">蛙卵</b>（${N.summary.pending} 人），期满未达标叫<b class="strong">未孵化</b>（${N.summary.failed} 人）。</span></p></div>
       <div class="gl-sec"><dl class="gl-dl">
         <dt>魔力</dt><dd>合入 PR 分（含直接推送，已乘模型系数）与协作分按周累计；当周 PR 原始分 P 按 ${R.weeklyScoreCaps.pr}P/(${R.weeklyScoreCaps.pr}+P) 递减，协作分 C 按 ${R.weeklyScoreCaps.collab}C/(${R.weeklyScoreCaps.collab}+C) 递减，两者分别计分。</dd>
         <dt>协作</dt><dd>参与别人的 PR 或 issue：review、评论、帮人合入。同一个只算一次；自己提的有效 issue 也算。每次贡献原始分 +${R.score.collab}，再按当周协作总量递减计入魔力。</dd>
