@@ -94,15 +94,16 @@ function semaphore(limit) {
 }
 const slots = { graphql: semaphore(12), rest: semaphore(16) };
 
-// 遇到限流时所有请求一起暂停，不再继续撞限流
+// 遇到限流时所有请求一起暂停，不再继续撞限流。同时在途的几个请求一起被拒只算一次：只记一次日志、只减半一次并发。
 let pausedUntil = 0;
 async function waitPause() {
   while (Date.now() < pausedUntil) await sleep(pausedUntil - Date.now());
 }
 function pauseAll(kind, seconds, why) {
   const until = Date.now() + seconds * 1000;
-  if (until > pausedUntil + 1000) log(`${why}，全部请求暂停 ${seconds} 秒`);
-  pausedUntil = Math.max(pausedUntil, until);
+  if (until <= pausedUntil + 1000) return;
+  log(`${why}，全部请求暂停 ${seconds} 秒`);
+  pausedUntil = until;
   if (kind === 'graphql') slots.graphql.limit = Math.max(4, Math.floor(slots.graphql.limit / 2));
 }
 
@@ -125,8 +126,6 @@ async function send(kind, phase, url, init) {
   }
 }
 
-// 返回重试前等待的秒数和原因；null 表示不重试。
-// 网络中断、超时、5xx、499 按 2、4、8… 秒退避；额度用尽等到重置时间；二级限流按 Retry-After，没有时 60、120… 秒。
 // 额度用尽：等到 x-ratelimit-reset（按 GitHub 服务端时间计算），超过 MAX_RESET_WAIT_S 就失败退出
 function untilReset(res, why) {
   const reset = Number(res.headers.get('x-ratelimit-reset'));
@@ -135,6 +134,8 @@ function untilReset(res, why) {
   return { seconds: Math.max(1, wait), why, limited: true };
 }
 
+// 返回重试前等待的秒数和原因；null 表示不重试。
+// 网络中断、超时、5xx、499 按 2、4、8… 秒退避；额度用尽等到重置时间；二级限流按 Retry-After，没有时 60、120… 秒。
 function retryPlan(res, text, attempt) {
   if (!res) return { seconds: 2 ** attempt };
   if (res.status >= 500 || res.status === 499) return { seconds: 2 ** attempt, why: `HTTP ${res.status}` };
@@ -509,7 +510,9 @@ async function changedUsers(gh, cache) {
     for (const c of repo.commits) note(c.author);
   }
   for (const c of Object.values(cache.closers)) note(c.actor);
-  const found = await lookup(gh, 'actors', USERS_QUERY, [...known.keys()], slots.graphql.limit);
+  const users = streamLookup(gh, 'actors', USERS_QUERY);
+  users.add([...known.keys()]);
+  const found = await users.done();
   return new Set([...known].filter(([id, login]) => found.get(id)?.login !== login).map(([id]) => id));
 }
 
@@ -619,16 +622,6 @@ async function syncItems(gh, org, repo, prev, ctx) {
   }
   const items = await scanRepo(gh, org, repo);
   return { items, extra: extraCount(items, repo, ctx.syncedAt), how: '全量', updated: 0 };
-}
-
-// nodes(ids) 分批查询，返回 id → 节点
-async function lookup(gh, phase, query, ids, limit) {
-  const found = new Map();
-  await runPool(chunks(ids, NODES_BATCH).map((chunk) => async () => {
-    const d = await gh.gql(phase, query, { ids: chunk }, { allowMissing: true });
-    for (const n of d.nodes) if (n) found.set(n.id, n);
-  }), limit);
-  return found;
 }
 
 // 边收集边查询的 nodes(ids)：每凑满一批就发出，done() 时查完余下的，返回 id → 节点。并发由全局的 GraphQL 限制控制。
@@ -838,7 +831,7 @@ async function fetchAll(gh, org, cache) {
   const [meta, recent, changedActors] = await Promise.all([
     timed('meta', () => fetchMeta(gh, org)),
     cache ? fetchRecent(gh, org) : null,
-    cache ? timed('actors', () => changedUsers(gh, cache)) : new Set(),
+    cache ? changedUsers(gh, cache) : new Set(),
   ]);
   const ctx = {
     recent,
@@ -1073,36 +1066,40 @@ async function main(started, state) {
   ];
   const publishGh = process.env.PUBLISH_TOKEN ? client(process.env.PUBLISH_TOKEN) : gh;
   let result;
-  if (DRY_RUN) {
-    const out = path.join(ROOT, 'dist', 'board.json');
-    fs.mkdirSync(path.dirname(out), { recursive: true });
-    fs.writeFileSync(out, json);
-    // 与发布分支比对只是提示；读不到时照常写出结果并保存缓存
-    let diff;
-    try {
-      next.pages = await timed('publish', () => readPages(publishGh, next.pages));
-      const changed = files.filter((f) => next.pages.blobs[f.path] !== blobSha(f.content)).length;
-      diff = `与 ${PAGES_BRANCH} 相比${changed ? `有 ${changed} 个文件变化` : '没有变化'}`;
-    } catch (err) {
-      diff = `无法与 ${PAGES_BRANCH} 比对：${err.message}`;
+  // 发布失败也保存缓存，下一轮不必重拉这次已拉到的数据
+  try {
+    if (DRY_RUN) {
+      const out = path.join(ROOT, 'dist', 'board.json');
+      fs.mkdirSync(path.dirname(out), { recursive: true });
+      fs.writeFileSync(out, json);
+      // 与发布分支比对只是提示；读不到时照常写出结果并保存缓存
+      let diff;
+      try {
+        next.pages = await timed('publish', () => readPages(publishGh, next.pages));
+        const changed = files.filter((f) => next.pages.blobs[f.path] !== blobSha(f.content)).length;
+        diff = `与 ${PAGES_BRANCH} 相比${changed ? `有 ${changed} 个文件变化` : '没有变化'}`;
+      } catch (err) {
+        diff = `无法与 ${PAGES_BRANCH} 比对：${err.message}`;
+      }
+      result = `--dry-run：已写入 ${path.relative(ROOT, out)}，未发布（${diff}）`;
+    } else {
+      const stamp = new Date(board.now + RULES.tzOffsetHours * 3600000).toISOString().slice(0, 16).replace('T', ' ');
+      const message = `更新贡献度数据 ${stamp}（UTC+${RULES.tzOffsetHours}）`;
+      let published;
+      try {
+        published = await timed('publish', async () => publish(publishGh, await readPages(publishGh, next.pages), files, message));
+      } catch (err) {
+        // 422：发布分支在本次提交期间被更新，基于最新提交重试一次
+        if (err.status !== 422) throw err;
+        log('发布分支已被更新，重试一次');
+        published = await timed('publish', async () => publish(publishGh, await readPages(publishGh, null), files, message));
+      }
+      next.pages = published.pages;
+      result = published.sha ? `已发布到 ${PAGES_REPO}@${PAGES_BRANCH}（${published.sha.slice(0, 7)}）` : '内容没有变化，未提交';
     }
-    result = `--dry-run：已写入 ${path.relative(ROOT, out)}，未发布（${diff}）`;
-  } else {
-    const stamp = new Date(board.now + RULES.tzOffsetHours * 3600000).toISOString().slice(0, 16).replace('T', ' ');
-    const message = `更新贡献度数据 ${stamp}（UTC+${RULES.tzOffsetHours}）`;
-    let published;
-    try {
-      published = await timed('publish', async () => publish(publishGh, await readPages(publishGh, next.pages), files, message));
-    } catch (err) {
-      // 422：发布分支在本次提交期间被更新，基于最新提交重试一次
-      if (err.status !== 422) throw err;
-      log('发布分支已被更新，重试一次');
-      published = await timed('publish', async () => publish(publishGh, await readPages(publishGh, null), files, message));
-    }
-    next.pages = published.pages;
-    result = published.sha ? `已发布到 ${PAGES_REPO}@${PAGES_BRANCH}（${published.sha.slice(0, 7)}）` : '内容没有变化，未提交';
+  } finally {
+    await timed('cache', () => saveCache(next));
   }
-  await timed('cache', () => saveCache(next));
   debug(phaseTable());
   log(finalLine(started, result, state.cacheHow));
 }
