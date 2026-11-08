@@ -18,9 +18,21 @@ https://github.com/user-attachments/assets/8727572c-4e0c-47b3-9ad6-5f0306008794
 node scripts/upload.mjs
 ```
 
-脚本完整拉取组织数据（约 160 点 GraphQL 额度、390 次 REST 请求，约六分钟），在本机计算贡献度，再把 `scripts/upload.mjs` 中 `SITE_FILES` 列出的站点文件（六个页面、`engine.js`、`assets/` 下的脚本与 `tokens.css`、`.nojekyll`、图标和宣传动图）与 `data/board.json` 一次提交到 `gh-pages`。内容没变时不提交，失败时退出码非 0。
+脚本拉取组织数据，在本机计算贡献度，再把 `scripts/upload.mjs` 中 `SITE_FILES` 列出的站点文件（六个页面、`engine.js`、`assets/` 下的脚本与 `tokens.css`、`.nojekyll`、图标和宣传动图）与 `data/board.json` 一次提交到 `gh-pages`。只上传与 `gh-pages` 不同的文件；内容没变时不提交，失败时退出码非 0。
 
-加 `--dry-run` 只拉取和计算，结果写到 `dist/board.json`，不发布。
+拉取结果缓存在 `CACHE_DIR/<ORG>.json`，下次只拉上次之后的变动：每小时运行一次时约半分钟、约 55 点 GraphQL 额度、约 40 次 REST 请求。没有可用缓存时全量拉取，约六分钟、约 770 点、约 420 次 REST 请求。每次运行另外重新拉取约 1/24 的已缓存数据与缓存比对，每小时运行时一天全部校验一遍；缓存损坏或版本不符时自动全量拉取。
+
+| 参数 | 作用 |
+|---|---|
+| `--dry-run` | 只拉取和计算，结果写到 `dist/board.json`，不发布；仍读取 `gh-pages`，报告内容有没有变化 |
+| `--no-cache` | 不读缓存，全量拉取后重建缓存 |
+| `--verbose` | 另外输出各仓库的同步方式、重试，以及各阶段的耗时和请求数 |
+
+默认只输出开始、拉取完成与结论三行；遇到限流暂停或校验发现缓存不符时各多一行。结论行在成功和失败时格式相同：
+
+```
+[时间] <已发布到 …（sha）| 内容没有变化，未提交 | --dry-run：… | 失败：原因>｜耗时 N 秒｜GraphQL N 次 N 点｜REST N 次｜重试 N 次｜缓存 <增量 | 全量（原因）>
+```
 
 | 环境变量 | 用途 | 默认值 |
 |---|---|---|
@@ -29,6 +41,7 @@ node scripts/upload.mjs
 | `ORG` | 统计的组织 | `nwverse` |
 | `PAGES_REPO` | 发布仓库 | `nwverse/contribution` |
 | `PAGES_BRANCH` | 发布分支 | `gh-pages` |
+| `CACHE_DIR` | 缓存目录 | `$XDG_CACHE_HOME/contribution`，未设置 `XDG_CACHE_HOME` 时为 `~/.cache/contribution` |
 
 token 权限：
 
@@ -52,7 +65,7 @@ node scripts/serve.mjs              # http://127.0.0.1:8080/
 
 `serve.mjs` 依次取 `BOARD_FILE`、`data/board.json`、`dist/board.json` 作为页面数据。
 
-`npm test` 运行 `test:engine` 和 `test:upload`，与 CI 运行的用例相同，无需安装依赖：前者用合成数据验证计分行为，后者用模拟的 GitHub 响应运行上传脚本的 `--dry-run`，不访问网络。端到端测试用脱敏的 `tests/fixtures/board.json`，不读取组织数据：
+`npm test` 运行 `test:engine` 和 `test:upload`，与 CI 运行的用例相同，无需安装依赖：前者用合成数据验证计分行为，后者让上传脚本对着模拟的 GitHub 运行，比对增量与全量拉取的结果，不访问网络（需要 `git` 生成 commit 历史）。端到端测试用脱敏的 `tests/fixtures/board.json`，不读取组织数据：
 
 ```bash
 npm ci

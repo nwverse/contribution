@@ -15,14 +15,17 @@
 ## 代码结构
 
 - `engine.js`：规则（`RULES`）与计算，页面和上传脚本共用。只依赖输入数据、规则与时间。
-- `scripts/upload.mjs`：拉取、计算、按上节范围裁剪字段，然后把 `SITE_FILES` 列出的页面、资源与数据一起发布。查询参数按 GitHub 计点规则调过，每批 1 点。
+- `scripts/upload.mjs`：拉取、计算、按上节范围裁剪字段，然后把 `SITE_FILES` 列出的页面、资源与数据一起发布。查询参数按 GitHub 计点规则调过，每批 1 点。拉取结果缓存在仓库工作区之外，每次只拉增量，并轮流校验一部分缓存。
+- `tests/fixtures/upload-github.mjs`：按世界快照应答的假 GitHub，`tests/upload.test.mjs` 用它比对增量与全量拉取的结果。
 - 页面：`index.html`（本周）、`ranking.html`（排行榜）、`profile.html`（档案）、`hatchery.html`（孵化台）、`pond.html`（形态池）、`rules.html`（规则与口径）。只读取 `data/board.json` 展示。
 - `assets/`：`boot.js` 读取数据后加载其余脚本并执行页面脚本；`derive.js` 展示用的派生指标（逐周累计、历史名次、预计升级），阈值读 `RULES`；`kit.js` 组件与交互；`tokens.css` 设计令牌与组件样式；`icons.js` 奶蛙形象。
 - `scripts/serve.mjs`、`tests/e2e/`：本地预览与端到端测试，测试数据是脱敏快照 `tests/fixtures/board.json`。
 
 - `[禁止]` 页面调用 GitHub API 或要求访问者提供 token。理由：数据由上传脚本统一生成，页面只做展示。
 - `[禁止]` 在 `assets/derive.js` 或页面里另存计分阈值。理由：阈值只在 `RULES` 维护，页面与数据才能一致。
-- `[必须]` 改动拉取层（批大小、并发、查询字段）后，用 `node scripts/upload.mjs --dry-run` 核对耗时、额度与结果。理由：嵌套连接数决定每批点数，多一个连接可能让额度翻倍。
+- `[必须]` 改动拉取层（批大小、并发、查询字段）后，用 `node scripts/upload.mjs --dry-run --verbose` 核对耗时、额度与结果，加与不加 `--no-cache` 各跑一次。理由：嵌套连接数决定每批点数，多一个连接可能让额度翻倍；增量与全量走不同的拉取路径。
+- `[必须]` 缓存内容的结构或解析方式（例如 `commitAuthors`）改变时，提升 `upload.mjs` 的 `CACHE_VERSION`。理由：旧缓存按新代码读取会算错；版本不符时脚本自动全量重建。
+- `[必须]` 拉取层新增查询形状时，同步让 `tests/fixtures/upload-github.mjs` 能应答。理由：假 GitHub 拒绝认不出的请求，`npm test` 会失败。
 - `[必须]` 修改 `RULES` 时，同步检查 `rules.html` 上手写的说明（「口径与盲区」「M-Team 规则对照」「名词解释」）。理由：这几处不由 `RULES` 自动生成。
 - `[必须]` 新增页面或资源文件时，加入 `upload.mjs` 的 `SITE_FILES`。理由：发布只提交列出的文件，漏掉的文件线上会 404。
 - `[必须]` 改动页面或 `assets/` 后运行 `npm run test:e2e`。理由：CI 用同一套用例检查六个页面的加载与主要交互。
