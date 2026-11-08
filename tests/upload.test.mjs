@@ -216,6 +216,9 @@ function worlds(t) {
   svc[1] = pr('svc', 2, 'bob', { createdAt: '2026-10-11T00:00:00Z', closedAt: '2026-11-02T06:00:00Z' });
   svc[2] = pr('svc', 3, 'carol', { createdAt: '2026-10-20T00:00:00Z', mergedAt: '2026-11-02T09:30:00Z', mergedBy: 'alice', comments: [['alice', '2026-10-21T00:00:00Z']] });
   svc[3] = issue(4, 'dave', { createdAt: '2026-10-13T00:00:00Z', closedAt: '2026-10-14T00:00:00Z', updatedAt: '2026-11-02T05:00:00Z', comments: [['alice', '2026-11-02T05:00:00Z']] });
+  // #8 was opened between the recently-updated query and META: only META counts it
+  svc.push(pr('svc', 8, 'bob', { createdAt: '2026-11-02T23:59:59Z' }));
+  w1.recentLag = { svc: [8] };
   Object.assign(w1.nodes, {
     PR_svc_2: { closer: user('bob') },
     PR_svc_3: { files: { nodes: [{ path: 'src/b.js', additions: 40, deletions: 4, changeType: 'ADDED' }] } },
@@ -245,9 +248,10 @@ test('a warm run after changes produces the same board and commit order as a ful
   // Commits of one person in one second are credited in list order, so the model weights depend on it
   assert.ok(full.board.people.find((p) => p.login === 'alice').bonusModel > 0);
 
-  // Only changes are fetched again: svc #2 #3 #4 and app #7 by number, docs in full after losing an issue
+  // Only changes are fetched again: svc #2 #3 #4 from the recently-updated list and #6–#8 above the cached numbers;
+  // app had no items, so every number up to its newest (#7) is new; docs in full after losing an issue
   assert.deepEqual(warm.requests.filter((r) => r.includes('issueOrPullRequest')).sort(), [
-    'POST graphql issueOrPullRequest app 1', 'POST graphql issueOrPullRequest docs 1', 'POST graphql issueOrPullRequest svc 3',
+    'POST graphql issueOrPullRequest app 7', 'POST graphql issueOrPullRequest docs 1', 'POST graphql issueOrPullRequest svc 6',
   ]);
   assert.match(warm.stdout, /整仓重拉 1 次/);
   // app moved forward: one compare; the only listed page is the verification slice (slot 0 checks page 1)

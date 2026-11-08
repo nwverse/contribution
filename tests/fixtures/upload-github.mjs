@@ -16,6 +16,7 @@
 //   fail: [{ match: substring of URL or query, status, retryAfter?, body }]   each entry fails one matching request
 //   issuePageSize: number      page size of the fallback issues connection (default 100)
 //   compareTruncate: number    compare returns at most this many commits in total
+//   recentLag: { repo: [number] }  left out of the recently-updated lists, as if that query ran just before they were created
 // }
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -90,8 +91,9 @@ function graphql(query, variables) {
       repos.nodes = repos.nodes.map((r) => {
         const prs = r.items.filter((it) => kind(it) === 'PullRequest');
         const issues = r.items.filter((it) => kind(it) === 'Issue');
+        const lag = new Set(world.recentLag?.[r.name] || []);
         const recent = (list, first) => {
-          const p = page(byUpdated(list), first);
+          const p = page(byUpdated(list.filter((it) => !lag.has(it.number))), first);
           return { ...p, nodes: p.nodes.map(({ number, updatedAt }) => ({ number, updatedAt })) };
         };
         return {

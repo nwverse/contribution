@@ -598,6 +598,9 @@ async function syncItems(gh, org, repo, prev, ctx) {
       for (const it of prev.items) if (mentions(it, ctx.changedActors)) updated.add(it.number);
     }
     if (updated) {
+      // 新建的条目编号大于缓存里最大的编号。最近更新列表与 META 是两个查询，两者之间新建的条目只出现在 META 的计数里，按编号补上
+      const maxCached = prev.items.reduce((max, it) => Math.max(max, it.number), 0);
+      for (let n = maxCached + 1; n <= repo.maxNumber; n++) updated.add(n);
       const items = new Map(prev.items.map((it) => [it.number, it]));
       const checks = [...items.keys()].filter((n) => n % VERIFY_SLOTS === ctx.slot && !updated.has(n));
       const fetched = await fetchNumbers(gh, org, repo, [...updated, ...checks]);
@@ -611,7 +614,7 @@ async function syncItems(gh, org, repo, prev, ctx) {
         else items.delete(n);
       }
       const count = (type) => [...items.values()].filter((it) => it.__typename === type).length;
-      const extra = { pr: count('PullRequest') - repo.prTotal, issue: count('Issue') - repo.issueTotal };
+      const extra = extraCount(items, repo, ctx.syncedAt);
       if (same(extra, prev.extra)) return { items, extra, how: `增量（更新 ${updated.size} 个）`, updated: updated.size };
       ctx.rescans++;
       debug(`${repo.name}：缓存 PR ${count('PullRequest')} 个、issue ${count('Issue')} 个，GitHub 上 ${repo.prTotal} 个、${repo.issueTotal} 个，差值与上次全量扫描（${prev.extra.pr}、${prev.extra.issue}）不同，整仓重扫`);
