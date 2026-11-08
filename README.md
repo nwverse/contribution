@@ -1,8 +1,14 @@
 # 奶蛙宇宙贡献度看板
 
+[![看板宣传视频预览](docs/assets/promo-preview.webp)](#视频介绍)
+
 https://nwverse.github.io/contribution/
 
 页面展示上传脚本生成的数据快照：nwverse 贡献者的人维度贡献度。页面和数据公开可见，数据范围约束见 [AGENTS.md](AGENTS.md)。
+
+## 视频介绍
+
+[下载高清视频与字幕](https://github.com/nwverse/contribution/releases/tag/promo-v1)
 
 ## 更新数据
 
@@ -10,7 +16,7 @@ https://nwverse.github.io/contribution/
 node scripts/upload.mjs
 ```
 
-脚本完整拉取组织数据（约 160 点 GraphQL 额度、390 次 REST 请求，约六分钟），在本机计算贡献度，再把 `scripts/upload.mjs` 中 `SITE_FILES` 列出的站点文件（六个页面、`engine.js`、`assets/` 下的脚本与 `tokens.css`、`.nojekyll` 和图标）与 `data/board.json` 一次提交到 `gh-pages`。内容没变时不提交，失败时退出码非 0。
+脚本完整拉取组织数据（约 160 点 GraphQL 额度、390 次 REST 请求，约六分钟），在本机计算贡献度，再把 `scripts/upload.mjs` 中 `SITE_FILES` 列出的站点文件（六个页面、`engine.js`、`assets/` 下的脚本与 `tokens.css`、`.nojekyll`、图标和宣传动图）与 `data/board.json` 一次提交到 `gh-pages`。内容没变时不提交，失败时退出码非 0。
 
 加 `--dry-run` 只拉取和计算，结果写到 `dist/board.json`，不发布。
 

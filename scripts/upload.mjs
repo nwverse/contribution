@@ -20,6 +20,7 @@ const SITE_FILES = [
   'engine.js',
   'assets/boot.js', 'assets/derive.js', 'assets/icons.js', 'assets/kit.js', 'assets/tokens.css',
   '.nojekyll', 'favicon.svg', 'favicon-32.png', 'apple-touch-icon.png',
+  'docs/assets/promo-preview.webp',
 ];
 
 const engineSource = fs.readFileSync(path.join(ROOT, 'engine.js'), 'utf8');
