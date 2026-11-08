@@ -9,7 +9,8 @@
 //             items: [GraphQL PullRequest/Issue node with __typename, number, createdAt, updatedAt, ...;
 //                     hidden: true keeps it reachable by number but out of totalCount and connections, as GitHub does for some PRs],
 //             commits: [REST commit objects listed from head since createdAt, in GitHub order],
-//             extraCommits: [REST commit objects not listed, e.g. a force-pushed-away head] }],
+//             extraCommits: [REST commit objects not listed, e.g. a force-pushed-away head],
+//             totals: { pr, issue }   optional totalCount as recorded, when GitHub counts fewer items than it serves }],
 //   nodes: { [node id]: { closer?: actor|null, files?: { nodes }, assoc?: number, lines?: { additions, deletions } } },
 //   pages: { commit, tree, blobs: { path: sha } } | absent, publish: boolean,
 //   fail: [{ match: substring of URL or query, status, retryAfter?, body }]   each entry fails one matching request
@@ -95,8 +96,8 @@ function graphql(query, variables) {
         };
         return {
           id: r.id, name: r.name, isArchived: !!r.isArchived, isFork: !!r.isFork, createdAt: r.createdAt,
-          pullRequests: { totalCount: prs.length, nodes: prs.length ? [{ number: newest(prs).number }] : [] },
-          issues: { totalCount: issues.length, nodes: issues.length ? [{ number: newest(issues).number }] : [] },
+          pullRequests: { totalCount: r.totals?.pr ?? prs.length, nodes: prs.length ? [{ number: newest(prs).number }] : [] },
+          issues: { totalCount: r.totals?.issue ?? issues.length, nodes: issues.length ? [{ number: newest(issues).number }] : [] },
           updatedPrs: recent(prs, firstOf('updatedPrs')),
           updatedIssues: recent(issues, firstOf('updatedIssues')),
           defaultBranchRef: r.head ? { target: { oid: r.head, history: { totalCount: r.commits.length } } } : null,

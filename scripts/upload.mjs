@@ -305,6 +305,8 @@ function slotOf(key) {
   return h % VERIFY_SLOTS;
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// 校验发现与缓存不符的项数，按阶段计
+const addStale = (ctx, phase, n = 1) => { ctx.stale[phase] = (ctx.stale[phase] || 0) + n; };
 
 // ---------- GitHub GraphQL ----------
 
@@ -412,32 +414,41 @@ function normalizeItem(item) {
   return { ...item, commits: { totalCount: item.commits.totalCount, nodes } };
 }
 
-// 成员与参与统计的仓库；超过 100 时只对还没取完的那一项继续翻页
+// 成员与参与统计的仓库；超过 100 时只对还没取完的那一项继续翻页。members 是 Promise。
 async function fetchMeta(gh, org) {
   const members = [];
   const repos = [];
   const vars = { org, memberCursor: null, repoCursor: null, needMembers: true, needRepos: true };
   let syncedAt = null;
-  while (vars.needMembers || vars.needRepos) {
+  let memberPage = null;
+  while (vars.needRepos) {
     const d = (await gh.gql('meta', META_QUERY, vars)).organization;
     syncedAt ??= serverTime ?? Date.now();
     if (!d) throw new Error('找不到组织，或 token 没有访问权限');
     if (vars.needMembers) {
       members.push(...d.membersWithRole.nodes.map((m) => m.login));
-      vars.needMembers = d.membersWithRole.pageInfo.hasNextPage;
-      vars.memberCursor = d.membersWithRole.pageInfo.endCursor;
+      memberPage = d.membersWithRole.pageInfo;
+      vars.needMembers = false;
     }
-    if (vars.needRepos) {
-      repos.push(...d.repositories.nodes);
-      vars.needRepos = d.repositories.pageInfo.hasNextPage;
-      vars.repoCursor = d.repositories.pageInfo.endCursor;
-    }
+    repos.push(...d.repositories.nodes);
+    vars.needRepos = d.repositories.pageInfo.hasNextPage;
+    vars.repoCursor = d.repositories.pageInfo.endCursor;
   }
+  // 成员只在计算时用到：超过 100 人时其余页在后台翻，不挡住条目与 commit 的拉取
+  const allMembers = (async () => {
+    while (memberPage.hasNextPage) {
+      const d = (await gh.gql('meta', META_QUERY, { org, memberCursor: memberPage.endCursor, repoCursor: null, needMembers: true, needRepos: false })).organization;
+      members.push(...d.membersWithRole.nodes.map((m) => m.login));
+      memberPage = d.membersWithRole.pageInfo;
+    }
+    return members;
+  })();
+  allMembers.catch(() => {});
   const included = repos.filter((r) => (RULES.includeArchived || !r.isArchived)
     && (RULES.includeForks || !r.isFork)
     && !RULES.excludeRepos.includes(r.name));
   return {
-    members,
+    members: allMembers,
     syncedAt,
     repos: included.map((r) => ({
       id: r.id,
@@ -567,7 +578,7 @@ async function syncItems(gh, org, repo, prev, ctx) {
       // 校验：上次同步前就没再更新、内容却变了的条目（例如账号改名），说明 updatedAt 没覆盖到这类变动
       for (const n of checks) {
         const it = fetched.get(n);
-        if (it && Date.parse(it.updatedAt) < ctx.since && !same(it, items.get(n))) ctx.stale.items++;
+        if (it && Date.parse(it.updatedAt) < ctx.since && !same(it, items.get(n))) addStale(ctx, 'items');
       }
       for (const n of [...updated, ...checks]) {
         if (fetched.has(n)) items.set(n, fetched.get(n));
@@ -627,51 +638,42 @@ function streamLookup(gh, phase, query) {
   };
 }
 
-// 关闭未合入的 PR 的关闭人：id → { closedAt, actor }，actor 为 null 表示查到了 PR 但没有关闭人。
-// 重新打开再关闭会改变 closedAt，缓存随之失效。
-async function syncClosers(gh, prs, prev, ctx) {
-  const next = {};
-  const ids = [];
-  for (const p of prs) {
-    const c = prev?.[p.id];
-    const valid = c && c.closedAt === p.closedAt && !mentions(c, ctx.changedActors);
-    if (valid) next[p.id] = c;
-    if (!valid || slotOf(p.id) === ctx.slot) ids.push(p.id);
-  }
-  const found = await lookup(gh, 'closers', CLOSER_QUERY, ids, slots.graphql.limit);
-  const byId = new Map(prs.map((p) => [p.id, p]));
-  for (const id of ids) {
-    const n = found.get(id);
-    if (!n) {
-      delete next[id];
-      continue;
-    }
-    const entry = { closedAt: byId.get(id).closedAt, actor: n.timelineItems.nodes[0]?.actor ?? null };
-    if (next[id] && !same(next[id], entry)) ctx.stale.closers++;
-    next[id] = entry;
-  }
-  return { closers: next, queried: ids.length };
-}
-
-// 合入 PR 的改动文件：id → files。合入后不再变化。
-async function syncFiles(gh, prs, prev, ctx) {
-  const next = {};
-  const ids = [];
-  for (const p of prs) {
-    if (prev?.[p.id]) next[p.id] = prev[p.id];
-    if (!prev?.[p.id] || slotOf(p.id) === ctx.slot) ids.push(p.id);
-  }
-  const found = await lookup(gh, 'files', FILES_QUERY, ids, slots.graphql.limit);
-  for (const id of ids) {
-    const files = found.get(id)?.files;
-    if (!files) {
-      delete next[id];
-      continue;
-    }
-    if (next[id] && !same(next[id], files)) ctx.stale.files++;
-    next[id] = files;
-  }
-  return { files: next, queried: ids.length };
+// 按节点 id 缓存的查询结果（关闭人、改动文件、commit 的 PR 归属与改动行）。
+// add(entries) 时，valid(cached, entry) 为真的沿用缓存，其余边收集边查询；本次校验分片里的也重查，与缓存不同的计入 ctx.stale。
+// value(node, entry) 取出要缓存的值；查不到节点或值为空的不缓存，下次再查。done() 返回 { values: id → 值, queried }。
+function nodeCache(gh, phase, query, prev, ctx, { valid = () => true, value }) {
+  const values = {};
+  const asked = new Map();
+  const stream = streamLookup(gh, phase, query);
+  return {
+    add(entries) {
+      const ids = [];
+      for (const e of entries) {
+        const cached = prev?.[e.id];
+        const keep = cached !== undefined && valid(cached, e);
+        if (keep) values[e.id] = cached;
+        const check = keep && slotOf(e.id) === ctx.slot;
+        if (keep && !check) continue;
+        asked.set(e.id, { e, check });
+        ids.push(e.id);
+      }
+      stream.add(ids);
+    },
+    async done() {
+      const found = await stream.done();
+      for (const [id, { e, check }] of asked) {
+        const n = found.get(id);
+        const v = n ? value(n, e) : null;
+        if (v == null) {
+          delete values[id];
+          continue;
+        }
+        if (check && !same(values[id], v)) addStale(ctx, phase);
+        values[id] = v;
+      }
+      return { values, queried: asked.size };
+    },
+  };
 }
 
 // ---------- 默认分支 commit ----------
@@ -791,7 +793,7 @@ async function syncCommits(gh, org, repo, prev, ctx) {
   if (commits && ctx.slot !== null) {
     const stale = await verifyCommits(gh, org, repo, commits, ctx.slot);
     if (stale) {
-      ctx.stale.commits += stale;
+      addStale(ctx, 'commits', stale);
       ctx.rescans++;
       debug(`${repo.name}：commit 列表校验有 ${stale} 个不一致，整仓重列`);
       commits = null;
@@ -819,78 +821,61 @@ async function fetchAll(gh, org, cache) {
     syncedAt: meta.syncedAt,
     changedActors,
     slot: cache ? cache.slot : null,
-    stale: { items: 0, commits: 0, closers: 0, files: 0, assoc: 0, lines: 0 },
+    stale: {},
     rescans: 0,
   };
   const prevRepo = (repo) => cache?.repos[repo.id];
   const repos = meta.repos.map((r) => ({ ...r }));
 
-  const itemsBranch = (async () => {
-    await timed('items', () => runPool(repos.map((repo) => async () => {
+  // 关闭未合入的 PR 的关闭人：id → { closedAt, actor }，actor 为 null 表示查到了 PR 但没有关闭人。
+  // 重新打开再关闭会改变 closedAt，关闭人的账号有变也重查。
+  const closers = nodeCache(gh, 'closers', CLOSER_QUERY, cache?.closers, ctx, {
+    valid: (c, p) => c.closedAt === p.closedAt && !mentions(c, changedActors),
+    value: (n, p) => ({ closedAt: p.closedAt, actor: n.timelineItems.nodes[0]?.actor ?? null }),
+  });
+  // 合入 PR 的改动文件：id → files，合入后不再变化
+  const files = nodeCache(gh, 'files', FILES_QUERY, cache?.files, ctx, { value: (n) => n.files });
+  // commit 是否属于 PR：id → associatedPullRequests.totalCount；查不到的不存，按属于 PR 计。
+  // 上次查到不属于 PR、提交时间又在上次同步前 ASSOC_RECHECK_MS 之内的重查
+  const assoc = nodeCache(gh, 'commit-pr', COMMIT_PR_QUERY, cache?.assoc, ctx, {
+    valid: (v, c) => !(v === 0 && Date.parse(c.at) >= Date.parse(cache.syncedAt) - ASSOC_RECHECK_MS),
+    value: (n) => n.associatedPullRequests.totalCount,
+  });
+  // 直接推送 commit 的改动行：id → additions + deletions
+  const lines = nodeCache(gh, 'commit-lines', COMMIT_LINES_QUERY, cache?.lines, ctx, { value: (n) => (n.additions || 0) + (n.deletions || 0) });
+
+  // 非合并、关联到 GitHub 账号的 commit 是直接推送的候选
+  const candidatesOf = (repo) => repo.commits.filter((c) => c.parents.length <= 1 && c.author).map((c) => ({
+    repo,
+    id: c.id,
+    author: { login: c.author.login, __typename: c.author.type },
+    at: c.date,
+    same: [repo.name, c.author.login, c.authorDate, c.date, c.title].join('\n'),
+    commit: { authors: { nodes: c.names.map((name) => ({ name })) } },
+  }));
+
+  // 两条线并发：条目 → 关闭人、改动文件；commit 列表 → PR 归属。一个仓库拉完就开始查它的节点，不等其他仓库。
+  await Promise.all([
+    timed('items', () => runPool(repos.map((repo) => async () => {
       const r = await syncItems(gh, org, repo, prevRepo(repo), ctx);
       Object.assign(repo, { items: r.items, extra: r.extra, itemsHow: r.how, updated: r.updated });
-    }), repos.length));
-    const prs = repos.flatMap((r) => [...r.items.values()].filter((it) => it.__typename === 'PullRequest'));
-    const [closers, files] = await Promise.all([
-      timed('closers', () => syncClosers(gh, prs.filter((p) => p.state === 'CLOSED'), cache?.closers, ctx)),
-      timed('files', () => syncFiles(gh, prs.filter((p) => p.mergedAt), cache?.files, ctx)),
-    ]);
-    return { closers, files };
-  })();
-
-  const commitsBranch = (async () => {
-    // 非合并、关联到 GitHub 账号的 commit 是直接推送的候选
-    const candidatesOf = (repo) => repo.commits.filter((c) => c.parents.length <= 1 && c.author).map((c) => ({
-      repo,
-      id: c.id,
-      author: { login: c.author.login, __typename: c.author.type },
-      at: c.date,
-      same: [repo.name, c.author.login, c.authorDate, c.date, c.title].join('\n'),
-      commit: { authors: { nodes: c.names.map((name) => ({ name })) } },
-    }));
-    // 是否属于 PR：id → associatedPullRequests.totalCount；查不到的不存，按属于 PR 计。
-    // 一个仓库列完就开始查它的 commit，不等其他仓库。
-    const assoc = {};
-    const ids = [];
-    const checks = new Set();
-    const lookups = streamLookup(gh, 'commit-pr', COMMIT_PR_QUERY);
-    await timed('commits', () => runPool(repos.map((repo) => async () => {
+      const prs = [...r.items.values()].filter((it) => it.__typename === 'PullRequest');
+      closers.add(prs.filter((p) => p.state === 'CLOSED'));
+      files.add(prs.filter((p) => p.mergedAt));
+    }), repos.length)),
+    timed('commits', () => runPool(repos.map((repo) => async () => {
       const r = await syncCommits(gh, org, repo, prevRepo(repo), ctx);
       Object.assign(repo, { commits: r.commits, commitsHow: r.how, added: r.added });
-      const need = [];
-      for (const c of candidatesOf(repo)) {
-        const v = cache?.assoc[c.id];
-        if (v !== undefined) assoc[c.id] = v;
-        const recheck = v === 0 && Date.parse(c.at) >= Date.parse(cache.syncedAt) - ASSOC_RECHECK_MS;
-        if (v === undefined || recheck) need.push(c.id);
-        else if (slotOf(c.id) === ctx.slot) {
-          need.push(c.id);
-          checks.add(c.id);
-        }
-      }
-      ids.push(...need);
-      lookups.add(need);
-    }), repos.length));
-    const candidates = repos.flatMap(candidatesOf);
-    const found = await lookups.done();
-    for (const id of ids) {
-      const n = found.get(id);
-      if (!n) {
-        delete assoc[id];
-        continue;
-      }
-      if (checks.has(id) && assoc[id] !== n.associatedPullRequests.totalCount) ctx.stale.assoc++;
-      assoc[id] = n.associatedPullRequests.totalCount;
-    }
-    return { candidates, assoc, queried: ids.length };
-  })();
+      assoc.add(candidatesOf(repo));
+    }), repos.length)),
+  ]);
+  const [closed, changed, linked] = await Promise.all([closers.done(), files.done(), assoc.done()]);
 
-  const [{ closers, files }, { candidates, assoc, queried: assocQueried }] = await Promise.all([itemsBranch, commitsBranch]);
-
-  const unlinked = candidates.filter((c) => assoc[c.id] === 0);
+  const candidates = repos.flatMap(candidatesOf);
+  const unlinked = candidates.filter((c) => linked.values[c.id] === 0);
   // 历史被改写过的仓库里，同一个 commit 会换个 SHA 再出现一次，副本关联不到 PR：作者、作者时间、提交时间和标题都相同的只算一份，其中一份属于 PR 就都不算。
   // squash、rebase 合入生成的 commit 有时也关联不到 PR：提交时间与本人在同仓库合入 PR 的时间相差不超过 2 秒的，视为合入时生成，不算。
-  const seen = new Set(candidates.filter((c) => assoc[c.id] !== 0).map((c) => c.same));
+  const seen = new Set(candidates.filter((c) => linked.values[c.id] !== 0).map((c) => c.same));
   const merges = new Map(repos.map((repo) => [repo, [...repo.items.values()].filter((p) => p.mergedAt).map((p) => [p.author?.login, Date.parse(p.mergedAt)])]));
   const pushed = [];
   for (const c of unlinked) {
@@ -899,41 +884,24 @@ async function fetchAll(gh, org, cache) {
     const t = Date.parse(c.at);
     if (!merges.get(c.repo).some(([login, at]) => login === c.author.login && Math.abs(at - t) <= 2000)) pushed.push(c);
   }
-
-  // 直接推送 commit 的改动行：id → additions + deletions
-  const lines = {};
-  const lineIds = [];
-  for (const c of pushed) {
-    const v = cache?.lines[c.id];
-    if (v !== undefined) lines[c.id] = v;
-    if (v === undefined || slotOf(c.id) === ctx.slot) lineIds.push(c.id);
-  }
-  const lineNodes = await timed('commit-lines', () => lookup(gh, 'commit-lines', COMMIT_LINES_QUERY, lineIds, slots.graphql.limit));
-  for (const id of lineIds) {
-    const n = lineNodes.get(id);
-    if (!n) {
-      delete lines[id];
-      continue;
-    }
-    const v = (n.additions || 0) + (n.deletions || 0);
-    if (lines[id] !== undefined && lines[id] !== v) ctx.stale.lines++;
-    lines[id] = v;
-  }
+  lines.add(pushed);
+  const counted = await lines.done();
 
   for (const repo of repos) repo.direct = [];
   for (const { repo, id, author, at, commit } of pushed) {
-    repo.direct.push({ author, committedAt: at, lines: lines[id] ?? 0, commit });
+    repo.direct.push({ author, committedAt: at, lines: counted.values[id] ?? 0, commit });
   }
+  const members = await meta.members;
 
   // 引擎输入：条目按编号排序；关闭人与改动文件只挂在这里，不进条目缓存
   const data = {
     org,
-    members: meta.members,
+    members,
     repos: repos.map((repo) => {
       const list = [...repo.items.values()].sort((a, b) => a.number - b.number);
       const prs = list.filter((it) => it.__typename === 'PullRequest').map((p) => {
-        const actor = closers.closers[p.id]?.actor;
-        const f = files.files[p.id];
+        const actor = closed.values[p.id]?.actor;
+        const f = changed.values[p.id];
         return { ...p, ...(p.state === 'CLOSED' && actor ? { closedBy: actor } : {}), ...(p.mergedAt && f ? { files: f } : {}) };
       });
       return { name: repo.name, prs, issues: list.filter((it) => it.__typename !== 'PullRequest'), direct: repo.direct };
@@ -952,20 +920,20 @@ async function fetchAll(gh, org, cache) {
       head: repo.head ?? null,
       commits: repo.commits,
     }])),
-    closers: closers.closers,
-    files: files.files,
-    assoc,
-    lines,
+    closers: closed.values,
+    files: changed.values,
+    assoc: linked.values,
+    lines: counted.values,
     pages: cache?.pages ?? null,
   };
 
   if (changedActors.size) debug(`账号改名或注销 ${changedActors.size} 个，涉及的条目、关闭人与 commit 已重新拉取`);
   for (const repo of repos) debug(`${repo.name}：PR/issue ${repo.itemsHow}；commit ${repo.commitsHow}`);
-  debug(`查询关闭人 ${closers.queried} 个、改动文件 ${files.queried} 个、commit 归属 ${assocQueried} 个、改动行 ${lineIds.length} 个；`
+  debug(`查询关闭人 ${closed.queried} 个、改动文件 ${changed.queried} 个、commit 归属 ${linked.queried} 个、改动行 ${counted.queried} 个；`
     + `候选 commit ${candidates.length} 个，不属于 PR 的 ${unlinked.length} 个，直接推送 ${pushed.length} 个`);
   const summary = {
     repos: repos.length,
-    members: meta.members.length,
+    members: members.length,
     updated: repos.reduce((n, r) => n + r.updated, 0),
     added: repos.reduce((n, r) => n + Math.max(0, r.added), 0),
     rescans: ctx.rescans,
@@ -1068,7 +1036,7 @@ async function main(started, state) {
 
   const { data, cache: next, summary } = await fetchAll(gh, ORG, cache);
   if (summary.stale) state.cacheHow += `，校验发现 ${summary.stale} 项与缓存不符，已更新`;
-  if (summary.stale) log(`校验：${summary.stale} 项与缓存不符，已替换（${Object.entries(summary.staleDetail).filter(([, v]) => v).map(([k, v]) => `${k} ${v}`).join('，')}）`);
+  if (summary.stale) log(`校验：${summary.stale} 项与缓存不符，已替换（${Object.entries(summary.staleDetail).map(([k, v]) => `${PHASES[k] || k} ${v}`).join('，')}）`);
   const board = await timed('compute', () => computeBoard(data, RULES, Date.now()));
   const json = `${JSON.stringify(serialize(board))}\n`;
   const delta = cache ? `PR/issue 更新 ${summary.updated} 个，新 commit ${summary.added} 个，整仓重拉 ${summary.rescans} 次` : '全量';
