@@ -85,7 +85,7 @@ function graphql(query, variables) {
     const firstOf = (alias) => Number(new RegExp(`${alias}: \\w+\\(first: (\\d+)`).exec(query)?.[1] || 0);
     const org = {};
     if (variables.needMembers) org.membersWithRole = page(world.members.map((login) => ({ login })), 100, variables.memberCursor);
-    if (variables.needRepos) {
+    if (variables.needRepos !== false) {
       const repos = page(world.repos, 100, variables.repoCursor);
       repos.nodes = repos.nodes.map((r) => {
         const prs = r.items.filter((it) => kind(it) === 'PullRequest');

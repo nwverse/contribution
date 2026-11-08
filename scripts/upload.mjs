@@ -331,9 +331,7 @@ const ISSUE_FIELDS = `
   author { ${ACTOR} }
   comments(first: ${NESTED_LIMIT}) { totalCount nodes { author { ${ACTOR} } createdAt } }`;
 
-// 成员、仓库，以及各仓库最新的 PR / issue 编号、最近更新的 PR / issue、默认分支的 head 一次取回，共 4 点。
-// 最近更新的列表供增量同步：上次同步之后的变动通常在前 50 个以内，超出时再按 UPDATED_AT 翻页。
-const RECENT = 50;
+// 成员、仓库，以及各仓库最新的 PR / issue 编号、默认分支的 head 一次取回
 const META_QUERY = `query($org: String!, $memberCursor: String, $repoCursor: String, $needMembers: Boolean!, $needRepos: Boolean!) {
   organization(login: $org) {
     membersWithRole(first: 100, after: $memberCursor) @include(if: $needMembers) {
@@ -346,9 +344,22 @@ const META_QUERY = `query($org: String!, $memberCursor: String, $repoCursor: Str
         id name isArchived isFork createdAt
         pullRequests(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) { totalCount nodes { number } }
         issues(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) { totalCount nodes { number } }
+        defaultBranchRef { target { ... on Commit { oid } } }
+      }
+    }
+  }
+}`;
+// 增量同步用：各仓库最近更新的 PR / issue。上次同步之后的变动通常在前 50 个以内，超出时再按 UPDATED_AT 翻页。
+// 与 META 分成两个查询并发，比合成一个快。
+const RECENT = 50;
+const RECENT_QUERY = `query($org: String!, $repoCursor: String) {
+  organization(login: $org) {
+    repositories(first: 100, after: $repoCursor, orderBy: {field: NAME, direction: ASC}) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        id
         updatedPrs: pullRequests(first: ${RECENT}, orderBy: {field: UPDATED_AT, direction: DESC}) { pageInfo { hasNextPage endCursor } nodes { number updatedAt } }
         updatedIssues: issues(first: ${RECENT}, orderBy: {field: UPDATED_AT, direction: DESC}) { pageInfo { hasNextPage endCursor } nodes { number updatedAt } }
-        defaultBranchRef { target { ... on Commit { oid } } }
       }
     }
   }
@@ -458,10 +469,20 @@ async function fetchMeta(gh, org) {
       prTotal: r.pullRequests.totalCount,
       issueTotal: r.issues.totalCount,
       maxNumber: Math.max(0, r.pullRequests.nodes[0]?.number || 0, r.issues.nodes[0]?.number || 0),
-      updatedPrs: r.updatedPrs,
-      updatedIssues: r.updatedIssues,
     })),
   };
+}
+
+// 仓库 id → { updatedPrs, updatedIssues }
+async function fetchRecent(gh, org) {
+  const recent = new Map();
+  let repoCursor = null;
+  do {
+    const { repositories } = (await gh.gql('meta', RECENT_QUERY, { org, repoCursor })).organization;
+    for (const r of repositories.nodes) recent.set(r.id, r);
+    repoCursor = repositories.pageInfo.hasNextPage ? repositories.pageInfo.endCursor : null;
+  } while (repoCursor);
+  return recent;
 }
 
 // ---------- 账号 ----------
@@ -530,7 +551,7 @@ async function scanRepo(gh, org, repo) {
 }
 
 // 上次同步之后更新过的编号；变动太多时返回 null
-async function updatedNumbers(gh, org, repo, since) {
+async function updatedNumbers(gh, org, repo, recent, since) {
   const numbers = new Set();
   // 列表按 updatedAt 从新到旧；读到早于 since 的就停，否则返回下一页的游标
   const take = (conn) => {
@@ -541,8 +562,10 @@ async function updatedNumbers(gh, org, repo, since) {
     }
     return conn.pageInfo.hasNextPage ? conn.pageInfo.endCursor : null;
   };
-  let prs = repo.updatedPrs;
-  let issues = repo.updatedIssues;
+  // 仓库在两次查询之间才出现在组织里：按变动太多处理，整仓重扫
+  if (!recent) return null;
+  let prs = recent.updatedPrs;
+  let issues = recent.updatedIssues;
   for (let page = 0; ; page++) {
     const prCursor = take(prs);
     const issueCursor = take(issues);
@@ -567,7 +590,7 @@ function extraCount(items, repo, syncedAt) {
 // 条目数与 totalCount 之差和上次全量扫描时不同（删除、转出）就整仓重扫。
 async function syncItems(gh, org, repo, prev, ctx) {
   if (prev) {
-    const updated = await updatedNumbers(gh, org, repo, ctx.since);
+    const updated = await updatedNumbers(gh, org, repo, ctx.recent.get(repo.id), ctx.since);
     if (updated && ctx.changedActors.size) {
       for (const it of prev.items) if (mentions(it, ctx.changedActors)) updated.add(it.number);
     }
@@ -812,11 +835,13 @@ async function syncCommits(gh, org, repo, prev, ctx) {
 // 拉取全部数据。cache 为 null 时全量拉取；否则只拉增量，并校验第 cache.slot 片缓存。
 // 返回引擎的输入 data、新的缓存与概况。
 async function fetchAll(gh, org, cache) {
-  const [meta, changedActors] = await Promise.all([
+  const [meta, recent, changedActors] = await Promise.all([
     timed('meta', () => fetchMeta(gh, org)),
+    cache ? fetchRecent(gh, org) : null,
     cache ? timed('actors', () => changedUsers(gh, cache)) : new Set(),
   ]);
   const ctx = {
+    recent,
     since: cache ? Date.parse(cache.syncedAt) - SINCE_MARGIN_MS : null,
     syncedAt: meta.syncedAt,
     changedActors,
