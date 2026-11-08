@@ -8,7 +8,7 @@ https://nwverse.github.io/contribution/
 
 ## 视频介绍
 
-https://github.com/user-attachments/assets/ddb288cf-3c91-4310-984d-95eed0d36533
+https://github.com/user-attachments/assets/1c52b02d-01f2-4773-b55b-5d6236049ce8
 
 [下载高清视频与字幕](https://github.com/nwverse/contribution/releases/tag/promo-v1)
 
