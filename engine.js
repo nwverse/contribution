@@ -103,7 +103,8 @@ const RULES = {
   invalidIssueReasons: ['NOT_PLANNED', 'DUPLICATE'],
   // GitHub 类型为 User、但实际是自动化的账号
   ignoreLogins: ['codex', 'cursoragent'],
-  includeArchived: false,
+  // 归档仓库只读，归档后不会再有贡献；纳入是为了保留归档前的历史，不让仓库迁移抹掉所有人的记录
+  includeArchived: true,
   includeForks: false,
   // 不参与统计的仓库：看板仓库本身的 PR、issue 与数据提交都不算贡献
   excludeRepos: ['contribution'],
