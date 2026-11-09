@@ -138,6 +138,23 @@ test('upload keeps the batched scan when every issue was already found', (t) => 
   assert.equal(count(requests, 'issues(first: 100, after'), 0);
 });
 
+test('an archived repository keeps its history on the board; forks stay excluded', (t) => {
+  const dir = sandbox(t);
+  const world = issueWorld('complete');
+  world.repos[0].items.push(pr('fixture-project', 2, 'fixture-recent', { createdAt: '2026-10-01T00:00:00Z', mergedAt: '2026-10-01T01:00:00Z' }));
+  world.repos.push(repo('R_fork', 'fixture-fork', '2026-10-01T00:00:00Z', { isFork: true, items: [pr('fixture-fork', 1, 'fixture-forker', { createdAt: '2026-10-02T00:00:00Z', mergedAt: '2026-10-02T01:00:00Z' })] }));
+  world.nodes = { PR_fixture_project_2: { files: { nodes: [] } } };
+  const live = run(dir, world);
+  assert.deepEqual(live.board.people.map((p) => p.login), ['fixture-recent']);
+  assert.equal(live.board.summary.merged, 1);
+  // Archiving makes the repository read-only; nothing is lost from the board, whether the cache is warm or cold
+  world.repos[0].isArchived = true;
+  const warm = run(dir, world);
+  assert.deepEqual(warm.board, live.board);
+  assert.deepEqual(cold(dir, world).board, live.board);
+  assert.equal(count(warm.requests, 'issueOrPullRequest fixture-fork'), 0);
+});
+
 // ---------- incremental sync ----------
 
 // W0 and W1 share repositories: `app` gains commits (fast-forward), `svc` gains and changes PRs and issues,
