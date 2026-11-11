@@ -134,6 +134,18 @@ test.describe('排行榜', () => {
     await expect(rows.first()).toHaveAttribute('data-key', weekTop.login);
   });
 
+  test('总榜引言只统计有贡献的组织成员', async ({ page }) => {
+    const board = structuredClone(BOARD);
+    board.summary.members += 1; // 未贡献的成员只计入成员总数，不计入总榜成员人数
+    expect(board.summary.members).toBeGreaterThan(board.summary.memberContributors);
+    expect(board.summary.memberContributors + board.summary.outsiders).toBe(P.length);
+    await page.route('**/data/board.json', (route) => route.fulfill({ json: board }));
+    await open(page, '/ranking.html');
+    await expect(page.locator('#introStats .istat').first().locator('small')).toHaveText(
+      `组织成员 ${board.summary.memberContributors} · 组织外 ${board.summary.outsiders}`,
+    );
+  });
+
   test('筛选组织外、搜索、点击打开档案', async ({ page }) => {
     await open(page, '/ranking.html');
     await page.locator('.chip[data-g="mem"][data-v="o"]').click();
