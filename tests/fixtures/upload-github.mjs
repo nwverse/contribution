@@ -13,7 +13,8 @@
 //             totals: { pr, issue }   optional totalCount as recorded, when GitHub counts fewer items than it serves }],
 //   nodes: { [node id]: { closer?: actor|null, files?: { nodes }, assoc?: number, lines?: { additions, deletions } } },
 //   pages: { commit, tree, blobs: { path: sha } } | absent, publish: boolean,
-//   fail: [{ match: substring of URL or query, status, retryAfter?, body }]   each entry fails one matching request
+//   fail: [{ match: substring of URL or query, status, retryAfter?, body }]   each entry fails one matching request;
+//                              status 200 with a cut-off body stands for a truncated response
 //   issuePageSize: number      page size of the fallback issues connection (default 100)
 //   compareTruncate: number    compare returns at most this many commits in total
 //   recentLag: { repo: [number] }  left out of the recently-updated lists, as if that query ran just before they were created

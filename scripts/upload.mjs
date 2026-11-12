@@ -135,7 +135,7 @@ function untilReset(res, why) {
 }
 
 // 返回重试前等待的秒数和原因；null 表示不重试。
-// 网络中断、超时、5xx、499 按 2、4、8… 秒退避；额度用尽等到重置时间；二级限流按 Retry-After，没有时 60、120… 秒。
+// 网络中断、超时、5xx、499、响应体不完整按 2、4、8… 秒退避；额度用尽等到重置时间；二级限流按 Retry-After，没有时 60、120… 秒。
 function retryPlan(res, text, attempt) {
   if (!res) return { seconds: 2 ** attempt };
   if (res.status >= 500 || res.status === 499) return { seconds: 2 ** attempt, why: `HTTP ${res.status}` };
@@ -145,6 +145,15 @@ function retryPlan(res, text, attempt) {
     return { seconds: Number(res.headers.get('retry-after')) || 60 * 2 ** (attempt - 1), why: `二级限流（HTTP ${res.status}）`, limited: true };
   }
   return null;
+}
+
+// 2xx 的响应体解析失败：服务端超时后截断、连接中途断开，与 5xx 一样退避重试
+function parseBody(text, attempt) {
+  try {
+    return { data: JSON.parse(text) };
+  } catch (err) {
+    return { broken: err, plan: { seconds: 2 ** attempt, why: `响应体不完整（${text.length} 字符）` } };
+  }
 }
 
 async function backoff(kind, phase, plan, attempt, detail) {
@@ -175,8 +184,9 @@ function client(token) {
       if (res?.status === 401) throw new Error('token 无效或已过期（HTTP 401）');
       let plan = retryPlan(res, text, attempt);
       let data = null;
-      if (!plan && res?.ok) {
-        data = JSON.parse(text);
+      let broken = null;
+      if (!plan && res?.ok) ({ data, broken, plan } = parseBody(text, attempt));
+      if (data) {
         const errors = data.errors || [];
         if (errors.some((e) => e.type === 'RATE_LIMITED')) {
           plan = res.headers.get('x-ratelimit-remaining') === '0' ? untilReset(res, 'GraphQL 额度用尽')
@@ -190,6 +200,7 @@ function client(token) {
       }
       if (error) throw new Error(`网络请求失败：${error.message}`);
       if (!res.ok) throw new Error(`GitHub API 返回 HTTP ${res.status}：${text.slice(0, 200)}`);
+      if (broken) throw new Error(`GitHub API 的响应体不完整（${text.length} 字符）：${broken.message}`);
       const errors = data.errors || [];
       const fatal = errors.filter((e) => !(allowMissing && e.type === 'NOT_FOUND'));
       if (fatal.length || !data.data) throw new Error((fatal.length ? fatal : errors).map((e) => e.message).join('；'));
@@ -217,7 +228,10 @@ function client(token) {
       } catch (err) {
         error = err;
       }
-      const plan = retryPlan(res, text, attempt);
+      let plan = retryPlan(res, text, attempt);
+      let data = null;
+      let broken = null;
+      if (!plan && res?.ok && text) ({ data, broken, plan } = parseBody(text, attempt));
       if (plan && attempt < MAX_ATTEMPTS) {
         await backoff('rest', phase, plan, attempt, error?.message);
         continue;
@@ -228,7 +242,8 @@ function client(token) {
         err.status = res.status;
         throw err;
       }
-      return { status: res.status, data: text ? JSON.parse(text) : null, headers: res.headers };
+      if (broken) throw new Error(`${method} ${url} 的响应体不完整（${text.length} 字符）：${broken.message}`);
+      return { status: res.status, data, headers: res.headers };
     }
   }
 

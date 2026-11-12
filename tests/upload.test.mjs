@@ -386,6 +386,19 @@ test('a secondary rate limit pauses requests for Retry-After and retries', (t) =
   assert.match(stdout, /重试 1 次/);
 });
 
+test('a 200 response with a truncated body is retried like a server error', (t) => {
+  const world = issueWorld('complete');
+  world.fail = [
+    { match: 'issueOrPullRequest', status: 200, body: '{"data":{"repository":{"n1":{"__typename":"Iss' },
+    { match: '/git/ref/heads/gh-pages', status: 200, body: '{"object":{"sh' },
+  ];
+  const { board, stdout } = run(sandbox(t), world);
+  assert.equal(board.summary.issues, 1);
+  // The dry-run still compares with the publishing branch: the truncated REST read was retried, not reported as unreadable
+  assert.match(stdout, /与 gh-pages 相比有 \d+ 个文件变化/);
+  assert.match(stdout, /重试 2 次/);
+});
+
 test('publishing uploads only changed files and skips an unchanged branch', (t) => {
   const dir = sandbox(t);
   const source = fs.readFileSync(path.join(root, 'scripts/upload.mjs'), 'utf8');
