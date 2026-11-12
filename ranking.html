@@ -426,7 +426,7 @@
     $('#lede').innerHTML = s;
     const twN = PEOPLE.filter((p) => p.tw > 0.005).length, l4N = PEOPLE.filter((p) => p.l4 > 0.005).length;
     $('#introStats').innerHTML = [
-      ['总榜', fmt.int(PEOPLE.length), `组织成员 ${N.summary.members} · 组织外 ${N.summary.outsiders}`],
+      ['总榜', fmt.int(PEOPLE.length), `组织成员 ${N.summary.memberContributors} · 组织外 ${N.summary.outsiders}`],
       ['本周有魔力', fmt.int(twN), K.week.range(LAST)],
       ['近 4 周有魔力', fmt.int(l4N), `${fmt.md(W[Math.max(0, LAST - 3)])}起`],
     ].map(([l, v, s2]) => `<div class="istat"><span class="label">${l}</span><b>${v}<span class="muted" style="font-size:var(--fs-sm);font-weight:600;margin-left:3px">人</span></b><small>${s2}</small></div>`).join('');
