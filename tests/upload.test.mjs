@@ -399,6 +399,27 @@ test('a 200 response with a truncated body is retried like a server error', (t) 
   assert.match(stdout, /重试 2 次/);
 });
 
+test('a node batch that fails on the server is split in halves; small batches and rate limits retry as is', (t) => {
+  const dir = sandbox(t);
+  const world = issueWorld('complete');
+  world.nodes = {};
+  for (let n = 2; n <= 31; n++) {
+    world.repos[0].items.push(pr('fixture-project', n, 'fixture-recent', { createdAt: '2026-10-01T00:00:00Z', mergedAt: '2026-10-01T01:00:00Z' }));
+    world.nodes[`PR_fixture-project_${n}`] = { files: { nodes: [{ path: `src/f${n}.js`, additions: 10, deletions: 1, changeType: 'MODIFIED' }] } };
+  }
+  const truth = cold(dir, world);
+  world.fail = [
+    { match: 'files(first', status: 403, retryAfter: 1, body: '{"message":"You have exceeded a secondary rate limit."}' },
+    { match: 'files(first', status: 502, body: '<html>502 Bad Gateway</html>' },
+    { match: 'files(first', status: 502, body: '<html>502 Bad Gateway</html>' },
+  ];
+  const { board, stdout, requests } = run(dir, world);
+  assert.deepEqual(board, truth.board);
+  // The rate-limited batch of 30 is sent again whole; after the 502 it becomes two halves of 15, and the half that fails again is retried at 15
+  assert.deepEqual(requests.filter((r) => r.includes('files(first')).map((r) => Number(r.split(' ').pop())), [30, 30, 15, 15, 15]);
+  assert.match(stdout, /重试 3 次/);
+});
+
 test('publishing uploads only changed files and skips an unchanged branch', (t) => {
   const dir = sandbox(t);
   const source = fs.readFileSync(path.join(root, 'scripts/upload.mjs'), 'utf8');
