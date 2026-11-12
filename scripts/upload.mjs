@@ -135,7 +135,7 @@ function untilReset(res, why) {
 }
 
 // 返回重试前等待的秒数和原因；null 表示不重试。
-// 网络中断、超时、5xx、499 按 2、4、8… 秒退避；额度用尽等到重置时间；二级限流按 Retry-After，没有时 60、120… 秒。
+// 网络中断、超时、5xx、499、响应体不完整按 2、4、8… 秒退避；额度用尽等到重置时间；二级限流按 Retry-After，没有时 60、120… 秒。
 function retryPlan(res, text, attempt) {
   if (!res) return { seconds: 2 ** attempt };
   if (res.status >= 500 || res.status === 499) return { seconds: 2 ** attempt, why: `HTTP ${res.status}` };
@@ -147,6 +147,15 @@ function retryPlan(res, text, attempt) {
   return null;
 }
 
+// 2xx 的响应体解析失败：服务端超时后截断、连接中途断开，与 5xx 一样退避重试
+function parseBody(text, attempt) {
+  try {
+    return { data: JSON.parse(text) };
+  } catch (err) {
+    return { broken: err, plan: { seconds: 2 ** attempt, why: `响应体不完整（${text.length} 字符）` } };
+  }
+}
+
 async function backoff(kind, phase, plan, attempt, detail) {
   stat(phase).retries++;
   if (plan.limited) pauseAll(kind, plan.seconds, plan.why);
@@ -156,8 +165,9 @@ async function backoff(kind, phase, plan, attempt, detail) {
 
 function client(token) {
   // allowMissing：编号空缺（已删除、转移或属于 discussion）时 GitHub 返回 NOT_FOUND，保留其余数据。
+  // split：遇到服务端错误（网络中断、超时、5xx、响应体不完整）时不重试，抛出带 split 标记的错误，由调用方拆小批次重查；限流照常等待后重试。
   // 每个查询附带 rateLimit.cost，按阶段统计实际消耗的点数。
-  async function gql(phase, query, variables, { allowMissing = false } = {}) {
+  async function gql(phase, query, variables, { allowMissing = false, split = false } = {}) {
     const body = JSON.stringify({ query: query.replace('{', '{ rateLimit { cost } '), variables });
     for (let attempt = 1; ; attempt++) {
       let res;
@@ -175,8 +185,9 @@ function client(token) {
       if (res?.status === 401) throw new Error('token 无效或已过期（HTTP 401）');
       let plan = retryPlan(res, text, attempt);
       let data = null;
-      if (!plan && res?.ok) {
-        data = JSON.parse(text);
+      let broken = null;
+      if (!plan && res?.ok) ({ data, broken, plan } = parseBody(text, attempt));
+      if (data) {
         const errors = data.errors || [];
         if (errors.some((e) => e.type === 'RATE_LIMITED')) {
           plan = res.headers.get('x-ratelimit-remaining') === '0' ? untilReset(res, 'GraphQL 额度用尽')
@@ -184,12 +195,14 @@ function client(token) {
         }
         else if (errors.some((e) => /timeout|timed out|something went wrong/i.test(e.message))) plan = { seconds: 2 ** attempt, why: errors[0].message };
       }
+      if (plan && split && !plan.limited) throw Object.assign(new Error(plan.why || error?.message), { split: true });
       if (plan && attempt < MAX_ATTEMPTS) {
         await backoff('graphql', phase, plan, attempt, error?.message);
         continue;
       }
       if (error) throw new Error(`网络请求失败：${error.message}`);
       if (!res.ok) throw new Error(`GitHub API 返回 HTTP ${res.status}：${text.slice(0, 200)}`);
+      if (broken) throw new Error(`GitHub API 的响应体不完整（${text.length} 字符）：${broken.message}`);
       const errors = data.errors || [];
       const fatal = errors.filter((e) => !(allowMissing && e.type === 'NOT_FOUND'));
       if (fatal.length || !data.data) throw new Error((fatal.length ? fatal : errors).map((e) => e.message).join('；'));
@@ -217,7 +230,10 @@ function client(token) {
       } catch (err) {
         error = err;
       }
-      const plan = retryPlan(res, text, attempt);
+      let plan = retryPlan(res, text, attempt);
+      let data = null;
+      let broken = null;
+      if (!plan && res?.ok && text) ({ data, broken, plan } = parseBody(text, attempt));
       if (plan && attempt < MAX_ATTEMPTS) {
         await backoff('rest', phase, plan, attempt, error?.message);
         continue;
@@ -228,7 +244,8 @@ function client(token) {
         err.status = res.status;
         throw err;
       }
-      return { status: res.status, data: text ? JSON.parse(text) : null, headers: res.headers };
+      if (broken) throw new Error(`${method} ${url} 的响应体不完整（${text.length} 字符）：${broken.message}`);
+      return { status: res.status, data, headers: res.headers };
     }
   }
 
@@ -373,6 +390,10 @@ const UPDATED_QUERY = `query($org: String!, $repo: String!, $prCursor: String, $
 }`;
 // 变动超过这么多页（每页 100 个）时不再翻页，整仓重扫
 const MAX_UPDATED_PAGES = 10;
+
+// nodes(ids) 查询的服务端耗时随批大小增长：commit 归属、改动文件、改动行每批 100 个时常接近 GitHub GraphQL 约 10 秒的服务端超时，
+// 超时表现为 502、504 或被截断的响应体。遇到这类错误时对半拆开重查；不超过 SPLIT_MIN 个的批次不再拆，按 MAX_ATTEMPTS 退避重试。
+const SPLIT_MIN = 25;
 
 // 关闭未合入的 PR 由谁关闭：timelineItems 是嵌套连接，只对这类 PR 单独查询，主查询每批仍是 1 点
 const NODES_BATCH = 100;
@@ -627,6 +648,20 @@ async function syncItems(gh, org, repo, prev, ctx) {
   return { items, extra: extraCount(items, repo, ctx.syncedAt), how: '全量', updated: 0 };
 }
 
+// 查询一批节点，遇到服务端错误时对半拆开重查（见 SPLIT_MIN）。返回的节点与 ids 一一对应，查不到的为 null。
+async function lookupNodes(gh, phase, query, ids) {
+  try {
+    return (await gh.gql(phase, query, { ids }, { allowMissing: true, split: ids.length > SPLIT_MIN })).nodes;
+  } catch (err) {
+    if (!err.split) throw err;
+    stat(phase).retries++;
+    debug(`${PHASES[phase]}：${err.message}，${ids.length} 个一批拆成两批重查`);
+    const half = Math.ceil(ids.length / 2);
+    const parts = await Promise.all([lookupNodes(gh, phase, query, ids.slice(0, half)), lookupNodes(gh, phase, query, ids.slice(half))]);
+    return parts.flat();
+  }
+}
+
 // 边收集边查询的 nodes(ids)：每凑满一批就发出，done() 时查完余下的，返回 id → 节点。并发由全局的 GraphQL 限制控制。
 function streamLookup(gh, phase, query) {
   const found = new Map();
@@ -636,8 +671,8 @@ function streamLookup(gh, phase, query) {
   const flush = (all) => {
     while (pending.length >= NODES_BATCH || (all && pending.length)) {
       started ??= performance.now();
-      const p = gh.gql(phase, query, { ids: pending.splice(0, NODES_BATCH) }, { allowMissing: true }).then((d) => {
-        for (const n of d.nodes) if (n) found.set(n.id, n);
+      const p = lookupNodes(gh, phase, query, pending.splice(0, NODES_BATCH)).then((nodes) => {
+        for (const n of nodes) if (n) found.set(n.id, n);
       });
       p.catch(() => {});
       running.push(p);
