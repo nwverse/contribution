@@ -222,6 +222,94 @@ test.describe('排行榜', () => {
       await expect(scrub).toHaveAttribute('aria-valuenow', '0');
     }
   });
+
+  // 时光机每一帧展示的人数，与 ranking.html 的 TOP_N 一致
+  const TM_TOP = 15;
+
+  test(`时光机每一周只展示当周累计魔力前 ${TM_TOP} 名，不足 ${TM_TOP} 人时全部展示`, async ({ page }) => {
+    // 独立重算每周末累计魔力的前 TM_TOP 名：只算该周结束前已有首次贡献的人；魔力按分比较，
+    // 并列按当前名次、再按 login；本周用线上魔力
+    const cents = (x) => Math.round(x * 100);
+    const tops = BOARD.weeks.map((w, i) => P.filter((p) => p.firstAt < w.start + WEEK)
+      .map((p) => ({ p, v: i === LAST ? p.bonus : BOARD.weeks.slice(0, i + 1).reduce((s, x) => s + weekValue(p, x.start), 0) }))
+      .sort((a, b) => cents(b.v) - cents(a.v) || a.p.rank - b.p.rank || a.p.login.localeCompare(b.p.login))
+      .slice(0, TM_TOP).map((x) => x.p.login));
+    // 测试数据必须同时覆盖「不足 TM_TOP 人」与「有人跌出前 TM_TOP」，否则本用例没有区分度
+    expect(tops.some((t) => t.length < TM_TOP)).toBe(true);
+    expect(tops.some((t, i) => i && t.length === TM_TOP && tops[i - 1].some((l) => !t.includes(l)))).toBe(true);
+
+    await page.emulateMedia({ reducedMotion: 'reduce' }); // 减少动效时每次换周直接落位，便于逐周核对
+    await open(page, '/ranking.html');
+    await expect(page.locator('#tmLede')).toContainText(`前 ${TM_TOP} 名`);
+    const stage = page.locator('#tmStage');
+    // 读页面给每行设定的位置（内联 transform），不读渲染中的过渡值：减少动效时 transform 仍有 1ms 过渡
+    const shown = () => stage.evaluate((st) => [...st.querySelectorAll('.tm-row')]
+      .map((el) => ({ el, y: new DOMMatrix(el.style.transform).m42 }))
+      .filter(({ el, y }) => el.style.visibility !== 'hidden' && +el.style.opacity > 0.5 && el.offsetTop + y + el.offsetHeight <= st.clientHeight + 0.5)
+      .sort((a, b) => a.y - b.y)
+      .map(({ el }) => [el.dataset.login, el.querySelector('.tm-rk').textContent]));
+    // 未隐藏、不透明度大于 0 的行数：前 TM_TOP 名之外不能有半透明的行残留在舞台底边
+    const alive = () => stage.evaluate((st) => [...st.querySelectorAll('.tm-row')]
+      .filter((el) => el.style.visibility !== 'hidden' && +el.style.opacity > 0).length);
+    const scrub = page.locator('#tmScrub');
+    await expect(scrub).toBeVisible(); // 减少动效时正文的 visibility 也有 1ms 过渡，启动后立刻聚焦会落空
+    await scrub.focus();
+    await page.keyboard.press('Home');
+    for (let i = 0; i <= LAST; i++) {
+      if (i) await page.keyboard.press('ArrowRight');
+      await expect(scrub).toHaveAttribute('aria-valuenow', String(i));
+      expect(await shown(), `第 ${i} 周`).toEqual(tops[i].map((l, k) => [l, String(k + 1)]));
+      expect(await alive(), `第 ${i} 周`).toBe(tops[i].length);
+      await expect(stage).toHaveAttribute('aria-label', new RegExp(`累计魔力前 ${tops[i].length} 名$`));
+    }
+  });
+
+  test(`时光机播放时跌出前 ${TM_TOP} 的人从底边滑出、挤进来的人从底边滑入，不闪现`, async ({ page }) => {
+    await page.clock.install();
+    await open(page, '/ranking.html');
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+    // 2× 回放：名次变化更快，断言更严，帧数也减半
+    await page.locator('#tmSpeed [data-value="2"]').click();
+    await expect(page.locator('#tmSpeed [data-value="2"]')).toHaveAttribute('aria-checked', 'true');
+    await page.locator('#tmPlay').click(); // 停在本周时点播放 = 从头回放
+    await expect(page.locator('#tmPlay')).toHaveAttribute('aria-label', '暂停');
+    // 每次重绘后记录每行的「可见度」= 不透明度 × 落在舞台裁切范围内的比例，以及以行高计的纵向位置。
+    // 用 MutationObserver 跟随页面写入的样式采样，不另开 rAF 循环：假时钟逐个执行计时器，多一个循环回放就慢一倍
+    await page.locator('#tmStage').evaluate((st) => {
+      const prev = new Map(), state = new Map();
+      const r = window.__tm = { frames: 0, maxDp: 0, maxDy: 0, worst: null, worstDy: null, enter: 0, exit: 0 };
+      new MutationObserver(() => {
+        const H = st.clientHeight;
+        for (const el of st.querySelectorAll('.tm-row')) {
+          if (!el.style.transform) continue;
+          const ty = new DOMMatrix(el.style.transform).m42, rh = el.offsetHeight, y = ty / rh;
+          const frac = Math.min(1, Math.max(0, (H - el.offsetTop - ty) / rh));
+          const vis = el.style.visibility === 'hidden' ? 0 : +el.style.opacity * frac;
+          const login = el.dataset.login, a = prev.get(login);
+          if (a) {
+            const dp = Math.abs(vis - a.vis);
+            if (dp > r.maxDp) { r.maxDp = dp; r.worst = { login, frame: r.frames, from: a, to: { vis, y } }; }
+            if (a.vis > 0.05 && vis > 0.05 && Math.abs(y - a.y) > r.maxDy) { r.maxDy = Math.abs(y - a.y); r.worstDy = { login, frame: r.frames, from: a, to: { vis, y } }; }
+          }
+          prev.set(login, { vis, y });
+          const s = vis < 0.05 ? 'out' : vis > 0.95 ? 'in' : state.get(login);
+          if (state.get(login) === 'out' && s === 'in') r.enter++;
+          if (state.get(login) === 'in' && s === 'out') r.exit++;
+          state.set(login, s);
+        }
+        r.frames++;
+      }).observe(st, { subtree: true, attributeFilter: ['style'] });
+    });
+    await page.clock.runFor((LAST + 3) * 550);
+    await expect(page.locator('#tmPlay')).toHaveAttribute('aria-label', '从头回放');
+    const r = await page.evaluate(() => window.__tm);
+    expect(r.frames).toBeGreaterThan(LAST * 20);
+    expect(r.enter, `回放中应有人进入前 ${TM_TOP}`).toBeGreaterThan(0);
+    expect(r.exit, `回放中应有人跌出前 ${TM_TOP}`).toBeGreaterThan(0);
+    // 一帧之内不会从基本看不见变成基本看得见（或反过来），也不会瞬移超过一行
+    expect(r.maxDp, JSON.stringify(r.worst)).toBeLessThanOrEqual(0.5);
+    expect(r.maxDy, JSON.stringify(r.worstDy)).toBeLessThanOrEqual(1);
+  });
 });
 
 test.describe('档案', () => {
