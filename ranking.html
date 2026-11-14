@@ -91,7 +91,8 @@
   .tm-speed { flex: none; }
   .tm-legend { align-self: flex-end; padding-bottom: 2px; }
 
-  .tm-stage { --rh: 34px; --n: 12; --lab: 168px; --endw: 92px; position: relative; isolation: isolate; height: calc(var(--n) * var(--rh) + 26px); overflow: hidden; }
+  /* --n 是舞台行数，由时光机脚本按 TOP_N 写入 */
+  .tm-stage { --rh: 34px; --lab: 168px; --endw: 92px; position: relative; isolation: isolate; height: calc(var(--n) * var(--rh) + 26px); overflow: hidden; }
   .tm-axis { position: absolute; left: calc(28px + var(--lab)); right: 0; top: 0; bottom: 0; pointer-events: none; }
   .tm-axis .g { position: absolute; top: 18px; bottom: 0; width: 1px; background: var(--viz-grid); }
   .tm-axis .g.b { background: var(--viz-axis); }
@@ -249,7 +250,7 @@
     .tm-scrub-wrap { order: 3; flex-basis: 100%; }
     .tm-speed { margin-left: auto; }
     .tm-body { padding: var(--s-3) var(--s-4) var(--s-4); }
-    .tm-stage { --rh: 30px; --n: 10; --lab: 104px; --endw: 74px; }
+    .tm-stage { --rh: 30px; --lab: 104px; --endw: 74px; }
     .tm-nm { font-size: var(--fs-xs); }
     .tm-nm .frog { display: none; }
     .tm-pop .t { display: none; }
@@ -763,7 +764,12 @@
     const START = Math.max(0, W.findIndex((_, i) => PEOPLE.filter((p) => p.started[i]).length >= 1));
     let t = LAST, playing = false, raf = 0, last = 0, speed = 1, shownWeek = -1, drag = false, hover = null;
     const rowEls = new Map();
-    const nRows = () => parseInt(getComputedStyle(stage).getPropertyValue('--n'), 10) || 12;
+    // 柱状竞赛图惯例：每一帧只排那一周累计魔力的前 TOP_N 名；跌出的人从舞台底边滑出，挤进来的人从底边滑入。
+    // 舞台高度跟着这个数走（CSS 变量 --n）
+    const TOP_N = 15;
+    stage.style.setProperty('--n', String(TOP_N));
+    // 行移动的速度上限（行 / 毫秒）：长距离入场、跌落时匀速滑过，不在一两帧内一闪而过
+    const ROW_SPEED = 1 / 50;
     const rowH = () => parseFloat(getComputedStyle(stage).getPropertyValue('--rh')) || 34;
     const topVal = (i) => Math.max(...PEOPLE.map((p) => (p.started[i] ? p.cum[i] : 0)));
     const niceStep = (raw) => { const q = Math.pow(10, Math.floor(Math.log10(raw || 1))); const m = raw / q; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * q; };
@@ -823,7 +829,7 @@
       const now = performance.now();
       const dt = lastT ? Math.min(64, now - lastT) : 16; lastT = now;
       const i = Math.floor(t), f = i >= LAST ? 0 : t - i, j = Math.min(LAST, i + 1);
-      const n = nRows(), rh = rowH();
+      const n = TOP_N, rh = rowH();
       const cs = getComputedStyle(stage), endW = parseFloat(cs.getPropertyValue('--endw')) || 92;
       const trackW = Math.max(60, stage.clientWidth - 28 - parseFloat(cs.getPropertyValue('--lab')) - endW);
       const xmax = Math.max(5, (topVal(i) * (1 - f) + topVal(j) * f)) * 1.04;
@@ -831,23 +837,33 @@
       const cand = [];
       for (const p of PEOPLE) {
         if (!p.started[i] && !(f > 0 && p.started[j])) continue;
-        cand.push({ p, v: p.cum[i] + ((p.cum[j] || 0) - p.cum[i]) * f });
+        const v = p.cum[i] + ((p.cum[j] || 0) - p.cum[i]) * f;
+        cand.push({ p, v, cents: Math.round(v * 100) });
       }
+      // 魔力按分比较（与 derive.js 的 ranksAt 同一精度），并列沿用 ranksAt 的先后：停在整周时，前 TOP_N 名与排行榜的历史名次一致
       const rj = N.ranksAt(f > 0.5 ? j : i);
-      cand.sort((a, b) => b.v - a.v || (rj.get(a.p.login) ?? 999) - (rj.get(b.p.login) ?? 999) || a.p.login.localeCompare(b.p.login));
-      const alpha = force || K.reduced() ? 1 : 1 - Math.exp(-dt / 110);
+      cand.sort((a, b) => b.cents - a.cents || (rj.get(a.p.login) ?? 999) - (rj.get(b.p.login) ?? 999) || a.p.login.localeCompare(b.p.login));
+      // 强制重绘与减少动效时直接落位，不平滑、不限速
+      const snap = force || K.reduced();
+      const alpha = snap ? 1 : 1 - Math.exp(-dt / 110);
+      const cap = snap ? Infinity : dt * ROW_SPEED;
       const live = new Set();
       let moving = false;
       cand.forEach(({ p, v }, k) => {
-        let y = ys.has(p.login) ? ys.get(p.login) : Math.max(k, n);
-        y += (k - y) * alpha;
-        if (Math.abs(k - y) < 0.002) y = k; else moving = true;
+        // 前 TOP_N 名之外的人一律以「舞台底边外一行」为目标：跌出的人只滑出一行，速度与跌到第几名无关；
+        // 挤进来的人也从这里滑入
+        const goal = k < n ? k : n + 1;
+        let y = ys.has(p.login) ? ys.get(p.login) : n + 1;
+        y += K.clamp((goal - y) * alpha, -cap, cap);
+        if (Math.abs(goal - y) < 0.002) y = goal; else moving = true;
         ys.set(p.login, y);
+        // 已滑出舞台底边的行退场；仍在底边以上的行继续下滑、渐隐
         if (y > n + 0.6 && k >= n) return;
         const el = rowEl(p);
         live.add(p.login);
+        el.style.visibility = '';
         // 被超过、正在往下让位的行（sink）隐去文字、压暗柱子，从超车行底下滑过；停下时一定恢复
-        const sinking = y < k - 0.04;
+        const sinking = y < goal - 0.04;
         el.classList.toggle('sink', sinking);
         const op = K.clamp(n - y + 0.4, 0, 1) * (p.started[i] ? 1 : Math.max(f, 0.2));
         el.style.transform = `translate3d(0, ${(y * rh).toFixed(2)}px, 0)`;
@@ -867,7 +883,8 @@
         if (el._kind !== kind) { el._fr.innerHTML = K.frog(kind, 18); el._kind = kind; }
         el.classList.toggle('hl', hover === p.login);
       });
-      rowEls.forEach((el, k) => { if (!live.has(k)) { el.style.opacity = '0'; ys.delete(k); } });
+      // 退场的行隐藏（visibility），不再响应悬停和点击
+      rowEls.forEach((el, k) => { if (!live.has(k)) { el.style.opacity = '0'; el.style.visibility = 'hidden'; ys.delete(k); } });
       cancelAnimationFrame(settleRaf);
       if (moving && !playing) settleRaf = requestAnimationFrame(() => draw());
       // 坐标轴
@@ -1004,7 +1021,7 @@
 
     const firstW = W.findIndex((_, i) => PEOPLE.some((p) => p.started[i]));
     const reach = PEOPLE.filter((p) => W.some((_, i) => p.started[i] && (N.ranksAt(i).get(p.login) || 99) <= 3)).length;
-    $('#tmLede').innerHTML = `从 ${fmt.md(W[firstW])} 那一周到本周，${W.length} 周里共有 <b class="strong">${reach}</b> 人进过前 3。柱长是到那一周末的累计魔力，柱子变亮说明那一周有新魔力。<span class="only-kbd">按 <kbd>P</kbd> 播放，<kbd>←</kbd> <kbd>→</kbd> 逐周。</span>`;
+    $('#tmLede').innerHTML = `从 ${fmt.md(W[firstW])} 那一周到本周，${W.length} 周里共有 <b class="strong">${reach}</b> 人进过前 3。每一周列出累计魔力前 ${TOP_N} 名，柱长是到那一周末的累计魔力，柱子变亮说明那一周有新魔力。<span class="only-kbd">按 <kbd>P</kbd> 播放，<kbd>←</kbd> <kbd>→</kbd> 逐周。</span>`;
     setBtn();
     layoutScrub();
     draw(true);
