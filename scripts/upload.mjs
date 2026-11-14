@@ -25,6 +25,8 @@ const SITE_FILES = [
   'index.html', 'ranking.html', 'profile.html', 'hatchery.html', 'pond.html', 'rules.html',
   'engine.js',
   'assets/boot.js', 'assets/derive.js', 'assets/icons.js', 'assets/kit.js', 'assets/tokens.css',
+  'assets/naiwa/egg.webp', 'assets/naiwa/unhatched.webp', 'assets/naiwa/tadpole.webp', 'assets/naiwa/froglet.webp',
+  'assets/naiwa/frog.webp', 'assets/naiwa/laugh.webp', 'assets/naiwa/cosmic.webp',
   '.nojekyll', 'favicon.svg', 'favicon-32.png', 'apple-touch-icon.png',
   'docs/assets/promo-preview.webp',
 ];
