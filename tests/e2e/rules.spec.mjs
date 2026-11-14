@@ -1,14 +1,13 @@
 // 规则页：八个小节齐全，手写说明在场，明细表可展开、可排序。
 import { test, expect, open, BOARD } from './fixtures.mjs';
 
-const SECTIONS = ['贡献度公式', '计分因子', '合入 PR 的模型分布', '合入率与警告线', '活力与掉队', 'M-Team 规则对照', '名词解释', '完整明细表', '口径与盲区'];
+const SECTIONS = ['贡献度公式', '计分因子', '合入 PR 的模型分布', '合入率与警告线', '活力与掉队', '名词解释', '完整明细表', '口径与盲区'];
 
-test('九个小节与目录 @mobile', async ({ page }) => {
+test('八个小节与目录 @mobile', async ({ page }) => {
   await open(page, '/rules.html');
   await expect(page.locator('main h2, h2')).toContainText(SECTIONS);
   await expect(page.locator('#toc a')).toHaveCount(SECTIONS.length);
   // 手写说明（修改 RULES 时要同步检查的部分）
-  await expect(page.locator('#mapping')).toContainText('分享率');
   await expect(page.locator('#blindList li').first()).not.toBeEmpty();
   await expect(page.locator('#vitCard .vt-cases tbody tr')).toHaveCount(8);
 });
