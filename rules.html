@@ -135,20 +135,6 @@
   .note p + p { margin-top: var(--s-2); }
   .note b { color: var(--ink); font-weight: 650; }
 
-  /* ── 05 M-Team 对照 ── */
-  .map { display: grid; grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1.35fr); align-items: center; }
-  .map > .mrow { display: contents; }
-  .map .c { padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: var(--fs-sm); }
-  .map .mrow:last-child .c { border-bottom: 0; }
-  .map .from { text-align: right; color: var(--ink-2); padding-right: 2px; }
-  .map .arrow { display: grid; place-items: center; align-self: stretch; color: var(--ink-4); }
-  .map .to { display: flex; flex-direction: column; gap: 2px; padding-left: 2px; }
-  .map .to > .lbl { align-self: flex-start; font-weight: 650; color: var(--ink); cursor: help; border-radius: var(--r-xs); text-decoration: underline dotted var(--line-strong); text-underline-offset: 0.3em; text-decoration-thickness: 1.5px; }
-  .map .to > .lbl:hover { text-decoration-color: var(--leaf); }
-  .map .mrow.off .to > span { font-weight: 450; color: var(--ink-3); }
-  .map .why { display: none; font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.55; }
-  .src { margin-top: var(--s-4); }
-
   /* ── 06 名词解释 ── */
   dl.terms { display: grid; grid-template-columns: max-content minmax(0, 1fr); margin: 0; }
   dl.terms dt, dl.terms dd { padding: 11px 0; border-bottom: 1px solid var(--line-soft); }
@@ -220,20 +206,11 @@
     .hb { grid-template-columns: minmax(0, 1fr) 92px; grid-template-areas: "l v" "b b"; row-gap: 4px; padding: 6px var(--s-2); }
     .hb-l { grid-area: l; } .hb-b { grid-area: b; height: 8px; } .hb-v { grid-area: v; }
     #scatter { height: 260px; }
-    .map { grid-template-columns: minmax(0, .9fr) 22px minmax(0, 1.3fr); }
     dl.terms { grid-template-columns: 1fr; }
     dl.terms dt { padding-bottom: 2px; border-bottom: 0; }
     dl.terms dd { padding-top: 0; }
     .dt-toggle { padding: var(--s-4); }
     .dt-toggle .s { display: none; }
-  }
-  /* 触屏没有悬停：映射理由直接写出来 */
-  @media (max-width: 720px), (hover: none) {
-    .map .why { display: block; }
-    .map .c { align-self: start; }
-    .map .from { padding-top: 9px; }
-    .map .arrow { place-items: start center; padding-top: 11px; }
-    .map .to > .lbl { text-decoration: none; cursor: default; }
   }
 </style>
 </head>
@@ -308,21 +285,13 @@
         <div class="card card-pad" id="vitCard"></div>
       </section>
 
-      <section class="section" id="mteam" aria-labelledby="h-mteam">
-        <div class="sec-h"><div><span class="eyebrow"><span class="i">06</span> · 对照</span><h2 id="h-mteam">M-Team 规则对照</h2><p>左边是 M-Team 的规则，右边是这里的对应做法；悬停查看映射理由</p></div></div>
-        <div class="card card-pad">
-          <div class="map" id="mapping"></div>
-          <p class="footnote src" id="mapSrc"></p>
-        </div>
-      </section>
-
       <section class="section" id="terms" aria-labelledby="h-terms">
-        <div class="sec-h"><div><span class="eyebrow"><span class="i">07</span> · 名词</span><h2 id="h-terms">名词解释</h2><p>排行、档案和人物卡上的标签都按这里的定义</p></div></div>
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">06</span> · 名词</span><h2 id="h-terms">名词解释</h2><p>排行、档案和人物卡上的标签都按这里的定义</p></div></div>
         <div class="card card-pad"><dl class="terms" id="termsDl"></dl></div>
       </section>
 
       <section class="section" id="detail" aria-labelledby="h-detail">
-        <div class="sec-h"><div><span class="eyebrow"><span class="i">08</span> · 明细</span><h2 id="h-detail">完整明细表</h2><p>所有贡献者的全部计分字段；点表头排序，点账号进档案</p></div></div>
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">07</span> · 明细</span><h2 id="h-detail">完整明细表</h2><p>所有贡献者的全部计分字段；点表头排序，点账号进档案</p></div></div>
         <div class="card">
           <button type="button" class="dt-toggle" id="dtToggle" aria-expanded="false" aria-controls="dtBody">
             <span class="card-icon" data-ic="list" data-ic-size="15"></span>
@@ -339,7 +308,7 @@
       </section>
 
       <section class="section" id="blind" aria-labelledby="h-blind">
-        <div class="sec-h"><div><span class="eyebrow"><span class="i">09</span> · 口径</span><h2 id="h-blind">口径与盲区</h2><p>这些数字能说明什么、不能说明什么</p></div></div>
+        <div class="sec-h"><div><span class="eyebrow"><span class="i">08</span> · 口径</span><h2 id="h-blind">口径与盲区</h2><p>这些数字能说明什么、不能说明什么</p></div></div>
         <div class="card card-pad"><ul class="blind" id="blindList"></ul></div>
       </section>
     </div>
@@ -703,29 +672,6 @@
     return { draw };
   })();
   $('#rateNote').innerHTML = `<p><b>合入率</b>：${esc(TERMS.rate.text)}</p><p><b>锈红色区域</b>：点落在这里会被标「合入率警告」。${esc(TERMS.warn.text)}</p>`;
-
-  // ───────── 05 M-Team 对照（手写映射与理由照抄旧版，修改 RULES 时同步检查） ─────────
-  (() => {
-    const rows = [
-      ['注册时间', '首次贡献', '首次开 PR、review、评论、提 issue 或直接推送的时间。GitHub 不向普通成员开放入组时间。'],
-      ['上传量', 'PR 分', '合入 PR 按改动行、commit 数（对数压缩）和模型系数计分；修改、删除已有样式的改动按占比打折，新增的文件和追加的样式不打折。不经 PR 直接推送的 commit，每人每个仓库合起来算一个 PR。'],
-      ['下载量', '不考核', 'GitHub 上 review 和评论极少，考核协作会误伤大多数人；协作只计入魔力。', true],
-      ['分享率', '合入率', '「给出 ÷ 收到 review」对所有人都是 0/0。合入率看 PR 是否收尾，作用接近 H&R。'],
-      ['做种魔力', `魔力（PR 与协作分别按递减曲线）`, '贡献越多仍会增加得分，但单次增量变小；两类贡献互不稀释。'],
-      ['新手考核', `${R.newbie.days} 天孵化期`, `合入 PR ≥ ${R.newbie.merged}，活跃周 ≥ ${R.newbie.activeWeeks}。只考一次，没有月考、季考${R.newbie.since ? `；例外是看板上线（${K.fmt.md(Date.parse(R.newbie.since))}）前就来了、第一次考核期没通过的人，从上线日起补考一次 ${R.newbie.days} 天` : ''}。没通过的人魔力达到 ${R.levels[1].bonus} 也直接孵化。`],
-      ['等级与降级线', '奶蛙进化（只看魔力）', 'M-Team 升级同时看注册时间、上传量和分享率；这里只看魔力，不设降级线，合入率只用于警告。'],
-      ['分享率警告期', '合入率警告线', '已收尾 PR 越多，合入率要求越高。'],
-      ['40 天不登录删号', `${R.dormantDays} 天无动作 → 冬眠`, `只标记不处理；${R.levels[R.dormantExemptLevel].name}及以上豁免。`],
-      ['考核不达标清退', `活力 < ${R.vitality.laggard} → 掉队`, '活力综合近期产出、持续度、历史信用与最近动作；老成员靠历史信用获得宽限，停更越久信用越低。看板只给出名单，是否移除由组织决定。'],
-      ['魔力兑换、连坐', '不映射', '兑换需要保存余额，违背无状态；组织没有邀请树。', true],
-    ];
-    $('#mapping').setAttribute('role', 'list');
-    $('#mapping').innerHTML = rows.map(([from, to, why, off]) => `<div class="mrow${off ? ' off' : ''}" role="listitem">
-      <span class="c from">${esc(from)}</span><span class="c arrow" aria-hidden="true">${K.icon('arrow-right', 14)}</span>
-      <span class="c to"><span class="lbl" tabindex="0" data-tip="${esc(why)}" aria-label="${esc(`${from} 对应 ${to}。${why}`)}">${esc(to)}</span><span class="why" aria-hidden="true">${esc(why)}</span></span>
-    </div>`).join('');
-    $('#mapSrc').innerHTML = `${K.icon('external-link', 13, 'ic')}<span>来源：<a href="https://wiki.m-team.cc/zh-tw/account-rules" target="_blank" rel="noopener">M-Team 帐号规则</a>（2026-08-23 版）</span>`;
-  })();
 
   // ───────── 06 名词解释 ─────────
   $('#termsDl').innerHTML = Object.values(TERMS)
