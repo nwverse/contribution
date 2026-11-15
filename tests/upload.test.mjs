@@ -138,6 +138,17 @@ test('upload keeps the batched scan when every issue was already found', (t) => 
   assert.equal(count(requests, 'issues(first: 100, after'), 0);
 });
 
+test('a warm run reads recently updated items for repositories beyond the first page', (t) => {
+  const dir = sandbox(t);
+  const world = issueWorld('complete');
+  // Repositories are listed by name; 20 empty ones push fixture-project onto the second page of the recent list
+  const fillers = Array.from({ length: 20 }, (_, i) => repo(`R_a${i}`, `a-${String(i).padStart(2, '0')}`, '2025-01-01T00:00:00Z'));
+  world.repos.unshift(...fillers);
+  run(dir, world);
+  const warm = run(dir, world);
+  assert.match(warm.stdout, /整仓重拉 0 次/);
+});
+
 test('an archived repository keeps its history on the board; forks stay excluded', (t) => {
   const dir = sandbox(t);
   const world = issueWorld('complete');
@@ -412,12 +423,14 @@ test('a node batch that fails on the server is split in halves; small batches an
     { match: 'files(first', status: 403, retryAfter: 1, body: '{"message":"You have exceeded a secondary rate limit."}' },
     { match: 'files(first', status: 502, body: '<html>502 Bad Gateway</html>' },
     { match: 'files(first', status: 502, body: '<html>502 Bad Gateway</html>' },
+    { match: 'files(first', status: 200, body: '{"data":null,"errors":[{"message":"Resource limits for this query exceeded."}]}' },
   ];
   const { board, stdout, requests } = run(dir, world);
   assert.deepEqual(board, truth.board);
-  // The rate-limited batch of 30 is sent again whole; after the 502 it becomes two halves of 15, and the half that fails again is retried at 15
-  assert.deepEqual(requests.filter((r) => r.includes('files(first')).map((r) => Number(r.split(' ').pop())), [30, 30, 15, 15, 15]);
-  assert.match(stdout, /重试 3 次/);
+  // The rate-limited batch of 30 is sent again whole; after the 502 it becomes two halves of 15, and the half that fails again
+  // (502, then exceeded resource limits) is retried at 15
+  assert.deepEqual(requests.filter((r) => r.includes('files(first')).map((r) => Number(r.split(' ').pop())), [30, 30, 15, 15, 15, 15]);
+  assert.match(stdout, /重试 4 次/);
 });
 
 test('publishing uploads only changed files and skips an unchanged branch', (t) => {
