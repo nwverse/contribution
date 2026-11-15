@@ -167,7 +167,7 @@ async function backoff(kind, phase, plan, attempt, detail) {
 
 function client(token) {
   // allowMissing：编号空缺（已删除、转移或属于 discussion）时 GitHub 返回 NOT_FOUND，保留其余数据。
-  // split：遇到服务端错误（网络中断、超时、5xx、响应体不完整）时不重试，抛出带 split 标记的错误，由调用方拆小批次重查；限流照常等待后重试。
+  // split：遇到服务端错误（网络中断、超时、资源超限、5xx、响应体不完整）时不重试，抛出带 split 标记的错误，由调用方拆小批次重查；限流照常等待后重试。
   // 每个查询附带 rateLimit.cost，按阶段统计实际消耗的点数。
   async function gql(phase, query, variables, { allowMissing = false, split = false } = {}) {
     const body = JSON.stringify({ query: query.replace('{', '{ rateLimit { cost } '), variables });
@@ -195,7 +195,7 @@ function client(token) {
           plan = res.headers.get('x-ratelimit-remaining') === '0' ? untilReset(res, 'GraphQL 额度用尽')
             : { seconds: 60 * 2 ** (attempt - 1), why: 'GraphQL 限流（RATE_LIMITED）', limited: true };
         }
-        else if (errors.some((e) => /timeout|timed out|something went wrong/i.test(e.message))) plan = { seconds: 2 ** attempt, why: errors[0].message };
+        else if (errors.some((e) => /timeout|timed out|something went wrong|resource limits/i.test(e.message))) plan = { seconds: 2 ** attempt, why: errors[0].message };
       }
       if (plan && split && !plan.limited) throw Object.assign(new Error(plan.why || error?.message), { split: true });
       if (plan && attempt < MAX_ATTEMPTS) {
@@ -372,9 +372,11 @@ const META_QUERY = `query($org: String!, $memberCursor: String, $repoCursor: Str
 // 增量同步用：各仓库最近更新的 PR / issue。上次同步之后的变动通常在前 50 个以内，超出时再按 UPDATED_AT 翻页。
 // 与 META 分成两个查询并发，比合成一个快。
 const RECENT = 50;
+// 每页仓库数。每个仓库各取 RECENT 个 PR 和 issue，仓库太多会超出 GitHub 单次查询的资源上限（Resource limits for this query exceeded）
+const RECENT_REPOS = 20;
 const RECENT_QUERY = `query($org: String!, $repoCursor: String) {
   organization(login: $org) {
-    repositories(first: 100, after: $repoCursor, orderBy: {field: NAME, direction: ASC}) {
+    repositories(first: ${RECENT_REPOS}, after: $repoCursor, orderBy: {field: NAME, direction: ASC}) {
       pageInfo { hasNextPage endCursor }
       nodes {
         id

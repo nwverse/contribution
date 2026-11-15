@@ -88,7 +88,7 @@ function graphql(query, variables) {
     const org = {};
     if (variables.needMembers) org.membersWithRole = page(world.members.map((login) => ({ login })), 100, variables.memberCursor);
     if (variables.needRepos !== false) {
-      const repos = page(world.repos, 100, variables.repoCursor);
+      const repos = page(world.repos, Number(/repositories\(first: (\d+)/.exec(query)[1]), variables.repoCursor);
       repos.nodes = repos.nodes.map((r) => {
         const prs = r.items.filter((it) => kind(it) === 'PullRequest');
         const issues = r.items.filter((it) => kind(it) === 'Issue');
