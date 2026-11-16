@@ -1000,7 +1000,7 @@
       <a class="brand" href="${href('c1')}" data-screen="c1" aria-label="奶蛙宇宙 · 回到本周"><span class="brand-mark">${frog('face', 24)}</span><span class="brand-txt"><span class="brand-name">奶蛙宇宙</span><span class="brand-sub">${esc(sub)}</span></span></a>
       <nav class="nav" aria-label="主导航">${SCREENS.map((s) => `<a href="${href(s.id)}" data-screen="${s.id}"${s.id === active ? ' aria-current="page"' : ''}>${icon(s.icon, 15)}${s.label}</a>`).join('')}</nav>
       <a class="org-link" href="${ORG_URL}" target="_blank" rel="noopener" aria-label="回到奶蛙宇宙 GitHub 组织（新窗口打开）">${icon('github', 15)}<span class="lbl">回到奶蛙</span>${icon('arrow-up-right', 12, 'ext')}</a>
-      <a class="org-link access-link" href="${ACCESS_URL}" target="_blank" rel="noopener" aria-label="申请组织邀请与仓库权限（新窗口打开）">${icon('user-plus', 15)}<span class="lbl">申请权限</span>${icon('arrow-up-right', 12, 'ext')}</a>
+      <a class="access-link" href="${ACCESS_URL}" target="_blank" rel="noopener" aria-label="申请组织邀请与仓库权限（新窗口打开）">${icon('user-plus', 15)}<span class="lbl">申请权限</span>${icon('arrow-up-right', 12, 'ext')}</a>
       <div class="appbar-r">
         <span class="fresh" data-tip="数据快照生成于 ${esc(fmt.datetime(NW.now))}（UTC+8）"><i class="live-dot"></i><span class="fresh-label">数据更新于</span>${fmt.week(NW.now)} ${fmt.hm(NW.now)}</span>
         <button type="button" class="btn search-btn" data-action="cmdk" aria-label="搜索贡献者（${mod}K）">${icon('search', 15)}<span class="lbl">搜索贡献者</span><span class="kbds only-kbd"><kbd>${mod}</kbd><kbd>K</kbd></span></button>
