@@ -13,11 +13,15 @@ for (const pg of PAGES) {
     for (const other of NAV) await expect(nav.locator(`a[data-screen="${other.id}"]`)).toHaveAttribute('href', other.file);
     if (pg.nav === false) await expect(nav.locator('[aria-current="page"]')).toHaveCount(0);
     else await expect(nav.locator('[aria-current="page"]')).toHaveAttribute('data-screen', pg.id);
-    // 顶栏右侧的站外入口只指向组织主页，新窗口打开
+    // 顶栏右侧的站外入口：组织主页与权限门户，新窗口打开
     const org = page.locator('#appbar .org-link');
     await expect(org).toBeVisible();
     await expect(org).toHaveAttribute('href', 'https://github.com/nwverse');
     await expect(org).toHaveAttribute('target', '_blank');
+    // 权限门户入口：申请组织邀请与仓库权限，新窗口打开
+    const access = page.locator('#appbar .access-link');
+    await expect(access).toHaveAttribute('href', 'https://nwverse.lab.holegots.com/');
+    await expect(access).toHaveAttribute('target', '_blank');
     // 外部请求只允许 GitHub 头像（已被拦截）；不允许调用 GitHub API
     expect(external.filter((u) => !/^https:\/\/github\.com\/[^/]+\.png/.test(u))).toEqual([]);
   });
